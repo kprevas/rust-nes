@@ -1,0 +1,9 @@
+[package]
+name = "nes"
+version = "0.1.0"
+authors = ["Gus Prevas <kprevas@gmail.com>"]
+
+[dependencies]
+log = "0.4.1"
+env_logger = "0.4.3"
+clap = "2.29.0"
