@@ -2,9 +2,20 @@ mod mapper0;
 
 use std::io::prelude::*;
 
-pub trait Cartridge {
+enum NametableMirroring {
+    Vertical,
+    Horizontal,
+}
+
+pub struct Cartridge {
+    pub cpu_bus: Box<CartridgeBus>,
+    pub ppu_bus: Box<CartridgeBus>,
+}
+
+pub trait CartridgeBus {
     fn read_memory(&self, address: u16) -> u8;
     fn write_memory(&mut self, address: u16, value: u8);
+    fn mirror_nametable(&self, address: u16) -> u16;
 }
 
 pub struct Header {
@@ -17,7 +28,7 @@ pub struct Header {
     flags_10: u8,
 }
 
-pub fn read(src: &mut Read) -> Box<Cartridge> {
+pub fn read(src: &mut Read) -> Cartridge {
     let mut contents = Box::new([0; 0xbfe0]);
     src.read(contents.as_mut()).expect("error reading source");
     assert_eq!([0x4E, 0x45, 0x53, 0x1A], contents[0..4]);

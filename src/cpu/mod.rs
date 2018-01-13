@@ -5,7 +5,7 @@ use self::opcodes::Opcode;
 use self::opcodes::AddressingMode;
 use self::opcodes::AddressingMode::*;
 
-use cartridge::Cartridge;
+use cartridge::CartridgeBus;
 
 #[cfg(test)]
 mod tests {
@@ -26,7 +26,7 @@ mod tests {
     }
 }
 
-struct Cpu {
+pub struct Cpu<'a> {
     a: u8,
     x: u8,
     y: u8,
@@ -36,7 +36,7 @@ struct Cpu {
     cycles_to_next: u16,
     ppu_cyc: u16,
     internal_ram: Box<[u8]>,
-    cartridge: Box<Cartridge>,
+    cartridge: &'a mut Box<CartridgeBus>,
 }
 
 const CARRY: u8 = 0b1;
@@ -46,8 +46,8 @@ const DECIMAL: u8 = 0b1000;
 const OVERFLOW: u8 = 0b1000000;
 const NEGATIVE: u8 = 0b10000000;
 
-impl Cpu {
-    fn boot(cartridge: Box<Cartridge>) -> Cpu {
+impl<'a> Cpu<'a> {
+    pub fn boot(cartridge: &mut Box<CartridgeBus>) -> Cpu {
         let mut cpu = Cpu {
             a: 0,
             x: 0,
@@ -97,29 +97,31 @@ impl Cpu {
 
     fn read_memory(&mut self, address: u16) -> u8 {
         self.cycles_to_next += 1;
-        if address < 0x2000 {
-            return self.internal_ram[(address % 0x800) as usize];
-        } else if address < 0x4000 {
+        match address {
+            0x0000 ... 0x1FFF => self.internal_ram[(address % 0x800) as usize],
+            0x2000 ... 0x3FFF =>
             // TODO PPU registers
-            return 0;
-        } else if address < 0x4020 {
+                0,
+            0x4000 ... 0x4019 =>
             // TODO APU and I/O registers
-            return 0;
-        } else {
-            return self.cartridge.read_memory(address);
+                0,
+            _ => self.cartridge.read_memory(address),
         }
     }
 
     fn write_memory(&mut self, address: u16, value: u8) {
         self.cycles_to_next += 1;
-        if address < 0x2000 {
-            self.internal_ram[(address % 0x800) as usize] = value;
-        } else if address < 0x4000 {
+        match address {
+            0x0000 ... 0x1FFF => self.internal_ram[(address % 0x800) as usize] = value,
+            0x2000 ... 0x3FFF =>
             // TODO PPU registers
-        } else if address < 0x4020 {
+                (),
+            0x4000 ... 0x4019 =>
             // TODO APU and I/O registers
-        } else {
+                (),
+            _ =>
             // TODO cartridge space
+                (),
         }
     }
 
