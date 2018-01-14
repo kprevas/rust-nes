@@ -34,7 +34,6 @@ pub struct Cpu<'a> {
     sp: u8,
     pc: u16,
     cycles_to_next: u16,
-    ppu_cyc: u16,
     internal_ram: Box<[u8]>,
     cartridge: &'a mut Box<CartridgeBus>,
 }
@@ -56,7 +55,6 @@ impl<'a> Cpu<'a> {
             sp: 0xfd,
             pc: 0,
             cycles_to_next: 0,
-            ppu_cyc: 0,
             internal_ram: vec![0; 0x800].into_boxed_slice(),
             cartridge,
         };
@@ -246,7 +244,7 @@ impl<'a> Cpu<'a> {
         }
     }
 
-    fn execute_opcode(&mut self, instrument: bool, start_cyc: u16) {
+    fn execute_opcode(&mut self, instrument: bool) {
         use self::opcodes::OPCODES;
         use self::Opcode::*;
 
@@ -268,7 +266,7 @@ impl<'a> Cpu<'a> {
         self.pc += u16::from(mode.bytes());
 
         if instrument {
-            debug!("{:04X}\t{:02X} {}\t{:?} {}\t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} CYC:{}",
+            debug!("{:04X}\t{:02X} {}\t{:?} {}\t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X}",
                    self.pc - u16::from(mode.bytes()) - 1,
                    opcode_hex,
                    match mode.bytes() {
@@ -278,7 +276,7 @@ impl<'a> Cpu<'a> {
                    },
                    opcode,
                    mode.format_operand(operand, self.pc),
-                   self.a, self.x, self.y, self.p, self.sp, start_cyc);
+                   self.a, self.x, self.y, self.p, self.sp);
         }
 
         match *opcode {
@@ -767,28 +765,25 @@ impl<'a> Cpu<'a> {
         }
     }
 
-    pub fn run(&mut self) {
-        loop {
-            self.execute_opcode(false, 0);
-            // TODO sync up
-            self.ppu_cyc += self.cycles_to_next * 3;
-            self.ppu_cyc %= 341;
-            self.cycles_to_next = 0;
+    pub fn tick(&mut self, instrument: bool) {
+        if self.cycles_to_next == 0 {
+            self.execute_opcode(instrument);
+            self.cycles_to_next -= 1;
+            self.cycles_to_next *= 3;
+        } else {
+            self.cycles_to_next -= 1;
         }
     }
 
     fn run_instrumented_until(&mut self, break_condition: fn(&Cpu) -> bool, max_cycles: u16) {
         let mut ops = 0;
-        let mut cyc: u16 = 0;
         loop {
-            self.execute_opcode(true, cyc);
+            self.execute_opcode(true);
             if break_condition(self) {
                 break;
             }
             ops += 1;
             assert_ne!(ops, max_cycles);
-            cyc += self.cycles_to_next * 3;
-            cyc %= 341;
             self.cycles_to_next = 0;
         }
     }

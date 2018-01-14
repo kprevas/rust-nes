@@ -23,6 +23,8 @@ mod cpu;
 mod cartridge;
 mod ppu;
 
+const CPU_PER_PPU: f32 = 3.0;
+
 fn main() {
     env_logger::init().unwrap();
 
@@ -65,15 +67,30 @@ fn main() {
 
         let mut ppu = ppu::Ppu::new(&mut cartridge.ppu_bus);
 
-        let cpu = cpu::Cpu::boot(&mut cartridge.cpu_bus);
+        let mut cpu = cpu::Cpu::boot(&mut cartridge.cpu_bus);
 
-        let mut events = Events::new(EventSettings::new());
+        let mut settings = EventSettings::new();
+        settings.ups = 60;
+        settings.ups_reset = 0;
+        let mut cpu_dots = 0f32;
+        let mut events = Events::new(settings);
         while let Some(e) = events.next(&mut window) {
+            if let Some(u) = e.update_args() {
+                let dots = ppu.dots_per_frame();
+                for _ in 0..dots {
+                    if cpu_dots <= 0.0 {
+                        cpu.tick(false);
+                        cpu_dots += CPU_PER_PPU;
+                    } else {
+                        cpu_dots -= 1.0;
+                    }
+                    ppu.tick();
+                }
+            }
+
             if let Some(r) = e.render_args() {
                 ppu.render(&mut gl, r);
             }
-
-            if let Some(u) = e.update_args() {}
         }
     }
 }
