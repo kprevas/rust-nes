@@ -1,11 +1,14 @@
 mod opcodes;
 pub mod disassembler;
 
+use std::cell::RefCell;
+
 use self::opcodes::Opcode;
 use self::opcodes::AddressingMode;
 use self::opcodes::AddressingMode::*;
 
 use cartridge::CartridgeBus;
+use ppu::bus::*;
 
 #[cfg(test)]
 mod tests {
@@ -17,7 +20,9 @@ mod tests {
     fn nes_test() {
         let _ = env_logger::init();
         let test_rom = &mut include_bytes!("nestest.nes").as_ref();
-        let mut cpu = Cpu::boot(::cartridge::read(test_rom));
+        let ppu_bus = RefCell::new(PpuBus::new());
+        let mut cartridge = ::cartridge::read(test_rom);
+        let mut cpu = Cpu::boot(&mut cartridge.cpu_bus, &ppu_bus);
         cpu.p = 0x24;
         cpu.pc = 0xc000;
         cpu.run_instrumented_until(|cpu| cpu.pc == 0xc66e, 9000);
@@ -36,6 +41,7 @@ pub struct Cpu<'a> {
     cycles_to_next: u16,
     internal_ram: Box<[u8]>,
     cartridge: &'a mut Box<CartridgeBus>,
+    ppu_bus: &'a RefCell<PpuBus>,
 }
 
 const CARRY: u8 = 0b1;
@@ -46,7 +52,7 @@ const OVERFLOW: u8 = 0b1000000;
 const NEGATIVE: u8 = 0b10000000;
 
 impl<'a> Cpu<'a> {
-    pub fn boot(cartridge: &mut Box<CartridgeBus>) -> Cpu {
+    pub fn boot<'b>(cartridge: &'b mut Box<CartridgeBus>, ppu_bus: &'b RefCell<PpuBus>) -> Cpu<'b> {
         let mut cpu = Cpu {
             a: 0,
             x: 0,
@@ -57,6 +63,7 @@ impl<'a> Cpu<'a> {
             cycles_to_next: 0,
             internal_ram: vec![0; 0x800].into_boxed_slice(),
             cartridge,
+            ppu_bus,
         };
 
         cpu.pc = cpu.read_word(0xfffc);
@@ -97,9 +104,7 @@ impl<'a> Cpu<'a> {
         self.cycles_to_next += 1;
         match address {
             0x0000 ... 0x1FFF => self.internal_ram[(address % 0x800) as usize],
-            0x2000 ... 0x3FFF =>
-            // TODO PPU registers
-                0,
+            0x2000 ... 0x3FFF => self.ppu_bus.borrow_mut().read(address),
             0x4000 ... 0x4019 =>
             // TODO APU and I/O registers
                 0,
@@ -111,9 +116,7 @@ impl<'a> Cpu<'a> {
         self.cycles_to_next += 1;
         match address {
             0x0000 ... 0x1FFF => self.internal_ram[(address % 0x800) as usize] = value,
-            0x2000 ... 0x3FFF =>
-            // TODO PPU registers
-                (),
+            0x2000 ... 0x3FFF => self.ppu_bus.borrow_mut().write(address, value),
             0x4000 ... 0x4019 =>
             // TODO APU and I/O registers
                 (),
@@ -767,7 +770,17 @@ impl<'a> Cpu<'a> {
 
     pub fn tick(&mut self, instrument: bool) {
         if self.cycles_to_next == 0 {
-            self.execute_opcode(instrument);
+            if self.ppu_bus.borrow().nmi_interrupt {
+                let old_pc = self.pc;
+                let p = self.p | 0b00100000;
+
+                self.push_word(old_pc);
+                self.push(p);
+                self.pc = self.read_word(0xFFFA);
+                self.ppu_bus.borrow_mut().nmi_interrupt = false;
+            } else {
+                self.execute_opcode(instrument);
+            }
             self.cycles_to_next -= 1;
             self.cycles_to_next *= 3;
         } else {

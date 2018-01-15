@@ -1,8 +1,12 @@
+pub mod bus;
+
+use std::cell::RefCell;
 use graphics::*;
 use image::{GenericImage, DynamicImage, Rgba};
 use piston::input::RenderArgs;
 use opengl_graphics::*;
 
+use self::bus::*;
 use cartridge::CartridgeBus;
 
 const NES_RGB: [[u8; 4]; 64] =
@@ -25,9 +29,7 @@ pub struct Ppu<'a> {
     tmp_vram_addr: u16,
     fine_x_scroll: u8,
 
-    rendering: bool,
     odd_frame: bool,
-    vblank: bool,
 
     nametable: u8,
     latch_attrtable: u8,
@@ -48,10 +50,12 @@ pub struct Ppu<'a> {
     palette_ram: Box<[u8]>,
     oam_ram: Box<[u8]>,
     cartridge: &'a mut Box<CartridgeBus>,
+
+    bus: &'a RefCell<PpuBus>,
 }
 
 impl<'a> Ppu<'a> {
-    pub fn new(cartridge: &mut Box<CartridgeBus>) -> Ppu {
+    pub fn new<'b>(cartridge: &'b mut Box<CartridgeBus>, bus: &'b RefCell<PpuBus>) -> Ppu<'b> {
         let image = DynamicImage::new_rgba8(256, 240);
         let texture = Texture::from_image(image.as_rgba8().unwrap(), &TextureSettings::new());
         Ppu {
@@ -62,9 +66,7 @@ impl<'a> Ppu<'a> {
             vram_addr: 0,
             tmp_vram_addr: 0,
             fine_x_scroll: 0,
-            rendering: false,
             odd_frame: false,
-            vblank: false,
             nametable: 0,
             latch_attrtable: 0,
             latch_bgd_low: 0,
@@ -80,6 +82,45 @@ impl<'a> Ppu<'a> {
             palette_ram: vec![0; 0x20].into_boxed_slice(),
             oam_ram: vec![0; 0x100].into_boxed_slice(),
             cartridge,
+            bus,
+        }
+    }
+
+    fn rendering(&self) -> bool {
+        let mask = &self.bus.borrow().mask;
+        mask.show_bgd || mask.show_sprite
+    }
+
+    fn update_tmp_addr(&mut self) {
+        let mut bus = self.bus.borrow_mut();
+        if let Some(nametable_address) = bus.ctrl.nametable_select.take() {
+            self.tmp_vram_addr = (self.tmp_vram_addr & (!0xC00)) | (u16::from(nametable_address) << 10);
+        }
+        if let Some(scroll) = bus.scroll.take() {
+            if bus.first_write {
+                self.fine_x_scroll = scroll & 0x7;
+                self.tmp_vram_addr = (self.tmp_vram_addr & (!0x1F)) | (u16::from(scroll) >> 3);
+            } else {
+                self.tmp_vram_addr = (self.tmp_vram_addr & 0xC1F) | ((u16::from(scroll) & 0x7) << 12)
+                    | ((u16::from(scroll) >> 3) << 5);
+            }
+        }
+        if let Some(addr) = bus.addr.take() {
+            if bus.first_write {
+                self.tmp_vram_addr = (self.tmp_vram_addr & 0xFF) | ((u16::from(addr) & 0x3F) << 8);
+            } else {
+                self.tmp_vram_addr = (self.tmp_vram_addr & (!0xFF)) | u16::from(addr);
+                self.vram_addr = self.tmp_vram_addr;
+            }
+        }
+    }
+
+    fn process_data_write(&mut self) {
+        let mut bus = self.bus.borrow_mut();
+        if let Some(data) = bus.data.take() {
+            let addr = self.vram_addr;
+            self.write_memory(addr, data);
+            self.vram_addr += if bus.ctrl.address_increment_vertical { 32 } else { 1 };
         }
     }
 
@@ -91,10 +132,10 @@ impl<'a> Ppu<'a> {
             0x3F00 ... 0x3FFF => {
                 let mut palette_address = address;
                 if palette_address & 0x13 == 0x10 {
-                    palette_address &= (!0x10);
+                    palette_address &= !0x10;
                 }
-                self.palette_ram[(address % 0x20) as usize]
-            },
+                self.palette_ram[(palette_address % 0x20) as usize] & (if self.bus.borrow().mask.grayscale { 0x30 } else { 0xFF })
+            }
             _ => panic!("Bad PPU memory read {:04X}", address),
         }
     }
@@ -109,16 +150,24 @@ impl<'a> Ppu<'a> {
         }
     }
 
-    pub fn tick(&mut self) {
+    pub fn tick(&mut self, instrument: bool) {
+        if instrument {
+            debug!("{}x{} V:{:04X} T:{:04X} fX:{} nt:{:04X} at:{:02X}{:02X} bg:{:02X}{:02X}",
+                   self.scanline, self.dot, self.vram_addr, self.tmp_vram_addr, self.fine_x_scroll,
+                   self.nametable, self.shift_attrtable_high, self.shift_attrtable_low,
+                   self.shift_bgd_high, self.shift_bgd_low);
+        }
+        self.update_tmp_addr();
+        self.process_data_write();
         match self.scanline {
-            0 ... 239 => self.tick_render(true),
+            0 ... 239 => self.tick_render(),
             240 => self.tick_post_render(),
             241 ... 260 => self.tick_vblank(),
             261 => self.tick_prerender(),
             _ => panic!("Bad scanline {}", self.scanline)
         }
         self.dot += 1;
-        if self.dot == 341 || (self.odd_frame && self.rendering && self.dot == 340 && self.scanline == 261) {
+        if self.dot == 341 || (self.odd_frame && self.rendering() && self.dot == 340 && self.scanline == 261) {
             self.dot = 0;
             self.scanline += 1;
             self.scanline %= 262;
@@ -139,15 +188,17 @@ impl<'a> Ppu<'a> {
     }
 
     fn draw_pixel(&mut self) {
-        let mut palette: u16;
+        let mut palette: u16 = 0;
         if self.scanline < 240 && self.dot >= 2 && self.dot < 258 {
-            // TODO check background flags on mask
-            palette = (((self.shift_bgd_high >> (15 - self.fine_x_scroll)) & 1) << 1) | ((self.shift_bgd_low >> (15 - self.fine_x_scroll)) & 1);
-            if palette > 0 {
-                palette |= u16::from((((self.shift_attrtable_high >> (7 - self.fine_x_scroll)) & 1) << 3) | (((self.shift_attrtable_low >> (7 - self.fine_x_scroll)) & 1) << 2));
+            let mask = &self.bus.borrow().mask;
+            if mask.show_bgd && (mask.show_bgd_left8 || self.dot >= 10) {
+                palette = (((self.shift_bgd_high >> (15 - self.fine_x_scroll)) & 1) << 1) | ((self.shift_bgd_low >> (15 - self.fine_x_scroll)) & 1);
+                if palette > 0 {
+                    palette |= u16::from((((self.shift_attrtable_high >> (7 - self.fine_x_scroll)) & 1) << 3) | (((self.shift_attrtable_low >> (7 - self.fine_x_scroll)) & 1) << 2));
+                }
             }
             // TODO sprite
-            let color = self.read_memory(0x3F00 + if self.rendering { palette } else { 0 });
+            let color = self.read_memory(0x3F00 + if self.rendering() { palette } else { 0 });
             self.image.put_pixel(u32::from(self.dot) - 2, u32::from(self.scanline), Rgba(NES_RGB[color as usize]))
         }
         self.shift_bgd_low <<= 1;
@@ -157,15 +208,17 @@ impl<'a> Ppu<'a> {
     }
 
     fn scroll_horizontal(&mut self) {
-        if (self.vram_addr & 0x001F) == 31 {
-            self.vram_addr ^= 0x041F;
-        } else {
-            self.vram_addr += 1;
+        if self.rendering() {
+            if (self.vram_addr & 0x001F) == 31 {
+                self.vram_addr ^= 0x041F;
+            } else {
+                self.vram_addr += 1;
+            }
         }
     }
 
     fn scroll_vertical(&mut self) {
-        if self.rendering {
+        if self.rendering() {
             let fine_y = self.vram_addr & 0x7000 >> 12;
             if fine_y < 7 {
                 self.vram_addr = (self.vram_addr & (!0x7000)) | ((fine_y + 1) << 12);
@@ -186,13 +239,13 @@ impl<'a> Ppu<'a> {
     }
 
     fn update_horizontal(&mut self) {
-        if self.rendering {
+        if self.rendering() {
             self.vram_addr = (self.vram_addr & (!0x41F)) | (self.tmp_vram_addr & 0x41F);
         }
     }
 
     fn update_vertical(&mut self) {
-        if self.rendering {
+        if self.rendering() {
             self.vram_addr = (self.vram_addr & (!0x7BE0)) | (self.tmp_vram_addr & 0x7BE0);
         }
     }
@@ -216,8 +269,8 @@ impl<'a> Ppu<'a> {
                 // TODO needs to be adjusted?
             }
             5 => {
-                // TODO adjust for bg table in control register
-                self.addr = u16::from(self.nametable) * 16 + self.vram_addr & 0x7000;
+                self.addr = if self.bus.borrow().ctrl.bgd_pattern_table_high { 0x1000 } else { 0 } +
+                    u16::from(self.nametable) * 16 + (self.vram_addr & 0x7000 >> 12);
             }
             6 => {
                 self.latch_bgd_low = self.read_memory(self.addr);
@@ -236,7 +289,7 @@ impl<'a> Ppu<'a> {
         }
     }
 
-    fn tick_render(&mut self, visible: bool) {
+    fn tick_render(&mut self) {
         // TODO sprites
         match self.dot {
             2 ... 256 => {
@@ -269,17 +322,20 @@ impl<'a> Ppu<'a> {
     }
 
     fn tick_vblank(&mut self) {
-        if self.dot == 1 {
-            self.vblank = true;
-            // TODO NMI interrupt to CPU
+        if self.scanline == 241 && self.dot == 1 {
+            let mut bus = self.bus.borrow_mut();
+            bus.status.vertical_blank = true;
+            if bus.ctrl.gen_nmi {
+                bus.nmi_interrupt = true;
+            }
         }
     }
 
     fn tick_prerender(&mut self) {
         if self.dot == 1 {
-            self.vblank = false;
+            self.bus.borrow_mut().status.vertical_blank = false;
         }
-        self.tick_render(false);
+        self.tick_render();
         if self.dot >= 280 && self.dot <= 304 {
             self.update_vertical();
         }
