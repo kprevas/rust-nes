@@ -6,6 +6,8 @@ extern crate clap;
 extern crate piston_window;
 extern crate image;
 extern crate time;
+extern crate find_folder;
+extern crate hex_slice;
 
 use std::cell::RefCell;
 use std::fs::File;
@@ -36,6 +38,7 @@ fn main() {
             (@arg instrument_ppu: -p "instruments PPU")
             (@arg time_frame: -t "logs frame timing")
             (@arg step: -s "frame-by-frames step with spacebar")
+            (@arg dump_vram: -v "dumps vram")
         )
     ).get_matches();
 
@@ -54,15 +57,21 @@ fn main() {
         let instrument_ppu = matches.is_present("instrument_ppu");
         let time_frame = matches.is_present("time_frame");
         let step = matches.is_present("step");
+        let dump_vram = matches.is_present("dump_vram");
         let mut cartridge = cartridge::read(File::open(input_file).as_mut().unwrap());
 
         let mut window: PistonWindow = WindowSettings::new(
             "nes",
-            [256, 240],
+            [293, 240],
         )
             .exit_on_esc(true)
             .build()
             .unwrap();
+
+        let assets = find_folder::Search::ParentsThenKids(3, 3).for_folder("src").unwrap();
+        let ref font = assets.join("VeraMono.ttf");
+        let factory = window.factory.clone();
+        let mut glyphs = Glyphs::new(font, factory, TextureSettings::new()).unwrap();
 
         let ppu_bus = RefCell::new(ppu::bus::PpuBus::new());
 
@@ -88,7 +97,12 @@ fn main() {
             }
 
             if let Some(r) = e.render_args() {
-                window.draw_2d(&e, |c, gl| ppu.render(c, gl));
+                window.draw_2d(&e, |c, gl| {
+                    ppu.render(c, gl);
+                    if dump_vram {
+                        ppu.dump_ram(c, gl, &mut glyphs);
+                    }
+                });
             }
         }
     }

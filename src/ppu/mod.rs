@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use std::borrow::BorrowMut;
 use image::{GenericImage, DynamicImage, Rgba};
 use piston_window::*;
+use hex_slice::AsHex;
 
 use self::bus::*;
 use cartridge::CartridgeBus;
@@ -292,9 +293,9 @@ impl<'a> Ppu<'a> {
 
     fn scroll_vertical(&mut self) {
         if self.rendering() {
-            let fine_y = self.vram_addr & 0x7000 >> 12;
+            let fine_y = (self.vram_addr & 0x7000) >> 12;
             if fine_y < 7 {
-                self.vram_addr = (self.vram_addr & (!0x7000)) | ((fine_y + 1) << 12);
+                self.vram_addr += 0x1000;
             } else {
                 self.vram_addr &= !0x7000;
                 let mut coarse_y = (self.vram_addr & 0x3E0) >> 5;
@@ -327,7 +328,7 @@ impl<'a> Ppu<'a> {
         match self.dot % 8 {
             1 => {
                 self.addr = 0x2000 | (self.vram_addr & 0xFFF);
-                if self.dot != 321 {
+                if self.dot != 1 && self.dot != 321 {
                     self.reload_shift();
                 }
             }
@@ -492,6 +493,18 @@ impl<'a> Ppu<'a> {
     }
 
     pub fn render(&self, c: Context, gl: &mut G2d) {
-        image(&self.texture, c.transform, gl);
+        image(&self.texture, c.transform.scale(8.0 / 7.0, 1.0), gl);
+    }
+
+    pub fn dump_ram(&self, c: Context, gl: &mut G2d, glyphs: &mut Glyphs) {
+        let mut trans = c.transform;
+        self.internal_ram.chunks(32).map(|chunk| {
+            trans = trans.trans(0.0, 7.0);
+            text::Text::new_color([1.0, 1.0, 1.0, 1.0], 4).draw(
+                &format!("{:02X}", chunk.as_hex()),
+                glyphs,
+                &c.draw_state,
+                trans, gl).unwrap();
+        }).collect::<Vec<_>>();
     }
 }
