@@ -1,10 +1,9 @@
 pub mod bus;
 
 use std::cell::RefCell;
-use graphics::*;
+use std::borrow::BorrowMut;
 use image::{GenericImage, DynamicImage, Rgba};
-use piston::input::RenderArgs;
-use opengl_graphics::*;
+use piston_window::*;
 
 use self::bus::*;
 use cartridge::CartridgeBus;
@@ -19,9 +18,35 @@ const NES_RGB: [[u8; 4]; 64] =
         [0xFC, 0xFC, 0xFC, 0xFF], [0xA4, 0xE4, 0xFC, 0xFF], [0xB8, 0xB8, 0xF8, 0xFF], [0xD8, 0xB8, 0xF8, 0xFF], [0xF8, 0xB8, 0xF8, 0xFF], [0xF8, 0xA4, 0xC0, 0xFF], [0xF0, 0xD0, 0xB0, 0xFF], [0xFC, 0xE0, 0xA8, 0xFF],
         [0xF8, 0xD8, 0x78, 0xFF], [0xD8, 0xF8, 0x78, 0xFF], [0xB8, 0xF8, 0xB8, 0xFF], [0xB8, 0xF8, 0xD8, 0xFF], [0x00, 0xFC, 0xFC, 0xFF], [0xF8, 0xD8, 0xF8, 0xFF], [0x00, 0x00, 0x00, 0xFF], [0x00, 0x00, 0x00, 0xFF]];
 
+#[derive(Copy, Clone)]
+struct Sprite {
+    id: u8,
+    x: u8,
+    y: u8,
+    tile: u8,
+    attr: u8,
+    data_low: u8,
+    data_high: u8,
+}
+
+impl Default for Sprite {
+    fn default() -> Sprite {
+        Sprite {
+            id: 64,
+            x: 0xFF,
+            y: 0xFF,
+            tile: 0xFF,
+            attr: 0xFF,
+            data_low: 0,
+            data_high: 0,
+        }
+    }
+}
+
 pub struct Ppu<'a> {
     image: DynamicImage,
-    texture: Texture,
+    texture: G2dTexture,
+
     scanline: u16,
     dot: u16,
 
@@ -46,6 +71,9 @@ pub struct Ppu<'a> {
 
     addr: u16,
 
+    oam: [Sprite; 8],
+    sec_oam: [Sprite; 8],
+
     internal_ram: Box<[u8]>,
     palette_ram: Box<[u8]>,
     oam_ram: Box<[u8]>,
@@ -55,9 +83,9 @@ pub struct Ppu<'a> {
 }
 
 impl<'a> Ppu<'a> {
-    pub fn new<'b>(cartridge: &'b mut Box<CartridgeBus>, bus: &'b RefCell<PpuBus>) -> Ppu<'b> {
+    pub fn new<'b>(cartridge: &'b mut Box<CartridgeBus>, bus: &'b RefCell<PpuBus>, window: &mut PistonWindow) -> Ppu<'b> {
         let image = DynamicImage::new_rgba8(256, 240);
-        let texture = Texture::from_image(image.as_rgba8().unwrap(), &TextureSettings::new());
+        let texture = G2dTexture::from_image(window.factory.borrow_mut(), image.as_rgba8().unwrap(), &TextureSettings::new()).unwrap();
         Ppu {
             image,
             texture,
@@ -78,6 +106,8 @@ impl<'a> Ppu<'a> {
             attrtable_latch_low: false,
             attrtable_latch_high: false,
             addr: 0,
+            oam: [Sprite::default(); 8],
+            sec_oam: [Sprite::default(); 8],
             internal_ram: vec![0; 0x800].into_boxed_slice(),
             palette_ram: vec![0; 0x20].into_boxed_slice(),
             oam_ram: vec![0; 0x100].into_boxed_slice(),
@@ -89,6 +119,10 @@ impl<'a> Ppu<'a> {
     fn rendering(&self) -> bool {
         let mask = &self.bus.borrow().mask;
         mask.show_bgd || mask.show_sprite
+    }
+
+    fn spr_height(&self) -> u8 {
+        if self.bus.borrow().ctrl.sprite_size_large { 16 } else { 8 }
     }
 
     fn update_tmp_addr(&mut self) {
@@ -150,7 +184,7 @@ impl<'a> Ppu<'a> {
         }
     }
 
-    pub fn tick(&mut self, instrument: bool) {
+    pub fn tick(&mut self, instrument: bool, encoder: &mut GfxEncoder) {
         if instrument {
             debug!("{}x{} V:{:04X} T:{:04X} fX:{} nt:{:04X} at:{:02X}{:02X} bg:{:02X}{:02X}",
                    self.scanline, self.dot, self.vram_addr, self.tmp_vram_addr, self.fine_x_scroll,
@@ -161,7 +195,7 @@ impl<'a> Ppu<'a> {
         self.process_data_write();
         match self.scanline {
             0 ... 239 => self.tick_render(),
-            240 => self.tick_post_render(),
+            240 => self.tick_post_render(encoder),
             241 ... 260 => self.tick_vblank(),
             261 => self.tick_prerender(),
             _ => panic!("Bad scanline {}", self.scanline)
@@ -189,15 +223,54 @@ impl<'a> Ppu<'a> {
 
     fn draw_pixel(&mut self) {
         let mut palette: u16 = 0;
+        let mut obj_palette: u16 = 0;
+        let mut obj_priority = false;
         if self.scanline < 240 && self.dot >= 2 && self.dot < 258 {
-            let mask = &self.bus.borrow().mask;
-            if mask.show_bgd && (mask.show_bgd_left8 || self.dot >= 10) {
-                palette = (((self.shift_bgd_high >> (15 - self.fine_x_scroll)) & 1) << 1) | ((self.shift_bgd_low >> (15 - self.fine_x_scroll)) & 1);
+            let mut show_bgd = false;
+            let mut show_bgd_left8 = false;
+            let mut show_sprite = false;
+            let mut show_sprite_left8 = false;
+            {
+                let mask = &self.bus.borrow().mask;
+                show_bgd = mask.show_bgd;
+                show_bgd_left8 = mask.show_bgd_left8;
+                show_sprite = mask.show_sprite;
+                show_sprite_left8 = mask.show_sprite_left8;
+            }
+            if show_bgd && (show_bgd_left8 || self.dot >= 10) {
+                palette = (((self.shift_bgd_high >> (15 - self.fine_x_scroll)) & 1) << 1)
+                    | ((self.shift_bgd_low >> (15 - self.fine_x_scroll)) & 1);
                 if palette > 0 {
-                    palette |= u16::from((((self.shift_attrtable_high >> (7 - self.fine_x_scroll)) & 1) << 3) | (((self.shift_attrtable_low >> (7 - self.fine_x_scroll)) & 1) << 2));
+                    palette |= u16::from((((self.shift_attrtable_high >> (7 - self.fine_x_scroll)) & 1) << 3)
+                        | (((self.shift_attrtable_low >> (7 - self.fine_x_scroll)) & 1) << 2));
                 }
             }
-            // TODO sprite
+            if show_sprite && (show_sprite_left8 || self.dot >= 10) {
+                for sprite in self.oam.iter() {
+                    if sprite.id != 64 && u16::from(sprite.x) <= self.dot - 2 {
+                        let mut sprite_x = self.dot - 2 - u16::from(sprite.x);
+                        if sprite_x < 8 {
+                            if sprite.attr & 0x40 > 0 {
+                                sprite_x ^= 7;
+                            }
+
+                            let mut sprite_palette = (((sprite.data_high >> (7 - sprite_x)) & 1) << 1)
+                                | ((sprite.data_low >> (7 - sprite_x)) & 1);
+                            if sprite_palette > 0 {
+                                if sprite.id == 0 && palette > 0 && self.dot != 257 {
+                                    self.bus.borrow_mut().status.sprite_0_hit = true;
+                                }
+                                sprite_palette |= (sprite.attr & 3) << 2;
+                                obj_palette = u16::from(sprite_palette) + 16;
+                                obj_priority = sprite.attr & 0x20 > 0;
+                            }
+                        }
+                    }
+                }
+                if obj_palette > 0 && (palette == 0 || !obj_priority) {
+                    palette = obj_palette;
+                }
+            }
             let color = self.read_memory(0x3F00 + if self.rendering() { palette } else { 0 });
             self.image.put_pixel(u32::from(self.dot) - 2, u32::from(self.scanline), Rgba(NES_RGB[color as usize]))
         }
@@ -289,8 +362,85 @@ impl<'a> Ppu<'a> {
         }
     }
 
+    fn clear_oam(&mut self) {
+        for sprite in self.oam.iter_mut() {
+            sprite.id = 64;
+            sprite.x = 0xFF;
+            sprite.y = 0xFF;
+            sprite.tile = 0xFF;
+            sprite.attr = 0xFF;
+            sprite.data_low = 0;
+            sprite.data_high = 0;
+        }
+    }
+
+    fn eval_sprites(&mut self) {
+        let mut sprite_index = 0;
+        for i in 0..64 {
+            let sprite_y = u16::from(self.oam_ram[(i * 4) as usize]);
+            if self.scanline < sprite_y {
+                let line = self.scanline - sprite_y;
+                if line < u16::from(self.spr_height()) {
+                    let mut sprite = self.sec_oam[sprite_index];
+                    sprite.id = i;
+                    sprite.y = self.oam_ram[(i * 4) as usize];
+                    sprite.tile = self.oam_ram[(i * 4 + 1) as usize];
+                    sprite.attr = self.oam_ram[(i * 4 + 2) as usize];
+                    sprite.x = self.oam_ram[(i * 4 + 3) as usize];
+
+                    sprite_index += 1;
+                    if sprite_index > 8 {
+                        self.bus.borrow_mut().status.sprite_overflow = true;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    fn load_sprites(&mut self) {
+        for (i, sprite) in self.sec_oam.iter().enumerate() {
+            self.oam[i] = sprite.clone();
+            let mut addr: u16 = 0;
+            let bus = self.bus.borrow();
+            if bus.ctrl.sprite_size_large {
+                addr = (u16::from(sprite.tile & 1) * 0x1000) + (u16::from(sprite.tile & (!1)) * 16);
+            } else {
+                addr = if bus.ctrl.sprite_pattern_table_high { 0x1000 } else { 0 } + u16::from(sprite.tile) * 16;
+            }
+            if self.scanline >= u16::from(sprite.y) {
+                let mut sprite_y = (self.scanline - u16::from(sprite.y)) * u16::from(self.spr_height());
+                if sprite.attr & 0x80 > 0 {
+                    sprite_y ^= u16::from(self.spr_height()) - 1;
+                }
+                addr += sprite_y + (sprite_y & 8);
+
+                self.oam[i].data_low = self.read_memory(addr);
+                self.oam[i].data_high = self.read_memory(addr + 8);
+            }
+        }
+    }
+
     fn tick_render(&mut self) {
-        // TODO sprites
+        match self.dot {
+            1 => {
+                self.clear_oam();
+                if self.scanline == 261 {
+                    let mut bus = self.bus.borrow_mut();
+                    bus.status.sprite_0_hit = false;
+                    bus.status.sprite_overflow = false;
+                }
+            }
+            257 => {
+                self.eval_sprites();
+            }
+            321 => {
+                if self.scanline != 261 {
+                    self.load_sprites();
+                }
+            }
+            _ => (),
+        }
         match self.dot {
             2 ... 256 => {
                 self.draw_pixel();
@@ -315,9 +465,9 @@ impl<'a> Ppu<'a> {
         // TODO signal scanline to mapper
     }
 
-    fn tick_post_render(&mut self) {
+    fn tick_post_render(&mut self, encoder: &mut GfxEncoder) {
         if self.dot == 0 {
-            self.texture.update(self.image.as_rgba8().unwrap());
+            self.texture.update(encoder, self.image.as_rgba8().unwrap()).unwrap();
         }
     }
 
@@ -341,9 +491,7 @@ impl<'a> Ppu<'a> {
         }
     }
 
-    pub fn render(&self, gl: &mut GlGraphics, r: RenderArgs) {
-        gl.draw(r.viewport(), |c, gl| {
-            image(&self.texture, c.transform, gl);
-        })
+    pub fn render(&self, c: Context, gl: &mut G2d) {
+        image(&self.texture, c.transform, gl);
     }
 }
