@@ -187,7 +187,7 @@ impl<'a> Ppu<'a> {
 
     pub fn tick(&mut self, instrument: bool, encoder: &mut GfxEncoder) {
         if instrument {
-            debug!("{}x{} V:{:04X} T:{:04X} fX:{} nt:{:04X} at:{:02X}{:02X} bg:{:02X}{:02X}",
+            debug!("{}x{} V:{:04X} T:{:04X} fX:{} nt:{:04X} at:{:02X}{:02X} bg:{:04X} {:04X}",
                    self.scanline, self.dot, self.vram_addr, self.tmp_vram_addr, self.fine_x_scroll,
                    self.nametable, self.shift_attrtable_high, self.shift_attrtable_low,
                    self.shift_bgd_high, self.shift_bgd_low);
@@ -277,8 +277,8 @@ impl<'a> Ppu<'a> {
         }
         self.shift_bgd_low <<= 1;
         self.shift_bgd_high <<= 1;
-        self.shift_attrtable_low = (self.shift_attrtable_low << 1) + if self.attrtable_latch_low { 1 } else { 0 };
-        self.shift_attrtable_high = (self.shift_attrtable_high << 1) + if self.attrtable_latch_high { 1 } else { 0 };
+        self.shift_attrtable_low = (self.shift_attrtable_low << 1) | if self.attrtable_latch_low { 1 } else { 0 };
+        self.shift_attrtable_high = (self.shift_attrtable_high << 1) | if self.attrtable_latch_high { 1 } else { 0 };
     }
 
     fn scroll_horizontal(&mut self) {
@@ -344,7 +344,7 @@ impl<'a> Ppu<'a> {
             }
             5 => {
                 self.addr = if self.bus.borrow().ctrl.bgd_pattern_table_high { 0x1000 } else { 0 } +
-                    u16::from(self.nametable) * 16 + (self.vram_addr & 0x7000 >> 12);
+                    u16::from(self.nametable) * 16 + ((self.vram_addr & 0x7000) >> 12);
             }
             6 => {
                 self.latch_bgd_low = self.read_memory(self.addr);
