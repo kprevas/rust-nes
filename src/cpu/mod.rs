@@ -130,6 +130,10 @@ impl<'a> Cpu<'a> {
         match address {
             0x0000 ... 0x1FFF => self.internal_ram[(address % 0x800) as usize] = value,
             0x2000 ... 0x3FFF => self.ppu_bus.borrow_mut().write(address, value),
+            0x4014 => for i in 0..256 {
+                let data = self.read_memory(u16::from(value) * 0x100 + i);
+                self.write_memory(0x2014, data);
+            }
             0x4016 => self.controller_strobe = value & 1 > 0,
             0x4000 ... 0x4019 =>
             // TODO APU and I/O registers

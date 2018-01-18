@@ -71,7 +71,6 @@ pub struct PpuBus {
     pub scroll: Option<u8>,
     pub addr: Option<u8>,
     pub data: Option<u8>,
-    pub oam_dma: Option<Vec<u8>>,
     pub first_write: bool,
     pub nmi_interrupt: bool,
 }
@@ -108,7 +107,6 @@ impl PpuBus {
             scroll: None,
             addr: None,
             data: None,
-            oam_dma: None,
             first_write: false,
             nmi_interrupt: false,
         }
@@ -180,9 +178,5 @@ impl PpuBus {
             }
             _ => panic!()
         }
-    }
-
-    pub fn write_oam_dma(&mut self, value: &[u8]) {
-        self.oam_dma = Some(value.to_vec());
     }
 }
