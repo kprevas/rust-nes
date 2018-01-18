@@ -22,7 +22,7 @@ mod tests {
         let _ = env_logger::init();
         let test_rom = &mut include_bytes!("nestest.nes").as_ref();
         let ppu_bus = RefCell::new(PpuBus::new());
-        let mut cartridge = ::cartridge::read(test_rom);
+        let mut cartridge = ::cartridge::read(test_rom).unwrap();
         let mut cpu = Cpu::boot(&mut cartridge.cpu_bus, &ppu_bus);
         cpu.p = 0x24;
         cpu.pc = 0xc000;

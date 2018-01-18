@@ -8,13 +8,17 @@ extern crate image;
 extern crate time;
 extern crate find_folder;
 extern crate hex_slice;
+extern crate nfd;
+extern crate simple_error;
 
 use std::cell::RefCell;
 use std::fs::File;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::io::prelude::*;
 
 use piston_window::*;
+
+use nfd::Response;
 
 mod cpu;
 mod cartridge;
@@ -34,7 +38,7 @@ fn main() {
         )
         (@subcommand run =>
             (about: "run a .nes file")
-            (@arg INPUT: +required "the input file to use")
+            (@arg INPUT: "the input file to use")
             (@arg instrument_cpu: -c "instruments CPU")
             (@arg instrument_ppu: -p "instruments PPU")
             (@arg time_frame: -t "logs frame timing")
@@ -50,20 +54,9 @@ fn main() {
             Some(ref path) => Box::new(File::create(&Path::new(path)).unwrap()) as Box<Write>,
             None => Box::new(std::io::stdout()) as Box<Write>,
         };
-        let cartridge = cartridge::read(File::open(input_file).as_mut().unwrap());
+        let cartridge = cartridge::read(File::open(input_file).as_mut().unwrap()).unwrap();
         cpu::disassembler::disassemble(cartridge.cpu_bus, 0xc000, &mut out).unwrap();
     } else if let Some(matches) = matches.subcommand_matches("run") {
-        let input_file = matches.value_of("INPUT").unwrap();
-        let instrument_cpu = matches.is_present("instrument_cpu");
-        let instrument_ppu = matches.is_present("instrument_ppu");
-        let time_frame = matches.is_present("time_frame");
-        let step = matches.is_present("step");
-        let dump_vram = matches.is_present("dump_vram");
-
-        let mut inputs: input::ControllerState = Default::default();
-
-        let mut cartridge = cartridge::read(File::open(input_file).as_mut().unwrap());
-
         let mut window: PistonWindow = WindowSettings::new(
             "nes",
             [293, 240],
@@ -71,6 +64,33 @@ fn main() {
             .exit_on_esc(true)
             .build()
             .unwrap();
+
+        let mut cartridge: cartridge::Cartridge = loop {
+            let input_file = match matches.value_of("INPUT") {
+                Some(i) => PathBuf::from(i),
+                None => {
+                    match nfd::open_file_dialog(None, None).unwrap() {
+                        Response::Okay(p) => PathBuf::from(p),
+                        Response::OkayMultiple(v) => PathBuf::from(&v[0]),
+                        Response::Cancel => return,
+                    }
+                }
+            };
+            match cartridge::read(File::open(input_file).as_mut().unwrap()) {
+                Ok(c) => break c,
+                Err(e) => if matches.is_present("INPUT") {
+                    panic!(e);
+                },
+            };
+        };
+
+        let instrument_cpu = matches.is_present("instrument_cpu");
+        let instrument_ppu = matches.is_present("instrument_ppu");
+        let time_frame = matches.is_present("time_frame");
+        let step = matches.is_present("step");
+        let dump_vram = matches.is_present("dump_vram");
+
+        let mut inputs: input::ControllerState = Default::default();
 
         let assets = find_folder::Search::ParentsThenKids(3, 3).for_folder("src").unwrap();
         let ref font = assets.join("VeraMono.ttf");

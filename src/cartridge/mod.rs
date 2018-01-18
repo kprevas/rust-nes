@@ -1,6 +1,7 @@
 mod mapper0;
 
 use std::io::prelude::*;
+use simple_error::*;
 
 enum NametableMirroring {
     Vertical,
@@ -28,10 +29,12 @@ pub struct Header {
     flags_10: u8,
 }
 
-pub fn read(src: &mut Read) -> Cartridge {
+pub fn read(src: &mut Read) -> SimpleResult<Cartridge> {
     let mut contents = Box::new([0; 0xbfe0]);
     src.read(contents.as_mut()).expect("error reading source");
-    assert_eq!([0x4E, 0x45, 0x53, 0x1A], contents[0..4]);
+    if contents[0..4] != [0x4E, 0x45, 0x53, 0x1A] {
+        return Err(SimpleError::new("Not a NES file."))
+    }
     let header = Header {
         prg_rom_blocks: contents[4],
         chr_rom_blocks: contents[5],
@@ -52,7 +55,7 @@ pub fn read(src: &mut Read) -> Cartridge {
     info!("Using mapper {}", mapper);
 
     match mapper {
-        0 => mapper0::read(&header, prg_rom, chr_rom),
+        0 => Ok(mapper0::read(&header, prg_rom, chr_rom)),
         _ => unimplemented!()
     }
 }
