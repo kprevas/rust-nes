@@ -18,6 +18,7 @@ use piston_window::*;
 
 mod cpu;
 mod cartridge;
+mod input;
 mod ppu;
 
 const CPU_PER_PPU: f32 = 3.0;
@@ -58,6 +59,9 @@ fn main() {
         let time_frame = matches.is_present("time_frame");
         let step = matches.is_present("step");
         let dump_vram = matches.is_present("dump_vram");
+
+        let mut inputs: input::ControllerState = Default::default();
+
         let mut cartridge = cartridge::read(File::open(input_file).as_mut().unwrap());
 
         let mut window: PistonWindow = WindowSettings::new(
@@ -86,13 +90,38 @@ fn main() {
         while let Some(e) = window.next() {
             if let Some(Button::Keyboard(key)) = e.press_args() {
                 if step && key == Key::Space {
-                    do_frame(&mut window, &mut cpu, &mut ppu, &mut cpu_dots, instrument_cpu, instrument_ppu, time_frame)
+                    do_frame(&mut window, &mut cpu, &mut ppu, &mut cpu_dots, inputs, instrument_cpu, instrument_ppu, time_frame)
+                }
+                match key {
+                    Key::A => inputs.b = true,
+                    Key::S => inputs.a = true,
+                    Key::Tab => inputs.select = true,
+                    Key::Return => inputs.start = true,
+                    Key::Up => inputs.up = true,
+                    Key::Down => inputs.down = true,
+                    Key::Left => inputs.left = true,
+                    Key::Right => inputs.right = true,
+                    _ => (),
+                }
+            }
+
+            if let Some(Button::Keyboard(key)) = e.release_args() {
+                match key {
+                    Key::A => inputs.b = false,
+                    Key::S => inputs.a = false,
+                    Key::Tab => inputs.select = false,
+                    Key::Return => inputs.start = false,
+                    Key::Up => inputs.up = false,
+                    Key::Down => inputs.down = false,
+                    Key::Left => inputs.left = false,
+                    Key::Right => inputs.right = false,
+                    _ => (),
                 }
             }
 
             if let Some(u) = e.update_args() {
                 if !step {
-                    do_frame(&mut window, &mut cpu, &mut ppu, &mut cpu_dots, instrument_cpu, instrument_ppu, time_frame)
+                    do_frame(&mut window, &mut cpu, &mut ppu, &mut cpu_dots, inputs, instrument_cpu, instrument_ppu, time_frame)
                 }
             }
 
@@ -112,6 +141,7 @@ fn do_frame(window: &mut PistonWindow,
             cpu: &mut cpu::Cpu,
             ppu: &mut ppu::Ppu,
             cpu_dots: &mut f32,
+            inputs: input::ControllerState,
             instrument_cpu: bool,
             instrument_ppu: bool,
             time_frame: bool) -> () {
@@ -119,7 +149,7 @@ fn do_frame(window: &mut PistonWindow,
     let dots = ppu.dots_per_frame();
     for _ in 0..dots {
         if *cpu_dots <= 0.0 {
-            cpu.tick(instrument_cpu);
+            cpu.tick(instrument_cpu, inputs);
             *cpu_dots += CPU_PER_PPU;
         } else {
             *cpu_dots -= 1.0;

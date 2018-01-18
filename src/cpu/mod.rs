@@ -8,6 +8,7 @@ use self::opcodes::AddressingMode;
 use self::opcodes::AddressingMode::*;
 
 use cartridge::CartridgeBus;
+use input::ControllerState;
 use ppu::bus::*;
 
 #[cfg(test)]
@@ -42,6 +43,8 @@ pub struct Cpu<'a> {
     internal_ram: Box<[u8]>,
     cartridge: &'a mut Box<CartridgeBus>,
     ppu_bus: &'a RefCell<PpuBus>,
+    controller_strobe: bool,
+    last_inputs: u8,
 }
 
 const CARRY: u8 = 0b1;
@@ -64,6 +67,8 @@ impl<'a> Cpu<'a> {
             internal_ram: vec![0; 0x800].into_boxed_slice(),
             cartridge,
             ppu_bus,
+            controller_strobe: false,
+            last_inputs: Default::default(),
         };
 
         cpu.pc = cpu.read_word(0xfffc);
@@ -105,6 +110,14 @@ impl<'a> Cpu<'a> {
         match address {
             0x0000 ... 0x1FFF => self.internal_ram[(address % 0x800) as usize],
             0x2000 ... 0x3FFF => self.ppu_bus.borrow_mut().read(address),
+            0x4016 => {
+                let value = self.last_inputs & 1;
+                self.last_inputs >>= 1;
+                value
+            },
+            0x4017 =>
+            // TODO joypad 2
+                0,
             0x4000 ... 0x4019 =>
             // TODO APU and I/O registers
                 0,
@@ -117,6 +130,7 @@ impl<'a> Cpu<'a> {
         match address {
             0x0000 ... 0x1FFF => self.internal_ram[(address % 0x800) as usize] = value,
             0x2000 ... 0x3FFF => self.ppu_bus.borrow_mut().write(address, value),
+            0x4016 => self.controller_strobe = value & 1 > 0,
             0x4000 ... 0x4019 =>
             // TODO APU and I/O registers
                 (),
@@ -768,7 +782,10 @@ impl<'a> Cpu<'a> {
         }
     }
 
-    pub fn tick(&mut self, instrument: bool) {
+    pub fn tick(&mut self, instrument: bool, inputs: ControllerState) {
+        if self.controller_strobe {
+            self.last_inputs = inputs.to_u8();
+        }
         if self.cycles_to_next == 0 {
             if self.ppu_bus.borrow().nmi_interrupt {
                 let old_pc = self.pc;
