@@ -19,7 +19,7 @@ const NES_RGB: [[u8; 4]; 64] =
         [0xFC, 0xFC, 0xFC, 0xFF], [0xA4, 0xE4, 0xFC, 0xFF], [0xB8, 0xB8, 0xF8, 0xFF], [0xD8, 0xB8, 0xF8, 0xFF], [0xF8, 0xB8, 0xF8, 0xFF], [0xF8, 0xA4, 0xC0, 0xFF], [0xF0, 0xD0, 0xB0, 0xFF], [0xFC, 0xE0, 0xA8, 0xFF],
         [0xF8, 0xD8, 0x78, 0xFF], [0xD8, 0xF8, 0x78, 0xFF], [0xB8, 0xF8, 0xB8, 0xFF], [0xB8, 0xF8, 0xD8, 0xFF], [0x00, 0xFC, 0xFC, 0xFF], [0xF8, 0xD8, 0xF8, 0xFF], [0x00, 0x00, 0x00, 0xFF], [0x00, 0x00, 0x00, 0xFF]];
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Clone)]
 struct Sprite {
     id: u8,
     x: u8,
@@ -107,8 +107,8 @@ impl<'a> Ppu<'a> {
             attrtable_latch_low: false,
             attrtable_latch_high: false,
             addr: 0,
-            oam: [Sprite::default(); 8],
-            sec_oam: [Sprite::default(); 8],
+            oam: Default::default(),
+            sec_oam: Default::default(),
             internal_ram: vec![0; 0x800].into_boxed_slice(),
             palette_ram: vec![0; 0x20].into_boxed_slice(),
             oam_ram: vec![0; 0x100].into_boxed_slice(),
@@ -156,6 +156,11 @@ impl<'a> Ppu<'a> {
             let addr = self.vram_addr;
             self.write_memory(addr, data);
             self.vram_addr += if bus.ctrl.address_increment_vertical { 32 } else { 1 };
+        }
+        if let Some(data) = bus.oam_data.take() {
+            let addr = bus.oam_addr;
+            self.oam_ram[addr as usize] = data;
+            bus.oam_addr = bus.oam_addr.wrapping_add(1);
         }
     }
 
@@ -364,7 +369,7 @@ impl<'a> Ppu<'a> {
     }
 
     fn clear_oam(&mut self) {
-        for sprite in self.oam.iter_mut() {
+        for sprite in self.sec_oam.iter_mut() {
             sprite.id = 64;
             sprite.x = 0xFF;
             sprite.y = 0xFF;
@@ -379,10 +384,10 @@ impl<'a> Ppu<'a> {
         let mut sprite_index = 0;
         for i in 0..64 {
             let sprite_y = u16::from(self.oam_ram[(i * 4) as usize]);
-            if self.scanline < sprite_y {
+            if sprite_y <= self.scanline {
                 let line = self.scanline - sprite_y;
                 if line < u16::from(self.spr_height()) {
-                    let mut sprite = self.sec_oam[sprite_index];
+                    let sprite = &mut self.sec_oam[sprite_index];
                     sprite.id = i;
                     sprite.y = self.oam_ram[(i * 4) as usize];
                     sprite.tile = self.oam_ram[(i * 4 + 1) as usize];
@@ -390,7 +395,7 @@ impl<'a> Ppu<'a> {
                     sprite.x = self.oam_ram[(i * 4 + 3) as usize];
 
                     sprite_index += 1;
-                    if sprite_index > 8 {
+                    if sprite_index >= 8 {
                         self.bus.borrow_mut().status.sprite_overflow = true;
                         break;
                     }
@@ -401,7 +406,7 @@ impl<'a> Ppu<'a> {
 
     fn load_sprites(&mut self) {
         for (i, sprite) in self.sec_oam.iter().enumerate() {
-            self.oam[i] = sprite.clone();
+            let mut sprite = sprite.clone();
             let mut addr: u16 = 0;
             let bus = self.bus.borrow();
             if bus.ctrl.sprite_size_large {
@@ -410,15 +415,16 @@ impl<'a> Ppu<'a> {
                 addr = if bus.ctrl.sprite_pattern_table_high { 0x1000 } else { 0 } + u16::from(sprite.tile) * 16;
             }
             if self.scanline >= u16::from(sprite.y) {
-                let mut sprite_y = (self.scanline - u16::from(sprite.y)) * u16::from(self.spr_height());
+                let mut sprite_y = (self.scanline - u16::from(sprite.y)) % u16::from(self.spr_height());
                 if sprite.attr & 0x80 > 0 {
                     sprite_y ^= u16::from(self.spr_height()) - 1;
                 }
                 addr += sprite_y + (sprite_y & 8);
 
-                self.oam[i].data_low = self.read_memory(addr);
-                self.oam[i].data_high = self.read_memory(addr + 8);
+                sprite.data_low = self.read_memory(addr);
+                sprite.data_high = self.read_memory(addr + 8);
             }
+            self.oam[i] = sprite;
         }
     }
 

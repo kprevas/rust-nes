@@ -40,6 +40,7 @@ pub struct Cpu<'a> {
     sp: u8,
     pc: u16,
     cycles_to_next: u16,
+    oam_dma_write: Option<(u8, u8)>,
     internal_ram: Box<[u8]>,
     cartridge: &'a mut Box<CartridgeBus>,
     ppu_bus: &'a RefCell<PpuBus>,
@@ -64,6 +65,7 @@ impl<'a> Cpu<'a> {
             sp: 0xfd,
             pc: 0,
             cycles_to_next: 0,
+            oam_dma_write: None,
             internal_ram: vec![0; 0x800].into_boxed_slice(),
             cartridge,
             ppu_bus,
@@ -130,9 +132,10 @@ impl<'a> Cpu<'a> {
         match address {
             0x0000 ... 0x1FFF => self.internal_ram[(address % 0x800) as usize] = value,
             0x2000 ... 0x3FFF => self.ppu_bus.borrow_mut().write(address, value),
-            0x4014 => for i in 0..256 {
-                let data = self.read_memory(u16::from(value) * 0x100 + i);
+            0x4014 => {
+                let data = self.read_memory(u16::from(value) * 0x100);
                 self.write_memory(0x2014, data);
+                self.oam_dma_write = Some((value, 1));
             }
             0x4016 => self.controller_strobe = value & 1 > 0,
             0x4000 ... 0x4019 =>
@@ -791,7 +794,11 @@ impl<'a> Cpu<'a> {
             self.last_inputs = inputs.to_u8();
         }
         if self.cycles_to_next == 0 {
-            if self.ppu_bus.borrow().nmi_interrupt {
+            if let Some((addr, i)) = self.oam_dma_write {
+                let data = self.read_memory(u16::from(addr) * 0x100 + u16::from(i));
+                self.write_memory(0x2014, data);
+                self.oam_dma_write = if i < 255 { Some((addr, i + 1)) } else { None };
+            } else if self.ppu_bus.borrow().nmi_interrupt {
                 let old_pc = self.pc;
                 let p = self.p | 0b00100000;
 

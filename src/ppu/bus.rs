@@ -163,7 +163,6 @@ impl PpuBus {
             3 => self.oam_addr = value,
             4 => {
                 self.oam_data = Some(value);
-                self.oam_addr += 1;
             }
             5 => {
                 self.scroll = Some(value);
