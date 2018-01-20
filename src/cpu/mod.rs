@@ -799,7 +799,6 @@ impl<'a> Cpu<'a> {
                 self.execute_opcode(instrument);
             }
             self.cycles_to_next -= 1;
-            self.cycles_to_next *= 3;
         } else {
             self.cycles_to_next -= 1;
         }
