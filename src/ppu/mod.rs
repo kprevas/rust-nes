@@ -349,7 +349,12 @@ impl<'a> Ppu<'a> {
             }
             4 => {
                 self.latch_attrtable = self.read_memory(self.addr);
-                // TODO needs to be adjusted?
+                if ((self.vram_addr >> 5) & 2) > 0 {
+                    self.latch_attrtable >>= 4;
+                }
+                if (self.vram_addr & 2) > 0 {
+                    self.latch_attrtable >>= 2;
+                }
             }
             5 => {
                 self.addr = if self.bus.borrow().ctrl.bgd_pattern_table_high { 0x1000 } else { 0 } +
