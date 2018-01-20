@@ -5,7 +5,6 @@ use cartridge::NametableMirroring;
 use cartridge::NametableMirroring::*;
 
 use std::cmp::max;
-use hex_slice::AsHex;
 
 struct Mapper0Cpu {
     prg_rom: Vec<u8>,

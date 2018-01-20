@@ -24,6 +24,7 @@ mod cpu;
 mod cartridge;
 mod input;
 mod ppu;
+mod test;
 
 const CPU_PER_PPU: f32 = 3.0;
 
@@ -99,7 +100,7 @@ fn main() {
 
         let ppu_bus = RefCell::new(ppu::bus::PpuBus::new());
 
-        let mut ppu = ppu::Ppu::new(&mut cartridge.ppu_bus, &ppu_bus, &mut window);
+        let mut ppu = ppu::Ppu::new(&mut cartridge.ppu_bus, &ppu_bus, Some(&mut window));
 
         let mut cpu = cpu::Cpu::boot(&mut cartridge.cpu_bus, &ppu_bus);
 
@@ -139,13 +140,13 @@ fn main() {
                 }
             }
 
-            if let Some(u) = e.update_args() {
+            if let Some(_u) = e.update_args() {
                 if !step {
                     do_frame(&mut window, &mut cpu, &mut ppu, &mut cpu_dots, inputs, instrument_cpu, instrument_ppu, time_frame)
                 }
             }
 
-            if let Some(r) = e.render_args() {
+            if let Some(_r) = e.render_args() {
                 window.draw_2d(&e, |c, gl| {
                     ppu.render(c, gl);
                     if dump_vram {
@@ -174,7 +175,7 @@ fn do_frame(window: &mut PistonWindow,
         } else {
             *cpu_dots -= 1.0;
         }
-        ppu.tick(instrument_ppu, &mut window.encoder);
+        ppu.tick(instrument_ppu, Some(&mut window.encoder));
     }
     if time_frame {
         debug!("frame took {}", start_time.to(time::PreciseTime::now()));

@@ -13,22 +13,11 @@ use ppu::bus::*;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    extern crate env_logger;
+    use test::run_test;
 
     #[test]
     fn nes_test() {
-        let _ = env_logger::init();
-        let test_rom = &mut include_bytes!("nestest.nes").as_ref();
-        let ppu_bus = RefCell::new(PpuBus::new());
-        let mut cartridge = ::cartridge::read(test_rom).unwrap();
-        let mut cpu = Cpu::boot(&mut cartridge.cpu_bus, &ppu_bus);
-        cpu.p = 0x24;
-        cpu.pc = 0xc000;
-        cpu.run_instrumented_until(|cpu| cpu.pc == 0xc66e, 9000);
-        assert_eq!(0, cpu.read_memory(0x02), "0x{:02X}", cpu.read_memory(0x02));
-        assert_eq!(0, cpu.read_memory(0x03), "0x{:02X}", cpu.read_memory(0x03));
+        run_test(&mut include_bytes!("nestest.nes").as_ref(), 0xc000, 0xc66e, &[(0x02, 0), (0x03, 0)]);
     }
 }
 
@@ -107,7 +96,7 @@ impl<'a> Cpu<'a> {
         }
     }
 
-    fn read_memory(&mut self, address: u16) -> u8 {
+    pub fn read_memory(&mut self, address: u16) -> u8 {
         self.cycles_to_next += 1;
         match address {
             0x0000 ... 0x1FFF => self.internal_ram[(address % 0x800) as usize],
@@ -816,16 +805,12 @@ impl<'a> Cpu<'a> {
         }
     }
 
-    fn run_instrumented_until(&mut self, break_condition: fn(&Cpu) -> bool, max_cycles: u16) {
-        let mut ops = 0;
-        loop {
-            self.execute_opcode(true);
-            if break_condition(self) {
-                break;
-            }
-            ops += 1;
-            assert_ne!(ops, max_cycles);
-            self.cycles_to_next = 0;
-        }
+    pub fn setup_for_test(&mut self, p_start: u8, pc_start: u16) {
+        self.p = p_start;
+        self.pc = pc_start;
+    }
+
+    pub fn pc_for_test(&self) -> u16 {
+        self.pc
     }
 }
