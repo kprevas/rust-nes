@@ -36,7 +36,7 @@ impl AddressingMode {
             IndirectIndexed => format!("(${:02X}),Y ", operand),
             Absolute => format!("${:04X} ", operand),
             Relative => format!("${:04X} ", {
-                let offset = operand as i8;
+                let offset = operand as i16;
                 if offset >= 0 {
                     pc.wrapping_add(offset as u16)
                 } else {
