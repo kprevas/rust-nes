@@ -17,7 +17,7 @@ mod tests {
 
     #[test]
     fn nes_test() {
-        run_test(&mut include_bytes!("nestest.nes").as_ref(), 0xc000, 0xc66e, &[(0x02, 0), (0x03, 0)]);
+        run_test(&mut include_bytes!("nestest.nes").as_ref(), Some(0xc000), 0xc66e, &[(0x02, 0), (0x03, 0)]);
     }
 }
 
@@ -279,7 +279,7 @@ impl<'a> Cpu<'a> {
         self.pc += u16::from(mode.bytes());
 
         if instrument {
-            debug!("{:04X}\t{:02X} {}\t{:?} {}\t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X}",
+            debug!(target: "cpu", "{:04X}\t{:02X} {}\t{:?} {}\t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X}",
                    self.pc - u16::from(mode.bytes()) - 1,
                    opcode_hex,
                    match mode.bytes() {

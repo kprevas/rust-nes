@@ -9,6 +9,16 @@ use hex_slice::AsHex;
 use self::bus::*;
 use cartridge::CartridgeBus;
 
+#[cfg(test)]
+mod tests {
+    use test::run_test;
+
+    #[test]
+    fn nes_test() {
+        run_test(&mut include_bytes!("1.frame_basics.nes").as_ref(), None, 0xe01d, &[(0xf8, 1)]);
+    }
+}
+
 const NES_RGB: [[u8; 4]; 64] =
     [[0x7C, 0x7C, 0x7C, 0xFF], [0x00, 0x00, 0xFC, 0xFF], [0x00, 0x00, 0xBC, 0xFF], [0x44, 0x28, 0xBC, 0xFF], [0x94, 0x00, 0x84, 0xFF], [0xA8, 0x00, 0x20, 0xFF], [0xA8, 0x10, 0x00, 0xFF], [0x88, 0x14, 0x00, 0xFF],
         [0x50, 0x30, 0x00, 0xFF], [0x00, 0x78, 0x00, 0xFF], [0x00, 0x68, 0x00, 0xFF], [0x00, 0x58, 0x00, 0xFF], [0x00, 0x40, 0x58, 0xFF], [0x00, 0x00, 0x00, 0xFF], [0x00, 0x00, 0x00, 0xFF], [0x00, 0x00, 0x00, 0xFF],
@@ -194,7 +204,7 @@ impl<'a> Ppu<'a> {
 
     pub fn tick(&mut self, instrument: bool, encoder: Option<&mut GfxEncoder>) {
         if instrument {
-            debug!("{}x{} V:{:04X} T:{:04X} fX:{} nt:{:04X} at:{:02X}{:02X} bg:{:04X} {:04X}",
+            debug!(target: "ppu", "{}x{} V:{:04X} T:{:04X} fX:{} nt:{:04X} at:{:02X}{:02X} bg:{:04X} {:04X}",
                    self.scanline, self.dot, self.vram_addr, self.tmp_vram_addr, self.fine_x_scroll,
                    self.nametable, self.shift_attrtable_high, self.shift_attrtable_low,
                    self.shift_bgd_high, self.shift_bgd_low);

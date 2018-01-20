@@ -115,11 +115,11 @@ impl PpuBus {
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr % 8 {
             0 => {
-                debug!("tried to read from PPU control register");
+                debug!(target: "bus", "tried to read from PPU control register");
                 0
             }
             1 => {
-                debug!("tried to read from PPU mask register");
+                debug!(target: "bus", "tried to read from PPU mask register");
                 0
             }
             2 => {
@@ -132,22 +132,22 @@ impl PpuBus {
             4 => match self.oam_data {
                 Some(value) => value,
                 None => {
-                    debug!("tried to read OAM data when none present");
+                    debug!(target: "bus", "tried to read OAM data when none present");
                     0
                 }
             },
             5 => {
-                debug!("tried to read from PPU scroll register");
+                debug!(target: "bus", "tried to read from PPU scroll register");
                 0
             }
             6 => {
-                debug!("tried to read from PPU address register");
+                debug!(target: "bus", "tried to read from PPU address register");
                 0
             }
             7 => match self.data {
                 Some(value) => value,
                 None => {
-                    debug!("tried to read PPU data when none present");
+                    debug!(target: "bus", "tried to read PPU data when none present");
                     0
                 }
             },
@@ -159,7 +159,7 @@ impl PpuBus {
         match addr % 8 {
             0 => self.ctrl = Ctrl::from_u8(value),
             1 => self.mask = Mask::from_u8(value),
-            2 => debug!("tried to write to PPU status register"),
+            2 => debug!(target: "bus", "tried to write to PPU status register"),
             3 => self.oam_addr = value,
             4 => {
                 self.oam_data = Some(value);

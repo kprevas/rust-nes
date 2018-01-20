@@ -178,6 +178,6 @@ fn do_frame(window: &mut PistonWindow,
         ppu.tick(instrument_ppu, Some(&mut window.encoder));
     }
     if time_frame {
-        debug!("frame took {}", start_time.to(time::PreciseTime::now()));
+        debug!(target: "timing", "frame took {}", start_time.to(time::PreciseTime::now()));
     }
 }
