@@ -38,13 +38,14 @@ pub fn run(matches: clap::ArgMatches) {
         let cartridge = cartridge::read(File::open(input_file).as_mut().unwrap()).unwrap();
         cpu::disassembler::disassemble(cartridge.cpu_bus, 0xc000, &mut out).unwrap();
     } else if let Some(matches) = matches.subcommand_matches("run") {
-        let mut window: PistonWindow = WindowSettings::new(
+        let window: PistonWindow = WindowSettings::new(
             "nes",
             [293, 240],
         )
             .exit_on_esc(true)
             .build()
             .unwrap();
+        let mut window = window.ups(60).ups_reset(0);
 
         let mut cartridge: cartridge::Cartridge = loop {
             let input_file = match matches.value_of("INPUT") {
@@ -79,16 +80,14 @@ pub fn run(matches: clap::ArgMatches) {
         let mut glyphs = Glyphs::new(font, factory, TextureSettings::new()).unwrap();
 
         let ppu_bus = RefCell::new(ppu::bus::PpuBus::new());
+        let apu_bus = RefCell::new(apu::bus::ApuBus::new());
 
         let mut ppu = ppu::Ppu::new(&mut cartridge.ppu_bus, &ppu_bus, Some(&mut window));
 
-        let mut cpu = cpu::Cpu::boot(&mut cartridge.cpu_bus, &ppu_bus);
+        let mut cpu = cpu::Cpu::boot(&mut cartridge.cpu_bus, &ppu_bus, &apu_bus);
 
-        let mut apu = apu::Apu::new().unwrap();
+        let mut apu = apu::Apu::new(&apu_bus).unwrap();
 
-        let mut settings = EventSettings::new();
-        settings.ups = 60;
-        settings.ups_reset = 0;
         let mut cpu_dots = 0f32;
         let mut apu_dots = 0f32;
 

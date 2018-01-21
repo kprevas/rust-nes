@@ -10,6 +10,7 @@ use self::opcodes::AddressingMode::*;
 use cartridge::CartridgeBus;
 use input::ControllerState;
 use ppu::bus::*;
+use apu::bus::*;
 
 pub struct Cpu<'a> {
     a: u8,
@@ -23,6 +24,7 @@ pub struct Cpu<'a> {
     internal_ram: Box<[u8]>,
     cartridge: &'a mut Box<CartridgeBus>,
     ppu_bus: &'a RefCell<PpuBus>,
+    apu_bus: &'a RefCell<ApuBus>,
     controller_strobe: bool,
     last_inputs: u8,
 }
@@ -35,7 +37,7 @@ const OVERFLOW: u8 = 0b1000000;
 const NEGATIVE: u8 = 0b10000000;
 
 impl<'a> Cpu<'a> {
-    pub fn boot<'b>(cartridge: &'b mut Box<CartridgeBus>, ppu_bus: &'b RefCell<PpuBus>) -> Cpu<'b> {
+    pub fn boot<'b>(cartridge: &'b mut Box<CartridgeBus>, ppu_bus: &'b RefCell<PpuBus>, apu_bus: &'b RefCell<ApuBus>) -> Cpu<'b> {
         let mut cpu = Cpu {
             a: 0,
             x: 0,
@@ -48,6 +50,7 @@ impl<'a> Cpu<'a> {
             internal_ram: vec![0; 0x800].into_boxed_slice(),
             cartridge,
             ppu_bus,
+            apu_bus,
             controller_strobe: false,
             last_inputs: Default::default(),
         };
@@ -116,10 +119,9 @@ impl<'a> Cpu<'a> {
                 self.write_memory(0x2014, data);
                 self.oam_dma_write = Some((value, 1));
             }
+            0x4000 ... 0x4013 | 0x4015 | 0x4017 => self.apu_bus.borrow_mut().write(address, value),
             0x4016 => self.controller_strobe = value & 1 > 0,
-            0x4000 ... 0x4019 =>
-            // TODO APU and I/O registers
-                (),
+            0x4018 ... 0x401F => (),
             _ =>
             // TODO cartridge space
                 (),
