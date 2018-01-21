@@ -18,12 +18,14 @@ use piston_window::*;
 
 use nfd::Response;
 
+pub mod apu;
 pub mod cpu;
 pub mod cartridge;
 pub mod input;
 pub mod ppu;
 
 const CPU_PER_PPU: f32 = 3.0;
+const APU_PER_PPU: f32 = CPU_PER_PPU * 2.0;
 
 pub fn run(matches: clap::ArgMatches) {
     if let Some(matches) = matches.subcommand_matches("disassemble") {
@@ -82,14 +84,18 @@ pub fn run(matches: clap::ArgMatches) {
 
         let mut cpu = cpu::Cpu::boot(&mut cartridge.cpu_bus, &ppu_bus);
 
+        let mut apu = apu::Apu::new().unwrap();
+
         let mut settings = EventSettings::new();
         settings.ups = 60;
         settings.ups_reset = 0;
         let mut cpu_dots = 0f32;
+        let mut apu_dots = 0f32;
+
         while let Some(e) = window.next() {
             if let Some(Button::Keyboard(key)) = e.press_args() {
                 if step && key == Key::Space {
-                    do_frame(&mut window, &mut cpu, &mut ppu, &mut cpu_dots, inputs, instrument_cpu, instrument_ppu, time_frame)
+                    do_frame(&mut window, &mut cpu, &mut ppu, &mut apu, &mut cpu_dots, &mut apu_dots, inputs, instrument_cpu, instrument_ppu, time_frame)
                 }
                 match key {
                     Key::A => inputs.b = true,
@@ -120,7 +126,7 @@ pub fn run(matches: clap::ArgMatches) {
 
             if let Some(_u) = e.update_args() {
                 if !step {
-                    do_frame(&mut window, &mut cpu, &mut ppu, &mut cpu_dots, inputs, instrument_cpu, instrument_ppu, time_frame)
+                    do_frame(&mut window, &mut cpu, &mut ppu, &mut apu, &mut cpu_dots, &mut apu_dots, inputs, instrument_cpu, instrument_ppu, time_frame)
                 }
             }
 
@@ -139,7 +145,9 @@ pub fn run(matches: clap::ArgMatches) {
 fn do_frame(window: &mut PistonWindow,
             cpu: &mut cpu::Cpu,
             ppu: &mut ppu::Ppu,
+            apu: &mut apu::Apu,
             cpu_dots: &mut f32,
+            apu_dots: &mut f32,
             inputs: input::ControllerState,
             instrument_cpu: bool,
             instrument_ppu: bool,
@@ -153,8 +161,15 @@ fn do_frame(window: &mut PistonWindow,
         } else {
             *cpu_dots -= 1.0;
         }
+        if *apu_dots <= 0.0 {
+            apu.tick();
+            *apu_dots += APU_PER_PPU;
+        } else {
+            *apu_dots -= 1.0;
+        }
         ppu.tick(instrument_ppu, Some(&mut window.encoder));
     }
+    apu.do_frame();
     if time_frame {
         debug!(target: "timing", "frame took {}", start_time.to(time::PreciseTime::now()));
     }
