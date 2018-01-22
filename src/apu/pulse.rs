@@ -18,6 +18,7 @@ pub struct Pulse {
     length_counter: u8,
     envelope_delay: u8,
     envelope_value: u8,
+    length_written: bool,
 }
 
 impl Pulse {
@@ -32,6 +33,7 @@ impl Pulse {
             length_counter: 0,
             envelope_delay: 0,
             envelope_value: 15,
+            length_written: false,
         }
     }
 
@@ -40,8 +42,7 @@ impl Pulse {
             self.length_counter = 0;
         } else if let Some(length_counter) = ctrl_bus.length_counter_load.take() {
             self.length_counter = LENGTH_TABLE[length_counter as usize];
-            self.envelope_delay = ctrl_bus.envelope_param;
-            self.envelope_value = 15;
+            self.length_written = true;
         }
 
         let tick_val;
@@ -86,13 +87,20 @@ impl Pulse {
     }
 
     pub fn clock_envelope(&mut self, ctrl_bus: &ChannelCtrl) {
+        if self.length_written {
+            self.length_written = false;
+            self.envelope_delay = ctrl_bus.envelope_param;
+            self.envelope_value = 15;
+        }
         if self.envelope_value == 0 {
+            self.envelope_delay = ctrl_bus.envelope_param;
             if ctrl_bus.halt_flag_envelope_loop {
-                self.envelope_value = ctrl_bus.envelope_param;
+                self.envelope_value = 15;
             }
         } else if self.envelope_delay > 0 {
             self.envelope_delay -= 1;
         } else {
+            self.envelope_delay = ctrl_bus.envelope_param;
             self.envelope_value -= 1;
         }
     }
