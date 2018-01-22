@@ -17,7 +17,7 @@ impl SweepCtrl {
     }
 }
 
-pub struct ChannelCtrl {
+pub struct SquareCtrl {
     pub enabled: bool,
 
     pub duty_cycle: usize,
@@ -31,7 +31,7 @@ pub struct ChannelCtrl {
     pub length_counter_load: Option<u8>,
 }
 
-impl ChannelCtrl {
+impl SquareCtrl {
     fn write(&mut self, address: u16, value: u8) {
         match address {
             0 => {
@@ -57,9 +57,44 @@ impl ChannelCtrl {
     }
 }
 
+pub struct TriangleCtrl {
+    pub enabled: bool,
+
+    pub control_flag: bool,
+    pub reload_value: u8,
+
+    pub timer: u16,
+    pub length_counter_load: Option<u8>,
+    pub linear_counter_reload: bool,
+}
+
+impl TriangleCtrl {
+    fn write(&mut self, address: u16, value: u8) {
+        match address {
+            0 => {
+                self.control_flag = value & 0x80 > 0;
+                self.reload_value = value & (!0x80);
+            },
+            1 => (),
+            2 => {
+                let timer = (self.timer & (!0xFF)) + u16::from(value);
+                self.timer = timer;
+            }
+            3 => {
+                let timer = (self.timer & 0xFF) + (u16::from(value & 0x7) << 8);
+                self.timer = timer;
+                self.length_counter_load = Some((value & (!0x7)) >> 3);
+                self.linear_counter_reload = true;
+            }
+            _ => panic!("bad APU channel control write {:04X}", address),
+        }
+    }
+}
+
 pub struct ApuBus {
-    pub pulse_1: ChannelCtrl,
-    pub pulse_2: ChannelCtrl,
+    pub pulse_1: SquareCtrl,
+    pub pulse_2: SquareCtrl,
+    pub triangle: TriangleCtrl,
 
     pub frame_mode: bool,
     pub irq_inhibit: bool,
@@ -70,7 +105,7 @@ pub struct ApuBus {
 impl ApuBus {
     pub fn new() -> ApuBus {
         ApuBus {
-            pulse_1: ChannelCtrl {
+            pulse_1: SquareCtrl {
                 duty_cycle: 0,
                 halt_flag_envelope_loop: false,
                 constant_volume: false,
@@ -87,7 +122,7 @@ impl ApuBus {
                 length_counter_load: None,
                 enabled: false,
             },
-            pulse_2: ChannelCtrl {
+            pulse_2: SquareCtrl {
                 duty_cycle: 0,
                 halt_flag_envelope_loop: false,
                 constant_volume: false,
@@ -104,6 +139,14 @@ impl ApuBus {
                 length_counter_load: None,
                 enabled: false,
             },
+            triangle: TriangleCtrl {
+                enabled: false,
+                control_flag: false,
+                reload_value: 0,
+                timer: 0,
+                length_counter_load: None,
+                linear_counter_reload: false,
+            },
             frame_mode: false,
             irq_inhibit: false,
             irq_interrupt: false,
@@ -114,14 +157,14 @@ impl ApuBus {
         match address {
             0x4000 ... 0x4003 => self.pulse_1.write(address - 0x4000, value),
             0x4004 ... 0x4007 => self.pulse_2.write(address - 0x4004, value),
-            0x4008 ... 0x400B => (),  // TODO: triangle
+            0x4008 ... 0x400B => self.triangle.write(address - 0x4008, value),
             0x400C ... 0x400F => (),  // TODO: noise
             0x4010 ... 0x4013 => (),  // TODO: DMC
             0x4015 => {
                 // TODO: DMC control
                 self.pulse_1.enabled = value & 1 > 0;
                 self.pulse_2.enabled = value & 2 > 0;
-                // TODO: triangle
+                self.triangle.enabled = value & 4 > 0;
                 // TODO: noise
                 // TODO: DMC
             }

@@ -39,7 +39,7 @@ impl Pulse {
         }
     }
 
-    fn sweep_target_period(&self, ctrl_bus: &ChannelCtrl) -> u16 {
+    fn sweep_target_period(&self, ctrl_bus: &SquareCtrl) -> u16 {
         let shift_amount = ctrl_bus.timer >> ctrl_bus.sweep.shift_count;
         if ctrl_bus.sweep.negate {
             ctrl_bus.timer - shift_amount - if ctrl_bus.sweep.ones_complement_adj { 1 } else { 0 }
@@ -48,7 +48,7 @@ impl Pulse {
         }
     }
 
-    pub fn tick(&mut self, ctrl_bus: &mut ChannelCtrl) {
+    pub fn tick(&mut self, ctrl_bus: &mut SquareCtrl) {
         if !ctrl_bus.enabled {
             self.length_counter = 0;
         } else if let Some(length_counter) = ctrl_bus.length_counter_load.take() {
@@ -91,7 +91,7 @@ impl Pulse {
         }
     }
 
-    pub fn clock_length_and_sweep(&mut self, ctrl_bus: &mut ChannelCtrl) {
+    pub fn clock_length_and_sweep(&mut self, ctrl_bus: &mut SquareCtrl) {
         if !ctrl_bus.halt_flag_envelope_loop && self.length_counter > 0 {
             self.length_counter -= 1;
         }
@@ -111,7 +111,7 @@ impl Pulse {
         }
     }
 
-    pub fn clock_envelope(&mut self, ctrl_bus: &ChannelCtrl) {
+    pub fn clock_envelope(&mut self, ctrl_bus: &SquareCtrl) {
         if self.length_written {
             self.length_written = false;
             self.envelope_delay = ctrl_bus.envelope_param;

@@ -4,11 +4,13 @@ extern crate rb;
 
 pub mod bus;
 mod pulse;
+mod triangle;
 
 use std::cell::RefCell;
 use self::rb::{SpscRb, RB, Producer, RbProducer, RbConsumer};
 use self::portaudio::*;
 use self::pulse::*;
+use self::triangle::*;
 
 use self::bus::*;
 
@@ -30,6 +32,7 @@ pub type OutputStream = Stream<NonBlocking, Output<f32>>;
 pub struct Apu<'a> {
     pulse_1: Pulse,
     pulse_2: Pulse,
+    triangle: Triangle,
     buffer: Producer<f32>,
     stream: OutputStream,
     frame_counter: u16,
@@ -55,6 +58,7 @@ impl<'a> Apu<'a> {
         Ok(Apu {
             pulse_1: Pulse::new(),
             pulse_2: Pulse::new(),
+            triangle: Triangle::new(),
             buffer: buffer_producer,
             stream,
             frame_counter: 0,
@@ -66,11 +70,13 @@ impl<'a> Apu<'a> {
     fn clock_envelope(&mut self, bus: &mut ApuBus) {
         self.pulse_1.clock_envelope(&bus.pulse_1);
         self.pulse_2.clock_envelope(&bus.pulse_2);
+        self.triangle.clock_linear_counter(&mut bus.triangle);
     }
 
     fn clock_length_and_sweep(&mut self, bus: &mut ApuBus) {
         self.pulse_1.clock_length_and_sweep(&mut bus.pulse_1);
         self.pulse_2.clock_length_and_sweep(&mut bus.pulse_2);
+        self.triangle.clock_length(&mut bus.triangle);
     }
 
     pub fn tick(&mut self) {
@@ -107,14 +113,16 @@ impl<'a> Apu<'a> {
 
         self.pulse_1.tick(&mut bus.pulse_1);
         self.pulse_2.tick(&mut bus.pulse_2);
+        self.triangle.tick(&mut bus.triangle);
     }
 
     pub fn do_frame(&mut self) {
         {
             let pulse_1 = self.pulse_1.sample_buffer();
             let pulse_2 = self.pulse_2.sample_buffer();
+            let triangle = self.triangle.sample_buffer();
             for i in 0..SAMPLES_PER_FRAME as usize {
-                let val = (pulse_1[i] + pulse_2[i]) * 0.00752;
+                let val = (pulse_1[i] + pulse_2[i]) * 0.00752 + triangle[i] * 0.00851;
                 self.frame_buffer[i] = val;
             }
         }
@@ -122,5 +130,6 @@ impl<'a> Apu<'a> {
 
         self.pulse_1.on_frame();
         self.pulse_2.on_frame();
+        self.triangle.on_frame();
     }
 }
