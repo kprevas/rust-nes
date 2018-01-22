@@ -787,6 +787,13 @@ impl<'a> Cpu<'a> {
                 self.push(p);
                 self.pc = self.read_word(0xFFFA);
                 self.ppu_bus.borrow_mut().nmi_interrupt = false;
+            } else if self.apu_bus.borrow().irq_interrupt && (self.p & 0x4) == 0 {
+                let old_pc = self.pc;
+                let p = self.p | 0b00100000;
+
+                self.push_word(old_pc);
+                self.push(p);
+                self.pc = self.read_word(0xFFFE);
             } else {
                 self.execute_opcode(instrument);
             }

@@ -79,11 +79,13 @@ impl Pulse {
         }
     }
 
-    pub fn on_frame(&mut self, ctrl_bus: &ChannelCtrl) {
-        self.sample_buffer_ptr = 0;
+    pub fn clock_length(&mut self, ctrl_bus: &ChannelCtrl) {
         if !ctrl_bus.halt_flag_envelope_loop && self.length_counter > 0 {
             self.length_counter -= 1;
         }
+    }
+
+    pub fn clock_envelope(&mut self, ctrl_bus: &ChannelCtrl) {
         if self.envelope_value == 0 {
             if ctrl_bus.halt_flag_envelope_loop {
                 self.envelope_value = ctrl_bus.envelope_param;
@@ -93,6 +95,10 @@ impl Pulse {
         } else {
             self.envelope_value -= 1;
         }
+    }
+
+    pub fn on_frame(&mut self) {
+        self.sample_buffer_ptr = 0;
     }
 
     pub fn sample_buffer(&self) -> &[f32] {

@@ -34,6 +34,7 @@ pub struct Apu<'a> {
     pulse_2: Pulse,
     buffer: Producer<f32>,
     stream: OutputStream,
+    frame_counter: u16,
     frame_buffer: Vec<f32>,
     bus: &'a RefCell<ApuBus>,
 }
@@ -59,14 +60,54 @@ impl<'a> Apu<'a> {
             pulse_2: Pulse::new(),
             buffer: buffer_producer,
             stream,
+            frame_counter: 0,
             frame_buffer: vec!(0.0; SAMPLES_PER_FRAME as usize),
             bus,
         })
     }
 
     pub fn tick(&mut self) {
+        self.frame_counter += 1;
         let mut bus = self.bus.borrow_mut();
+        match self.frame_counter {
+            3729 => {
+                self.pulse_1.clock_envelope(&bus.pulse_1);
+                self.pulse_2.clock_envelope(&bus.pulse_2);
+            },
+            7457 => {
+                self.pulse_1.clock_envelope(&bus.pulse_1);
+                self.pulse_1.clock_length(&bus.pulse_1);
+                self.pulse_2.clock_envelope(&bus.pulse_2);
+                self.pulse_2.clock_length(&bus.pulse_2);
+            },
+            11186 => {
+                self.pulse_1.clock_envelope(&bus.pulse_1);
+                self.pulse_2.clock_envelope(&bus.pulse_2);
+            },
+            14915 => {
+                if !bus.frame_mode {
+                    self.pulse_1.clock_envelope(&bus.pulse_1);
+                    self.pulse_1.clock_length(&bus.pulse_1);
+                    self.pulse_2.clock_envelope(&bus.pulse_2);
+                    self.pulse_2.clock_length(&bus.pulse_2);
+                    self.frame_counter = 0;
+                    if !bus.irq_inhibit {
+                        bus.irq_interrupt = true;
+                    }
+                }
+            },
+            18641 => {
+                self.pulse_1.clock_envelope(&bus.pulse_1);
+                self.pulse_1.clock_length(&bus.pulse_1);
+                self.pulse_2.clock_envelope(&bus.pulse_2);
+                self.pulse_2.clock_length(&bus.pulse_2);
+                self.frame_counter = 0;
+            },
+            _ => (),
+        }
+
         self.pulse_1.tick(&mut bus.pulse_1);
+        self.pulse_2.tick(&mut bus.pulse_2);
     }
 
     pub fn do_frame(&mut self) {
@@ -80,7 +121,7 @@ impl<'a> Apu<'a> {
         }
         self.buffer.write_blocking(self.frame_buffer.as_slice());
 
-        let mut bus = self.bus.borrow_mut();
-        self.pulse_1.on_frame(&mut bus.pulse_1);
+        self.pulse_1.on_frame();
+        self.pulse_2.on_frame();
     }
 }

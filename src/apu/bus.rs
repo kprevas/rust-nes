@@ -57,6 +57,11 @@ impl ChannelCtrl {
 pub struct ApuBus {
     pub pulse_1: ChannelCtrl,
     pub pulse_2: ChannelCtrl,
+
+    pub frame_mode: bool,
+    pub irq_inhibit: bool,
+
+    pub irq_interrupt: bool,
 }
 
 impl ApuBus {
@@ -92,6 +97,9 @@ impl ApuBus {
                 length_counter_load: None,
                 enabled: false,
             },
+            frame_mode: false,
+            irq_inhibit: false,
+            irq_interrupt: false,
         }
     }
 
@@ -111,7 +119,8 @@ impl ApuBus {
                 // TODO: DMC
             }
             0x4017 => {
-                // TODO: frame counter
+                self.frame_mode = value & 0x80 > 0;
+                self.irq_inhibit = value & 0x40 > 0;
             }
             _ => panic!("bad APU bus write {:04X}", address),
         }
