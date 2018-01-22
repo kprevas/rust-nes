@@ -1,4 +1,19 @@
-#[derive(Debug)]
+pub struct SweepCtrl {
+    pub enabled: bool,
+    pub period: u8,
+    pub negate: bool,
+    pub shift_count: u8,
+}
+
+impl SweepCtrl {
+    fn write(&mut self, value: u8) {
+        self.enabled = value & 0x80 > 0;
+        self.period = (value & 0x70) >> 4;
+        self.negate = value & 0x8 > 0;
+        self.shift_count = value & 0x7;
+    }
+}
+
 pub struct ChannelCtrl {
     pub enabled: bool,
 
@@ -7,7 +22,7 @@ pub struct ChannelCtrl {
     pub constant_volume: bool,
     pub envelope_param: u8,
 
-    // TODO sweep unit
+    pub sweep: SweepCtrl,
 
     pub timer: u16,
     pub length_counter_load: Option<u8>,
@@ -23,7 +38,7 @@ impl ChannelCtrl {
                 self.envelope_param = value & 0xF;
             }
             1 => {
-                // TODO sweep unit
+                self.sweep.write(value);
             }
             2 => {
                 let timer = (self.timer & (!0xFF)) + u16::from(value);
@@ -52,6 +67,12 @@ impl ApuBus {
                 halt_flag_envelope_loop: false,
                 constant_volume: false,
                 envelope_param: 0,
+                sweep: SweepCtrl {
+                    enabled: false,
+                    period: 0,
+                    negate: false,
+                    shift_count: 0,
+                },
                 timer: 0,
                 length_counter_load: None,
                 enabled: false,
@@ -61,6 +82,12 @@ impl ApuBus {
                 halt_flag_envelope_loop: false,
                 constant_volume: false,
                 envelope_param: 0,
+                sweep: SweepCtrl {
+                    enabled: false,
+                    period: 0,
+                    negate: false,
+                    shift_count: 0,
+                },
                 timer: 0,
                 length_counter_load: None,
                 enabled: false,
