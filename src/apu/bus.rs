@@ -3,6 +3,8 @@ pub struct SweepCtrl {
     pub period: u8,
     pub negate: bool,
     pub shift_count: u8,
+    pub ones_complement_adj: bool,
+    pub reload: bool,
 }
 
 impl SweepCtrl {
@@ -11,6 +13,7 @@ impl SweepCtrl {
         self.period = (value & 0x70) >> 4;
         self.negate = value & 0x8 > 0;
         self.shift_count = value & 0x7;
+        self.reload = true;
     }
 }
 
@@ -77,6 +80,8 @@ impl ApuBus {
                     period: 0,
                     negate: false,
                     shift_count: 0,
+                    ones_complement_adj: true,
+                    reload: false,
                 },
                 timer: 0,
                 length_counter_load: None,
@@ -92,6 +97,8 @@ impl ApuBus {
                     period: 0,
                     negate: false,
                     shift_count: 0,
+                    ones_complement_adj: false,
+                    reload: false,
                 },
                 timer: 0,
                 length_counter_load: None,

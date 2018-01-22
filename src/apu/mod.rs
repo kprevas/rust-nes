@@ -5,10 +5,8 @@ extern crate rb;
 pub mod bus;
 mod pulse;
 
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use std::cell::RefCell;
-use self::rb::{SpscRb, RB, Producer, RbProducer, RbConsumer, RbInspector};
+use self::rb::{SpscRb, RB, Producer, RbProducer, RbConsumer};
 use self::portaudio::*;
 use self::pulse::*;
 
@@ -46,7 +44,6 @@ impl<'a> Apu<'a> {
 
         let buffer = SpscRb::new((SAMPLES_PER_FRAME * 5) as usize);
         let (buffer_producer, buffer_consumer) = (buffer.producer(), buffer.consumer());
-        let inspector = buffer;
 
         let callback = move |OutputStreamCallbackArgs { buffer, .. }| {
             buffer_consumer.read_blocking(buffer);
@@ -66,30 +63,34 @@ impl<'a> Apu<'a> {
         })
     }
 
+    fn clock_envelope(&mut self, bus: &mut ApuBus) {
+        self.pulse_1.clock_envelope(&bus.pulse_1);
+        self.pulse_2.clock_envelope(&bus.pulse_2);
+    }
+
+    fn clock_length_and_sweep(&mut self, bus: &mut ApuBus) {
+        self.pulse_1.clock_length_and_sweep(&mut bus.pulse_1);
+        self.pulse_2.clock_length_and_sweep(&mut bus.pulse_2);
+    }
+
     pub fn tick(&mut self) {
         self.frame_counter += 1;
         let mut bus = self.bus.borrow_mut();
         match self.frame_counter {
             3729 => {
-                self.pulse_1.clock_envelope(&bus.pulse_1);
-                self.pulse_2.clock_envelope(&bus.pulse_2);
+                self.clock_envelope(&mut bus);
             },
             7457 => {
-                self.pulse_1.clock_envelope(&bus.pulse_1);
-                self.pulse_1.clock_length(&bus.pulse_1);
-                self.pulse_2.clock_envelope(&bus.pulse_2);
-                self.pulse_2.clock_length(&bus.pulse_2);
+                self.clock_envelope(&mut bus);
+                self.clock_length_and_sweep(&mut bus);
             },
             11186 => {
-                self.pulse_1.clock_envelope(&bus.pulse_1);
-                self.pulse_2.clock_envelope(&bus.pulse_2);
+                self.clock_envelope(&mut bus);
             },
             14915 => {
                 if !bus.frame_mode {
-                    self.pulse_1.clock_envelope(&bus.pulse_1);
-                    self.pulse_1.clock_length(&bus.pulse_1);
-                    self.pulse_2.clock_envelope(&bus.pulse_2);
-                    self.pulse_2.clock_length(&bus.pulse_2);
+                    self.clock_envelope(&mut bus);
+                    self.clock_length_and_sweep(&mut bus);
                     self.frame_counter = 0;
                     if !bus.irq_inhibit {
                         bus.irq_interrupt = true;
@@ -97,10 +98,8 @@ impl<'a> Apu<'a> {
                 }
             },
             18641 => {
-                self.pulse_1.clock_envelope(&bus.pulse_1);
-                self.pulse_1.clock_length(&bus.pulse_1);
-                self.pulse_2.clock_envelope(&bus.pulse_2);
-                self.pulse_2.clock_length(&bus.pulse_2);
+                self.clock_envelope(&mut bus);
+                self.clock_length_and_sweep(&mut bus);
                 self.frame_counter = 0;
             },
             _ => (),

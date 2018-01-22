@@ -19,6 +19,7 @@ pub struct Pulse {
     envelope_delay: u8,
     envelope_value: u8,
     length_written: bool,
+    sweep_counter: u8,
 }
 
 impl Pulse {
@@ -34,6 +35,16 @@ impl Pulse {
             envelope_delay: 0,
             envelope_value: 15,
             length_written: false,
+            sweep_counter: 0,
+        }
+    }
+
+    fn sweep_target_period(&self, ctrl_bus: &ChannelCtrl) -> u16 {
+        let shift_amount = ctrl_bus.timer >> ctrl_bus.sweep.shift_count;
+        if ctrl_bus.sweep.negate {
+            ctrl_bus.timer - shift_amount - if ctrl_bus.sweep.ones_complement_adj { 1 } else { 0 }
+        } else {
+            ctrl_bus.timer + shift_amount
         }
     }
 
@@ -46,7 +57,7 @@ impl Pulse {
         }
 
         let tick_val;
-        if self.length_counter > 0 {
+        if self.length_counter > 0 || self.sweep_target_period(&ctrl_bus) > 0x7FF {
             if self.curr_timer == 0 {
                 self.curr_timer = ctrl_bus.timer;
                 if ctrl_bus.timer >= 8 {
@@ -80,9 +91,23 @@ impl Pulse {
         }
     }
 
-    pub fn clock_length(&mut self, ctrl_bus: &ChannelCtrl) {
+    pub fn clock_length_and_sweep(&mut self, ctrl_bus: &mut ChannelCtrl) {
         if !ctrl_bus.halt_flag_envelope_loop && self.length_counter > 0 {
             self.length_counter -= 1;
+        }
+        if self.sweep_counter == 0 || ctrl_bus.sweep.reload {
+            if self.sweep_counter == 0 {
+                if ctrl_bus.sweep.enabled {
+                    let target_period = self.sweep_target_period(&ctrl_bus);
+                    if target_period <= 0x7FF {
+                        ctrl_bus.timer = target_period;
+                    }
+                }
+            }
+            self.sweep_counter = ctrl_bus.sweep.period;
+            ctrl_bus.sweep.reload = false;
+        } else {
+            self.sweep_counter -= 1;
         }
     }
 
