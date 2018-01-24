@@ -11,10 +11,6 @@ const DUTY_CYCLES: [[bool; 8]; 4] = [
 pub struct Pulse {
     curr_timer: u16,
     curr_cycle: usize,
-    tick_buffer: Box<[f32]>,
-    tick_buffer_ptr: usize,
-    sample_buffer: Box<[f32]>,
-    sample_buffer_ptr: usize,
     length_counter: u8,
     envelope_delay: u8,
     envelope_value: u8,
@@ -27,10 +23,6 @@ impl Pulse {
         Pulse {
             curr_timer: 0,
             curr_cycle: 0,
-            tick_buffer: vec![0.0; TICKS_PER_SAMPLE as usize].into_boxed_slice(),
-            tick_buffer_ptr: 0,
-            sample_buffer: vec![0.0; SAMPLES_PER_FRAME as usize].into_boxed_slice(),
-            sample_buffer_ptr: 0,
             length_counter: 0,
             envelope_delay: 0,
             envelope_value: 15,
@@ -48,7 +40,7 @@ impl Pulse {
         }
     }
 
-    pub fn tick(&mut self, ctrl_bus: &mut SquareCtrl) {
+    pub fn tick(&mut self, ctrl_bus: &mut SquareCtrl) -> f32 {
         if !ctrl_bus.enabled {
             self.length_counter = 0;
         } else if let Some(length_counter) = ctrl_bus.length_counter_load.take() {
@@ -71,7 +63,7 @@ impl Pulse {
         } else {
             tick_val = false;
         }
-        self.tick_buffer[self.tick_buffer_ptr] = if tick_val {
+        if tick_val {
             if ctrl_bus.constant_volume {
                 f32::from(ctrl_bus.envelope_param)
             } else {
@@ -79,15 +71,6 @@ impl Pulse {
             }
         } else {
             0.0
-        };
-
-        self.tick_buffer_ptr += 1;
-        if self.tick_buffer_ptr == TICKS_PER_SAMPLE as usize {
-            let avg = self.tick_buffer.iter().fold(0.0f32, |a, &b| { a + b })
-                / f32::from(TICKS_PER_SAMPLE);
-            self.sample_buffer[self.sample_buffer_ptr] = avg;
-            self.sample_buffer_ptr += 1;
-            self.tick_buffer_ptr = 0;
         }
     }
 
@@ -128,13 +111,5 @@ impl Pulse {
             self.envelope_delay = ctrl_bus.envelope_param;
             self.envelope_value -= 1;
         }
-    }
-
-    pub fn on_frame(&mut self) {
-        self.sample_buffer_ptr = 0;
-    }
-
-    pub fn sample_buffer(&self) -> &[f32] {
-        &self.sample_buffer
     }
 }

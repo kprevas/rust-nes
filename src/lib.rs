@@ -13,6 +13,8 @@ use std::cell::RefCell;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::io::prelude::*;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use piston_window::*;
 
@@ -82,11 +84,13 @@ pub fn run(matches: clap::ArgMatches) {
         let ppu_bus = RefCell::new(ppu::bus::PpuBus::new());
         let apu_bus = RefCell::new(apu::bus::ApuBus::new());
 
+        let audio_buffer_underrun = Arc::new(AtomicBool::new(false));
+
         let mut ppu = ppu::Ppu::new(&mut cartridge.ppu_bus, &ppu_bus, Some(&mut window));
 
         let mut cpu = cpu::Cpu::boot(&mut cartridge.cpu_bus, &ppu_bus, &apu_bus);
 
-        let mut apu = apu::Apu::new(&apu_bus).unwrap();
+        let mut apu = apu::Apu::new(&apu_bus, audio_buffer_underrun.clone()).unwrap();
 
         let mut cpu_dots = 0f32;
         let mut apu_dots = 0f32;
@@ -132,10 +136,17 @@ pub fn run(matches: clap::ArgMatches) {
             if let Some(_r) = e.render_args() {
                 window.draw_2d(&e, |c, gl| {
                     ppu.render(c, gl);
+                    if audio_buffer_underrun.load(Ordering::Relaxed) {
+                        rectangle([1.0, 0.0, 0.0, 1.0], [5.0, 230.0, 10.0, 10.0], c.transform, gl);
+                    }
                     if dump_vram {
                         ppu.dump_ram(c, gl, &mut glyphs);
                     }
                 });
+            }
+
+            if let Some(_c) = e.close_args() {
+                apu.close().unwrap();
             }
         }
     }
@@ -168,7 +179,6 @@ fn do_frame(window: &mut PistonWindow,
         }
         ppu.tick(instrument_ppu, Some(&mut window.encoder));
     }
-    apu.do_frame();
     if time_frame {
         debug!(target: "timing", "frame took {}", start_time.to(time::PreciseTime::now()));
     }

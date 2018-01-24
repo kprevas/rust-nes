@@ -1,13 +1,17 @@
 extern crate sample;
 extern crate portaudio;
 extern crate rb;
+extern crate time;
 
 pub mod bus;
 mod pulse;
 mod triangle;
 
 use std::cell::RefCell;
-use self::rb::{SpscRb, RB, Producer, RbProducer, RbConsumer};
+use std::collections::VecDeque;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use self::rb::{SpscRb, RB, Producer, RbProducer, RbConsumer, RbInspector};
 use self::portaudio::*;
 use self::pulse::*;
 use self::triangle::*;
@@ -15,10 +19,9 @@ use self::triangle::*;
 use self::bus::*;
 
 const CHANNELS: i32 = 1;
-const FRAMES: u32 = 256;
-const SAMPLE_HZ: f64 = 44_100.0;
-const TICKS_PER_SAMPLE: u8 = (894_886.5 / 44_100.0) as u8;
-const SAMPLES_PER_FRAME: u16 = 44_100 / 60;
+const FRAMES: u32 = 512;
+const TARGET_HZ: f64 = 44_100.0;
+const TICKS_PER_SAMPLE: usize = 20;
 
 const LENGTH_TABLE: [u8; 0x20] = [
     0x0A, 0xFE, 0x14, 0x02, 0x28, 0x04, 0x50, 0x06,
@@ -33,22 +36,24 @@ pub struct Apu<'a> {
     pulse_1: Pulse,
     pulse_2: Pulse,
     triangle: Triangle,
-    buffer: Producer<f32>,
-    stream: OutputStream,
     frame_counter: u16,
-    frame_buffer: Vec<f32>,
+    output_buffer: Producer<f32>,
+    stream: OutputStream,
+    buffer: Box<VecDeque<f32>>,
     bus: &'a RefCell<ApuBus>,
 }
 
 impl<'a> Apu<'a> {
-    pub fn new(bus: &RefCell<ApuBus>) -> Result<Apu, Error> {
+    pub fn new(bus: &RefCell<ApuBus>, underrun: Arc<AtomicBool>) -> Result<Apu, Error> {
         let pa = PortAudio::new()?;
-        let settings = pa.default_output_stream_settings::<f32>(CHANNELS, SAMPLE_HZ, FRAMES)?;
+        let settings = pa.default_output_stream_settings::<f32>(CHANNELS, TARGET_HZ, FRAMES)?;
 
-        let buffer = SpscRb::new((SAMPLES_PER_FRAME * 5) as usize);
+        let buffer = SpscRb::new((FRAMES * 5) as usize);
         let (buffer_producer, buffer_consumer) = (buffer.producer(), buffer.consumer());
+        let inspector = buffer;
 
-        let callback = move |OutputStreamCallbackArgs { buffer, .. }| {
+        let callback = move |OutputStreamCallbackArgs { buffer, frames, .. }| {
+            underrun.store(inspector.count() < frames, Ordering::Relaxed);
             buffer_consumer.read_blocking(buffer);
             Continue
         };
@@ -59,10 +64,10 @@ impl<'a> Apu<'a> {
             pulse_1: Pulse::new(),
             pulse_2: Pulse::new(),
             triangle: Triangle::new(),
-            buffer: buffer_producer,
-            stream,
             frame_counter: 0,
-            frame_buffer: vec!(0.0; SAMPLES_PER_FRAME as usize),
+            output_buffer: buffer_producer,
+            stream,
+            buffer: Box::new(VecDeque::with_capacity(TICKS_PER_SAMPLE + 1)),
             bus,
         })
     }
@@ -111,25 +116,22 @@ impl<'a> Apu<'a> {
             _ => (),
         }
 
-        self.pulse_1.tick(&mut bus.pulse_1);
-        self.pulse_2.tick(&mut bus.pulse_2);
-        self.triangle.tick(&mut bus.triangle);
+        let pulse_1 = self.pulse_1.tick(&mut bus.pulse_1);
+        let pulse_2 = self.pulse_2.tick(&mut bus.pulse_2);
+        let triangle = self.triangle.tick(&mut bus.triangle);
+        self.buffer.push_back((pulse_1 + pulse_2) * 0.00752 + triangle * 0.00851);
+        if self.buffer.len() >= TICKS_PER_SAMPLE {
+            let mut sum = 0.0;
+            for _ in 0..TICKS_PER_SAMPLE {
+                sum += self.buffer.pop_front().unwrap();
+            }
+            let avg = sum / (TICKS_PER_SAMPLE as f32);
+            self.output_buffer.write_blocking(&[avg]);
+        }
     }
 
-    pub fn do_frame(&mut self) {
-        {
-            let pulse_1 = self.pulse_1.sample_buffer();
-            let pulse_2 = self.pulse_2.sample_buffer();
-            let triangle = self.triangle.sample_buffer();
-            for i in 0..SAMPLES_PER_FRAME as usize {
-                let val = (pulse_1[i] + pulse_2[i]) * 0.00752 + triangle[i] * 0.00851;
-                self.frame_buffer[i] = val;
-            }
-        }
-        self.buffer.write_blocking(self.frame_buffer.as_slice());
-
-        self.pulse_1.on_frame();
-        self.pulse_2.on_frame();
-        self.triangle.on_frame();
+    pub fn close(&mut self) -> Result<(), Error> {
+        self.stream.abort()?;
+        Ok(())
     }
 }
