@@ -13,8 +13,6 @@ use std::cell::RefCell;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::io::prelude::*;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 use piston_window::*;
 
@@ -84,16 +82,14 @@ pub fn run(matches: clap::ArgMatches) {
         let ppu_bus = RefCell::new(ppu::bus::PpuBus::new());
         let apu_bus = RefCell::new(apu::bus::ApuBus::new());
 
-        let audio_buffer_underrun = Arc::new(AtomicBool::new(false));
-
         let mut ppu = ppu::Ppu::new(&mut cartridge.ppu_bus, &ppu_bus, Some(&mut window));
 
         let mut cpu = cpu::Cpu::boot(&mut cartridge.cpu_bus, &ppu_bus, &apu_bus);
 
-        let mut apu = apu::Apu::new(&apu_bus, audio_buffer_underrun.clone()).unwrap();
+        let mut apu = apu::Apu::new(&apu_bus).unwrap();
 
-        let mut cpu_dots = 0f32;
-        let mut apu_dots = 0f32;
+        let mut cpu_dots = 0.0;
+        let mut apu_dots = 0.0;
 
         while let Some(e) = window.next() {
             if let Some(Button::Keyboard(key)) = e.press_args() {
@@ -129,16 +125,13 @@ pub fn run(matches: clap::ArgMatches) {
 
             if let Some(_u) = e.update_args() {
                 if !step {
-                    do_frame(&mut window, &mut cpu, &mut ppu, &mut apu, &mut cpu_dots, &mut apu_dots, inputs, instrument_cpu, instrument_ppu, time_frame)
+                    do_frame(&mut window, &mut cpu, &mut ppu, &mut apu, &mut cpu_dots, &mut apu_dots, inputs, instrument_cpu, instrument_ppu, time_frame);
                 }
             }
 
             if let Some(_r) = e.render_args() {
                 window.draw_2d(&e, |c, gl| {
                     ppu.render(c, gl);
-                    if audio_buffer_underrun.load(Ordering::Relaxed) {
-                        rectangle([1.0, 0.0, 0.0, 1.0], [5.0, 230.0, 10.0, 10.0], c.transform, gl);
-                    }
                     if dump_vram {
                         ppu.dump_ram(c, gl, &mut glyphs);
                     }
@@ -168,15 +161,13 @@ fn do_frame(window: &mut PistonWindow,
         if *cpu_dots <= 0.0 {
             cpu.tick(instrument_cpu, inputs);
             *cpu_dots += CPU_PER_PPU;
-        } else {
-            *cpu_dots -= 1.0;
         }
+        *cpu_dots -= 1.0;
         if *apu_dots <= 0.0 {
             apu.tick();
             *apu_dots += APU_PER_PPU;
-        } else {
-            *apu_dots -= 1.0;
         }
+        *apu_dots -= 1.0;
         ppu.tick(instrument_ppu, Some(&mut window.encoder));
     }
     if time_frame {

@@ -8,9 +8,6 @@ mod pulse;
 mod triangle;
 
 use std::cell::RefCell;
-use std::collections::VecDeque;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use self::rb::{SpscRb, RB, Producer, RbProducer, RbConsumer, RbInspector};
 use self::portaudio::*;
 use self::pulse::*;
@@ -19,7 +16,7 @@ use self::triangle::*;
 use self::bus::*;
 
 const CHANNELS: i32 = 1;
-const FRAMES: u32 = 512;
+const FRAMES: u32 = 735;
 const TARGET_HZ: f64 = 44_100.0;
 const TICKS_PER_SAMPLE: usize = 20;
 
@@ -39,22 +36,40 @@ pub struct Apu<'a> {
     frame_counter: u16,
     output_buffer: Producer<f32>,
     stream: OutputStream,
-    buffer: Box<VecDeque<f32>>,
     bus: &'a RefCell<ApuBus>,
 }
 
 impl<'a> Apu<'a> {
-    pub fn new(bus: &RefCell<ApuBus>, underrun: Arc<AtomicBool>) -> Result<Apu, Error> {
+    pub fn new(bus: &RefCell<ApuBus>) -> Result<Apu, Error> {
         let pa = PortAudio::new()?;
         let settings = pa.default_output_stream_settings::<f32>(CHANNELS, TARGET_HZ, FRAMES)?;
 
-        let buffer = SpscRb::new((FRAMES * 5) as usize);
+        let buffer = SpscRb::new(1_000_000);
         let (buffer_producer, buffer_consumer) = (buffer.producer(), buffer.consumer());
+
+        let mut resample_data = Box::new(vec![0.0; 20_000]);
         let inspector = buffer;
 
         let callback = move |OutputStreamCallbackArgs { buffer, frames, .. }| {
-            underrun.store(inspector.count() < frames, Ordering::Relaxed);
-            buffer_consumer.read_blocking(buffer);
+            let ticks_to_read = inspector.count().min(TICKS_PER_SAMPLE * frames);
+            buffer_consumer.read_blocking(&mut resample_data[0..ticks_to_read]);
+            let ticks_per_sample = ((ticks_to_read as f32) / (frames as f32)).floor() as i16;
+            let mut buffer_ptr = 0;
+            let mut sum = 0.0;
+            let mut ticks = 0;
+            for tick_val in resample_data.iter().take(ticks_to_read) {
+                sum += tick_val;
+                ticks += 1;
+                if ticks >= ticks_per_sample {
+                    buffer[buffer_ptr] = sum / (ticks as f32);
+                    buffer_ptr += 1;
+                    if buffer_ptr >= frames {
+                        break;
+                    }
+                    sum = 0.0;
+                    ticks = 0;
+                }
+            }
             Continue
         };
         let mut stream = pa.open_non_blocking_stream(settings, callback)?;
@@ -67,7 +82,6 @@ impl<'a> Apu<'a> {
             frame_counter: 0,
             output_buffer: buffer_producer,
             stream,
-            buffer: Box::new(VecDeque::with_capacity(TICKS_PER_SAMPLE + 1)),
             bus,
         })
     }
@@ -119,15 +133,7 @@ impl<'a> Apu<'a> {
         let pulse_1 = self.pulse_1.tick(&mut bus.pulse_1);
         let pulse_2 = self.pulse_2.tick(&mut bus.pulse_2);
         let triangle = self.triangle.tick(&mut bus.triangle);
-        self.buffer.push_back((pulse_1 + pulse_2) * 0.00752 + triangle * 0.00851);
-        if self.buffer.len() >= TICKS_PER_SAMPLE {
-            let mut sum = 0.0;
-            for _ in 0..TICKS_PER_SAMPLE {
-                sum += self.buffer.pop_front().unwrap();
-            }
-            let avg = sum / (TICKS_PER_SAMPLE as f32);
-            self.output_buffer.write_blocking(&[avg]);
-        }
+        self.output_buffer.write_blocking(&[(pulse_1 + pulse_2) * 0.00752 + triangle * 0.00851]);
     }
 
     pub fn close(&mut self) -> Result<(), Error> {

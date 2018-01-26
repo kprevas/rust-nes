@@ -25,8 +25,8 @@ pub struct Header {
     prg_ram_blocks: u8,
     flags_6: u8,
     flags_7: u8,
-    flags_9: u8,
-    flags_10: u8,
+    _flags_9: u8,
+    _flags_10: u8,
 }
 
 pub fn read(src: &mut Read) -> SimpleResult<Cartridge> {
@@ -41,8 +41,8 @@ pub fn read(src: &mut Read) -> SimpleResult<Cartridge> {
         prg_ram_blocks: contents[8],
         flags_6: contents[6],
         flags_7: contents[7],
-        flags_9: contents[9],
-        flags_10: contents[10],
+        _flags_9: contents[9],
+        _flags_10: contents[10],
     };
     assert_eq!([0, 0, 0, 0, 0], contents[11..16]);
     // TODO check for trainer
