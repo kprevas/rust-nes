@@ -6,12 +6,14 @@ extern crate time;
 pub mod bus;
 mod pulse;
 mod triangle;
+mod noise;
 
 use std::cell::RefCell;
 use self::rb::{SpscRb, RB, Producer, RbProducer, RbConsumer, RbInspector};
 use self::portaudio::*;
 use self::pulse::*;
 use self::triangle::*;
+use self::noise::*;
 
 use self::bus::*;
 
@@ -33,6 +35,7 @@ pub struct Apu<'a> {
     pulse_1: Pulse,
     pulse_2: Pulse,
     triangle: Triangle,
+    noise: Noise,
     frame_counter: u16,
     output_buffer: Producer<f32>,
     stream: OutputStream,
@@ -79,6 +82,7 @@ impl<'a> Apu<'a> {
             pulse_1: Pulse::new(),
             pulse_2: Pulse::new(),
             triangle: Triangle::new(),
+            noise: Noise::new(),
             frame_counter: 0,
             output_buffer: buffer_producer,
             stream,
@@ -90,12 +94,14 @@ impl<'a> Apu<'a> {
         self.pulse_1.clock_envelope(&bus.pulse_1);
         self.pulse_2.clock_envelope(&bus.pulse_2);
         self.triangle.clock_linear_counter(&mut bus.triangle);
+        self.noise.clock_envelope(&bus.noise);
     }
 
     fn clock_length_and_sweep(&mut self, bus: &mut ApuBus) {
         self.pulse_1.clock_length_and_sweep(&mut bus.pulse_1);
         self.pulse_2.clock_length_and_sweep(&mut bus.pulse_2);
         self.triangle.clock_length(&mut bus.triangle);
+        self.noise.clock_length(&bus.noise);
     }
 
     pub fn tick(&mut self) {
@@ -133,7 +139,8 @@ impl<'a> Apu<'a> {
         let pulse_1 = self.pulse_1.tick(&mut bus.pulse_1);
         let pulse_2 = self.pulse_2.tick(&mut bus.pulse_2);
         let triangle = self.triangle.tick(&mut bus.triangle);
-        self.output_buffer.write_blocking(&[(pulse_1 + pulse_2) * 0.00752 + triangle * 0.00851]);
+        let noise = self.noise.tick(&mut bus.noise);
+        self.output_buffer.write_blocking(&[(pulse_1 + pulse_2) * 0.00752 + triangle * 0.00851 + noise * 0.00494]);
     }
 
     pub fn close(&mut self) -> Result<(), Error> {

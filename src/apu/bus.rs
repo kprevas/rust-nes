@@ -91,10 +91,45 @@ impl TriangleCtrl {
     }
 }
 
+pub struct NoiseCtrl {
+    pub enabled: bool,
+
+    pub halt_flag_envelope_loop: bool,
+    pub constant_volume: bool,
+    pub envelope_param: u8,
+
+    pub loop_noise: bool,
+    pub timer: u16,
+
+    pub length_counter_load: Option<u8>,
+}
+
+impl NoiseCtrl {
+    fn write(&mut self, address: u16, value: u8) {
+        match address {
+            0 => {
+                self.halt_flag_envelope_loop = (value >> 5) & 1 > 0;
+                self.constant_volume = (value >> 4) & 1 > 0;
+                self.envelope_param = value & 0xF;
+            }
+            1 => (),
+            2 => {
+                self.loop_noise = (value >> 7) & 1 > 0;
+                self.timer = super::noise::TIMER_VALUES[(value & 0xF) as usize];
+            }
+            3 => {
+                self.length_counter_load = Some((value & (!0x7)) >> 3);
+            }
+            _ => panic!("bad APU channel control write {:04X}", address),
+        }
+    }
+}
+
 pub struct ApuBus {
     pub pulse_1: SquareCtrl,
     pub pulse_2: SquareCtrl,
     pub triangle: TriangleCtrl,
+    pub noise: NoiseCtrl,
 
     pub frame_mode: bool,
     pub irq_inhibit: bool,
@@ -147,6 +182,15 @@ impl ApuBus {
                 length_counter_load: None,
                 linear_counter_reload: false,
             },
+            noise: NoiseCtrl {
+                enabled: false,
+                halt_flag_envelope_loop: false,
+                constant_volume: false,
+                envelope_param: 0,
+                loop_noise: false,
+                timer: 0,
+                length_counter_load: None,
+            },
             frame_mode: false,
             irq_inhibit: false,
             irq_interrupt: false,
@@ -158,14 +202,14 @@ impl ApuBus {
             0x4000 ... 0x4003 => self.pulse_1.write(address - 0x4000, value),
             0x4004 ... 0x4007 => self.pulse_2.write(address - 0x4004, value),
             0x4008 ... 0x400B => self.triangle.write(address - 0x4008, value),
-            0x400C ... 0x400F => (),  // TODO: noise
+            0x400C ... 0x400F => self.noise.write(address - 0x400C, value),
             0x4010 ... 0x4013 => (),  // TODO: DMC
             0x4015 => {
                 // TODO: DMC control
                 self.pulse_1.enabled = value & 1 > 0;
                 self.pulse_2.enabled = value & 2 > 0;
                 self.triangle.enabled = value & 4 > 0;
-                // TODO: noise
+                self.noise.enabled = value & 8 > 0;
                 // TODO: DMC
             }
             0x4017 => {
