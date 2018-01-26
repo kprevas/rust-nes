@@ -47,7 +47,7 @@ impl<'a> Apu<'a> {
         let pa = PortAudio::new()?;
         let settings = pa.default_output_stream_settings::<f32>(CHANNELS, TARGET_HZ, FRAMES)?;
 
-        let buffer = SpscRb::new(1_000_000);
+        let buffer = SpscRb::new(100_000);
         let (buffer_producer, buffer_consumer) = (buffer.producer(), buffer.consumer());
 
         let mut resample_data = Box::new(vec![0.0; 20_000]);
@@ -55,6 +55,9 @@ impl<'a> Apu<'a> {
 
         let callback = move |OutputStreamCallbackArgs { buffer, frames, .. }| {
             let ticks_to_read = inspector.count().min(TICKS_PER_SAMPLE * frames);
+            while inspector.count() > ticks_to_read * 2 {
+                buffer_consumer.read_blocking(&mut resample_data[0..ticks_to_read]);
+            }
             buffer_consumer.read_blocking(&mut resample_data[0..ticks_to_read]);
             let ticks_per_sample = ((ticks_to_read as f32) / (frames as f32)).floor() as i16;
             let mut buffer_ptr = 0;
