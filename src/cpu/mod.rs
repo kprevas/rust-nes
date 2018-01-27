@@ -774,6 +774,11 @@ impl<'a> Cpu<'a> {
         if self.controller_strobe {
             self.last_inputs = inputs.to_u8();
         }
+        let mut apu_bus = self.apu_bus.borrow_mut();
+        if apu_bus.dmc_delay {
+            apu_bus.dmc_delay = false;
+            self.cycles_to_next += if self.oam_dma_write.is_none() { 2 } else { 4 };
+        }
         if self.cycles_to_next == 0 {
             if let Some((addr, i)) = self.oam_dma_write {
                 let data = self.read_memory(u16::from(addr) * 0x100 + u16::from(i));

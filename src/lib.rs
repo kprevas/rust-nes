@@ -164,7 +164,7 @@ fn do_frame(window: &mut PistonWindow,
         }
         *cpu_dots -= 1.0;
         if *apu_dots <= 0.0 {
-            apu.tick();
+            apu.tick(&mut |addr| { cpu.read_memory(addr) });
             *apu_dots += APU_PER_PPU;
         }
         *apu_dots -= 1.0;

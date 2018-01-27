@@ -7,6 +7,7 @@ pub mod bus;
 mod pulse;
 mod triangle;
 mod noise;
+mod dmc;
 
 use std::cell::RefCell;
 use self::rb::{SpscRb, RB, Producer, RbProducer, RbConsumer, RbInspector};
@@ -14,6 +15,7 @@ use self::portaudio::*;
 use self::pulse::*;
 use self::triangle::*;
 use self::noise::*;
+use self::dmc::*;
 
 use self::bus::*;
 
@@ -36,6 +38,7 @@ pub struct Apu<'a> {
     pulse_2: Pulse,
     triangle: Triangle,
     noise: Noise,
+    dmc: Dmc,
     frame_counter: u16,
     output_buffer: Producer<f32>,
     stream: OutputStream,
@@ -86,6 +89,7 @@ impl<'a> Apu<'a> {
             pulse_2: Pulse::new(),
             triangle: Triangle::new(),
             noise: Noise::new(),
+            dmc: Dmc::new(),
             frame_counter: 0,
             output_buffer: buffer_producer,
             stream,
@@ -107,7 +111,7 @@ impl<'a> Apu<'a> {
         self.noise.clock_length(&bus.noise);
     }
 
-    pub fn tick(&mut self) {
+    pub fn tick(&mut self, cpu_reader: &mut FnMut(u16) -> u8) {
         self.frame_counter += 1;
         let mut bus = self.bus.borrow_mut();
         match self.frame_counter {
@@ -143,7 +147,9 @@ impl<'a> Apu<'a> {
         let pulse_2 = self.pulse_2.tick(&mut bus.pulse_2);
         let triangle = self.triangle.tick(&mut bus.triangle);
         let noise = self.noise.tick(&mut bus.noise);
-        self.output_buffer.write_blocking(&[(pulse_1 + pulse_2) * 0.00752 + triangle * 0.00851 + noise * 0.00494]);
+        let dmc = self.dmc.tick(&mut bus, cpu_reader);
+        self.output_buffer.write_blocking(
+            &[(pulse_1 + pulse_2) * 0.00752 + triangle * 0.00851 + noise * 0.00494 + dmc * 0.00335]);
     }
 
     pub fn close(&mut self) -> Result<(), Error> {

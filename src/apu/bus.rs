@@ -125,15 +125,46 @@ impl NoiseCtrl {
     }
 }
 
+pub struct DmcCtrl {
+    pub enabled: bool,
+
+    pub irq_enabled: bool,
+    pub loop_sample: bool,
+    pub rate: u16,
+
+    pub direct_load: Option<u8>,
+
+    pub sample_address: u16,
+    pub sample_length: u16,
+}
+
+impl DmcCtrl {
+    fn write(&mut self, address: u16, value: u8) {
+        match address {
+            0 => {
+                self.irq_enabled = (value >> 7) & 1 > 0;
+                self.loop_sample = (value >> 6) & 1 > 0;
+                self.rate = super::dmc::TIMER_VALUES[(value & 0xF) as usize];
+            }
+            1 => self.direct_load = Some(value & (!0x80)),
+            2 => self.sample_address = 0xC000 + u16::from(value) * 64,
+            3 => self.sample_length = u16::from(value) * 16 + 1,
+            _ => panic!("bad APU channel control write {:04X}", address),
+        }
+    }
+}
+
 pub struct ApuBus {
     pub pulse_1: SquareCtrl,
     pub pulse_2: SquareCtrl,
     pub triangle: TriangleCtrl,
     pub noise: NoiseCtrl,
+    pub dmc: DmcCtrl,
 
     pub frame_mode: bool,
     pub irq_inhibit: bool,
 
+    pub dmc_delay: bool,
     pub irq_interrupt: bool,
 }
 
@@ -191,8 +222,18 @@ impl ApuBus {
                 timer: 0,
                 length_counter_load: None,
             },
+            dmc: DmcCtrl {
+                enabled: false,
+                irq_enabled: false,
+                loop_sample: false,
+                rate: 0,
+                direct_load: None,
+                sample_address: 0,
+                sample_length: 0,
+            },
             frame_mode: false,
             irq_inhibit: false,
+            dmc_delay: false,
             irq_interrupt: false,
         }
     }
@@ -203,14 +244,13 @@ impl ApuBus {
             0x4004 ... 0x4007 => self.pulse_2.write(address - 0x4004, value),
             0x4008 ... 0x400B => self.triangle.write(address - 0x4008, value),
             0x400C ... 0x400F => self.noise.write(address - 0x400C, value),
-            0x4010 ... 0x4013 => (),  // TODO: DMC
+            0x4010 ... 0x4013 => self.dmc.write(address - 0x4010, value),
             0x4015 => {
-                // TODO: DMC control
                 self.pulse_1.enabled = value & 1 > 0;
                 self.pulse_2.enabled = value & 2 > 0;
                 self.triangle.enabled = value & 4 > 0;
                 self.noise.enabled = value & 8 > 0;
-                // TODO: DMC
+                self.dmc.enabled = value & 0x10 > 0;
             }
             0x4017 => {
                 self.frame_mode = value & 0x80 > 0;
