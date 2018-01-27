@@ -28,6 +28,7 @@ pub struct SquareCtrl {
     pub sweep: SweepCtrl,
 
     pub timer: u16,
+    pub length_counter: u8,
     pub length_counter_load: Option<u8>,
 }
 
@@ -64,6 +65,7 @@ pub struct TriangleCtrl {
     pub reload_value: u8,
 
     pub timer: u16,
+    pub length_counter: u8,
     pub length_counter_load: Option<u8>,
     pub linear_counter_reload: bool,
 }
@@ -101,6 +103,7 @@ pub struct NoiseCtrl {
     pub loop_noise: bool,
     pub timer: u16,
 
+    pub length_counter: u8,
     pub length_counter_load: Option<u8>,
 }
 
@@ -136,6 +139,8 @@ pub struct DmcCtrl {
 
     pub sample_address: u16,
     pub sample_length: u16,
+
+    pub bytes_remaining: u16,
 }
 
 impl DmcCtrl {
@@ -162,10 +167,11 @@ pub struct ApuBus {
     pub dmc: DmcCtrl,
 
     pub frame_mode: bool,
-    pub irq_inhibit: bool,
+    pub frame_irq_inhibit: bool,
 
     pub dmc_delay: bool,
-    pub irq_interrupt: bool,
+    pub frame_interrupt: bool,
+    pub dmc_interrupt: bool,
 }
 
 impl ApuBus {
@@ -185,6 +191,7 @@ impl ApuBus {
                     reload: false,
                 },
                 timer: 0,
+                length_counter: 0,
                 length_counter_load: None,
                 enabled: false,
             },
@@ -202,6 +209,7 @@ impl ApuBus {
                     reload: false,
                 },
                 timer: 0,
+                length_counter: 0,
                 length_counter_load: None,
                 enabled: false,
             },
@@ -210,6 +218,7 @@ impl ApuBus {
                 control_flag: false,
                 reload_value: 0,
                 timer: 0,
+                length_counter: 0,
                 length_counter_load: None,
                 linear_counter_reload: false,
             },
@@ -220,6 +229,7 @@ impl ApuBus {
                 envelope_param: 0,
                 loop_noise: false,
                 timer: 0,
+                length_counter: 0,
                 length_counter_load: None,
             },
             dmc: DmcCtrl {
@@ -230,11 +240,13 @@ impl ApuBus {
                 direct_load: None,
                 sample_address: 0,
                 sample_length: 0,
+                bytes_remaining: 0,
             },
             frame_mode: false,
-            irq_inhibit: false,
+            frame_irq_inhibit: false,
             dmc_delay: false,
-            irq_interrupt: false,
+            frame_interrupt: false,
+            dmc_interrupt: false,
         }
     }
 
@@ -251,12 +263,44 @@ impl ApuBus {
                 self.triangle.enabled = value & 4 > 0;
                 self.noise.enabled = value & 8 > 0;
                 self.dmc.enabled = value & 0x10 > 0;
+                self.dmc_interrupt = false;
             }
             0x4017 => {
                 self.frame_mode = value & 0x80 > 0;
-                self.irq_inhibit = value & 0x40 > 0;
+                self.frame_irq_inhibit = value & 0x40 > 0;
             }
             _ => panic!("bad APU bus write {:04X}", address),
         }
+    }
+
+    pub fn read_status(&mut self) -> u8 {
+        let mut status = 0;
+        if self.pulse_1.length_counter > 0 {
+            status += 1 << 0;
+        }
+        if self.pulse_2.length_counter > 0 {
+            status += 1 << 1;
+        }
+        if self.triangle.length_counter > 0 {
+            status += 1 << 2;
+        }
+        if self.noise.length_counter > 0 {
+            status += 1 << 3;
+        }
+        if self.dmc.bytes_remaining > 0 {
+            status += 1 << 4;
+        }
+        if self.frame_interrupt {
+            status += 1 << 6;
+        }
+        if self.dmc_interrupt {
+            status += 1 << 7;
+        }
+        self.frame_interrupt = false;
+        status
+    }
+
+    pub fn irq_interrupt(&self) -> bool {
+        self.frame_interrupt || self.dmc_interrupt
     }
 }

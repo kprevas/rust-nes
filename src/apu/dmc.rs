@@ -6,7 +6,6 @@ pub struct Dmc {
     started: bool,
     curr_timer: u16,
     address: u16,
-    bytes_remaining: u16,
     sample_buffer: Option<u8>,
     shift_register: u8,
     bits_remaining: u8,
@@ -20,7 +19,6 @@ impl Dmc {
             started: false,
             curr_timer: 0,
             address: 0,
-            bytes_remaining: 0,
             sample_buffer: None,
             shift_register: 0,
             bits_remaining: 8,
@@ -30,13 +28,14 @@ impl Dmc {
     }
 
     pub fn tick(&mut self, cpu_bus: &mut ApuBus, cpu_reader: &mut FnMut(u16) -> u8) -> f32 {
-        let ctrl_bus = &cpu_bus.dmc;
+        let ctrl_bus = &mut cpu_bus.dmc;
         if !self.started && ctrl_bus.enabled {
+            self.started = true;
             self.address = ctrl_bus.sample_address;
-            self.bytes_remaining = ctrl_bus.sample_length;
+            ctrl_bus.bytes_remaining = ctrl_bus.sample_length;
         }
         if ctrl_bus.enabled {
-            if self.sample_buffer.is_none() && self.bytes_remaining > 0 {
+            if self.sample_buffer.is_none() && ctrl_bus.bytes_remaining > 0 {
                 cpu_bus.dmc_delay = true;
                 self.sample_buffer = Some(cpu_reader(self.address));
                 if self.address == 0xFFFF {
@@ -44,13 +43,13 @@ impl Dmc {
                 } else {
                     self.address += 1;
                 }
-                self.bytes_remaining -= 1;
-                if self.bytes_remaining == 0 {
+                ctrl_bus.bytes_remaining -= 1;
+                if ctrl_bus.bytes_remaining == 0 {
                     if ctrl_bus.loop_sample {
                         self.address = ctrl_bus.sample_address;
-                        self.bytes_remaining = ctrl_bus.sample_length;
+                        ctrl_bus.bytes_remaining = ctrl_bus.sample_length;
                     } else if ctrl_bus.irq_enabled {
-                        cpu_bus.irq_interrupt = true;
+                        cpu_bus.dmc_interrupt = true;
                     }
                 }
             }
@@ -93,7 +92,8 @@ impl Dmc {
             }
             f32::from(self.output_level)
         } else {
-            self.bytes_remaining = 0;
+            self.started = false;
+            ctrl_bus.bytes_remaining = 0;
             0.0
         }
     }

@@ -108,7 +108,7 @@ impl<'a> Apu<'a> {
         self.pulse_1.clock_length_and_sweep(&mut bus.pulse_1);
         self.pulse_2.clock_length_and_sweep(&mut bus.pulse_2);
         self.triangle.clock_length(&mut bus.triangle);
-        self.noise.clock_length(&bus.noise);
+        self.noise.clock_length(&mut bus.noise);
     }
 
     pub fn tick(&mut self, cpu_reader: &mut FnMut(u16) -> u8) {
@@ -130,8 +130,8 @@ impl<'a> Apu<'a> {
                     self.clock_envelope(&mut bus);
                     self.clock_length_and_sweep(&mut bus);
                     self.frame_counter = 0;
-                    if !bus.irq_inhibit {
-                        bus.irq_interrupt = true;
+                    if !bus.frame_irq_inhibit {
+                        bus.frame_interrupt = true;
                     }
                 }
             },

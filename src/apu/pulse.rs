@@ -11,7 +11,6 @@ const DUTY_CYCLES: [[bool; 8]; 4] = [
 pub struct Pulse {
     curr_timer: u16,
     curr_cycle: usize,
-    length_counter: u8,
     envelope_delay: u8,
     envelope_value: u8,
     length_written: bool,
@@ -23,7 +22,6 @@ impl Pulse {
         Pulse {
             curr_timer: 0,
             curr_cycle: 0,
-            length_counter: 0,
             envelope_delay: 0,
             envelope_value: 15,
             length_written: false,
@@ -42,14 +40,14 @@ impl Pulse {
 
     pub fn tick(&mut self, ctrl_bus: &mut SquareCtrl) -> f32 {
         if !ctrl_bus.enabled {
-            self.length_counter = 0;
+            ctrl_bus.length_counter = 0;
         } else if let Some(length_counter) = ctrl_bus.length_counter_load.take() {
-            self.length_counter = LENGTH_TABLE[length_counter as usize];
+            ctrl_bus.length_counter = LENGTH_TABLE[length_counter as usize];
             self.length_written = true;
         }
 
         let tick_val;
-        if self.length_counter > 0 && self.sweep_target_period(&ctrl_bus) > 0x7FF {
+        if ctrl_bus.length_counter > 0 && self.sweep_target_period(&ctrl_bus) > 0x7FF {
             if self.curr_timer == 0 {
                 self.curr_timer = ctrl_bus.timer;
                 if ctrl_bus.timer >= 8 {
@@ -75,8 +73,8 @@ impl Pulse {
     }
 
     pub fn clock_length_and_sweep(&mut self, ctrl_bus: &mut SquareCtrl) {
-        if !ctrl_bus.halt_flag_envelope_loop && self.length_counter > 0 {
-            self.length_counter -= 1;
+        if !ctrl_bus.halt_flag_envelope_loop && ctrl_bus.length_counter > 0 {
+            ctrl_bus.length_counter -= 1;
         }
         if self.sweep_counter == 0 || ctrl_bus.sweep.reload {
             if self.sweep_counter == 0 {

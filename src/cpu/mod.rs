@@ -94,6 +94,8 @@ impl<'a> Cpu<'a> {
         match address {
             0x0000 ... 0x1FFF => self.internal_ram[(address % 0x800) as usize],
             0x2000 ... 0x3FFF => self.ppu_bus.borrow_mut().read(address),
+            0x4000 ... 0x4014 => panic!("bad CPU memory read {:04X}", address),
+            0x4015 => self.apu_bus.borrow_mut().read_status(),
             0x4016 => {
                 let value = self.last_inputs & 1;
                 self.last_inputs >>= 1;
@@ -102,9 +104,7 @@ impl<'a> Cpu<'a> {
             0x4017 =>
             // TODO joypad 2
                 0,
-            0x4000 ... 0x4019 =>
-            // TODO APU and I/O registers
-                0,
+            0x4018 ... 0x401F => 0,
             _ => self.cartridge.read_memory(address),
         }
     }
@@ -792,7 +792,7 @@ impl<'a> Cpu<'a> {
                 self.push(p);
                 self.pc = self.read_word(0xFFFA);
                 self.ppu_bus.borrow_mut().nmi_interrupt = false;
-            } else if self.apu_bus.borrow().irq_interrupt && (self.p & 0x4) == 0 {
+            } else if self.apu_bus.borrow().irq_interrupt() && (self.p & 0x4) == 0 {
                 let old_pc = self.pc;
                 let p = self.p | 0b00100000;
 
