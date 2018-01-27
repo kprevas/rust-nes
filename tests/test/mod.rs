@@ -7,6 +7,7 @@ use nes::cartridge;
 use nes::cpu::*;
 use nes::ppu::*;
 use nes::ppu::bus::*;
+use nes::apu::bus::*;
 use nes::input::ControllerState;
 
 const CPU_PER_PPU: f32 = 3.0;
@@ -14,9 +15,10 @@ const CPU_PER_PPU: f32 = 3.0;
 pub fn run_test(rom: &mut Read, pc_start: Option<u16>, pc_end: u16, assert: &[(u16, u8)]) {
     let _ = env_logger::init();
     let ppu_bus = RefCell::new(PpuBus::new());
+    let apu_bus = RefCell::new(ApuBus::new());
     let mut cartridge = cartridge::read(rom).unwrap();
     let mut ppu = Ppu::new(&mut cartridge.ppu_bus, &ppu_bus, None);
-    let mut cpu = Cpu::boot(&mut cartridge.cpu_bus, &ppu_bus);
+    let mut cpu = Cpu::boot(&mut cartridge.cpu_bus, &ppu_bus, &apu_bus);
     let inputs = ControllerState::default();
 
     if let Some(pc_start) = pc_start {
