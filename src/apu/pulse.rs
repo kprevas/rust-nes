@@ -49,7 +49,7 @@ impl Pulse {
         }
 
         let tick_val;
-        if self.length_counter > 0 || self.sweep_target_period(&ctrl_bus) > 0x7FF {
+        if self.length_counter > 0 && self.sweep_target_period(&ctrl_bus) > 0x7FF {
             if self.curr_timer == 0 {
                 self.curr_timer = ctrl_bus.timer;
                 if ctrl_bus.timer >= 8 {
