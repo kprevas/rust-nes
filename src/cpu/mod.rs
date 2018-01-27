@@ -774,10 +774,14 @@ impl<'a> Cpu<'a> {
         if self.controller_strobe {
             self.last_inputs = inputs.to_u8();
         }
-        let mut apu_bus = self.apu_bus.borrow_mut();
-        if apu_bus.dmc_delay {
-            apu_bus.dmc_delay = false;
-            self.cycles_to_next += if self.oam_dma_write.is_none() { 2 } else { 4 };
+        let irq_interrupt;
+        {
+            let mut apu_bus = self.apu_bus.borrow_mut();
+            if apu_bus.dmc_delay {
+                apu_bus.dmc_delay = false;
+                self.cycles_to_next += if self.oam_dma_write.is_none() { 2 } else { 4 };
+            }
+            irq_interrupt = apu_bus.irq_interrupt();
         }
         if self.cycles_to_next == 0 {
             if let Some((addr, i)) = self.oam_dma_write {
@@ -792,7 +796,7 @@ impl<'a> Cpu<'a> {
                 self.push(p);
                 self.pc = self.read_word(0xFFFA);
                 self.ppu_bus.borrow_mut().nmi_interrupt = false;
-            } else if self.apu_bus.borrow().irq_interrupt() && (self.p & 0x4) == 0 {
+            } else if irq_interrupt && (self.p & 0x4) == 0 {
                 let old_pc = self.pc;
                 let p = self.p | 0b00100000;
 
