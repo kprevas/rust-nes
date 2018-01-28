@@ -56,6 +56,7 @@ impl Dmc {
 
             if self.curr_timer == 0 {
                 if self.silence {
+                    debug!("silence");
                     self.output_level = 0;
                 } else {
                     if self.shift_register & 1 > 0 {
@@ -67,24 +68,27 @@ impl Dmc {
                             self.output_level -= 2;
                         }
                     }
+                    if ctrl_bus.direct_load.is_none() {
+                        debug!("{}", self.output_level);
+                    }
                 }
                 self.shift_register >>= 1;
                 self.bits_remaining -= 1;
                 if self.bits_remaining == 0 {
                     self.bits_remaining = 8;
-                    match self.sample_buffer {
+                    match self.sample_buffer.take() {
                         Some(value) => {
                             self.silence = false;
                             self.shift_register = value;
-                            self.sample_buffer = None;
                         }
                         None => {
                             self.silence = true;
                         }
                     }
                 }
+                self.curr_timer = ctrl_bus.rate;
             } else {
-                self.curr_timer -= 1;
+                self.curr_timer -= 2;
             }
         } else {
             self.started = false;
@@ -92,7 +96,7 @@ impl Dmc {
             self.output_level = 0
         }
 
-        if let Some(value) = ctrl_bus.direct_load {
+        if let Some(value) = ctrl_bus.direct_load.take() {
             self.output_level = value;
         }
         f32::from(self.output_level)
