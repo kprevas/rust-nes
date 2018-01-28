@@ -24,13 +24,12 @@ impl Triangle {
         }
 
         if ctrl_bus.length_counter > 0 && self.linear_counter > 0 {
-            if self.timer_tick >= ctrl_bus.timer {
-                self.timer_tick = 0;
+            if self.timer_tick >= ctrl_bus.timer + 1 {
+                self.timer_tick -= ctrl_bus.timer + 1;
                 self.timer_phase += 1;
                 self.timer_phase %= 32;
-            } else {
-                self.timer_tick += 2;
             }
+            self.timer_tick += 2;
             if self.timer_phase < 16 {
                 15.0 - f32::from(self.timer_phase)
             } else {
