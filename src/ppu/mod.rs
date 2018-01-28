@@ -232,6 +232,7 @@ impl<'a> Ppu<'a> {
     }
 
     fn draw_pixel(&mut self) {
+        // TODO: color emphasis
         let mut palette: u16 = 0;
         let mut obj_palette: u16 = 0;
         let mut obj_priority = false;
