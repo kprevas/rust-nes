@@ -86,15 +86,15 @@ impl Dmc {
             } else {
                 self.curr_timer -= 1;
             }
-
-            if let Some(value) = ctrl_bus.direct_load {
-                self.output_level = value;
-            }
-            f32::from(self.output_level)
         } else {
             self.started = false;
             ctrl_bus.bytes_remaining = 0;
-            0.0
+            self.output_level = 0
         }
+
+        if let Some(value) = ctrl_bus.direct_load {
+            self.output_level = value;
+        }
+        f32::from(self.output_level)
     }
 }
