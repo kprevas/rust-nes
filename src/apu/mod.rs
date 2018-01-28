@@ -50,7 +50,7 @@ impl<'a> Apu<'a> {
         let pa = PortAudio::new()?;
         let settings = pa.default_output_stream_settings::<f32>(CHANNELS, TARGET_HZ, FRAMES)?;
 
-        let buffer = SpscRb::new(100_000);
+        let buffer = SpscRb::new(500_000);
         let (buffer_producer, buffer_consumer) = (buffer.producer(), buffer.consumer());
 
         let mut resample_data = Box::new(vec![0.0; 20_000]);
