@@ -187,7 +187,13 @@ impl<'a> Ppu<'a> {
             0x0000 ... 0x1FFF => self.cartridge.write_memory(address, value),
             0x2000 ... 0x2FFF => self.internal_ram[self.cartridge.mirror_nametable(address) as usize] = value,
             0x3000 ... 0x3EFF => self.internal_ram[(self.cartridge.mirror_nametable(address - 0x1000)) as usize] = value,
-            0x3F00 ... 0x3FFF => self.palette_ram[(address % 0x20) as usize] = value,
+            0x3F00 ... 0x3FFF => {
+                let mut palette_address = address;
+                if palette_address & 0x13 == 0x10 {
+                    palette_address &= !0x10;
+                }
+                self.palette_ram[(palette_address % 0x20) as usize] = value
+            },
             _ => panic!("Bad PPU memory write {:04X}", address),
         }
     }
