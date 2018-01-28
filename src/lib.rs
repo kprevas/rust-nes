@@ -69,10 +69,10 @@ pub fn run(matches: clap::ArgMatches) {
         let instrument_cpu = matches.is_present("instrument_cpu");
         let instrument_ppu = matches.is_present("instrument_ppu");
         let time_frame = matches.is_present("time_frame");
-        let step = matches.is_present("step");
         let dump_vram = matches.is_present("dump_vram");
 
         let mut inputs: input::ControllerState = Default::default();
+        let mut reset = false;
 
         let assets = find_folder::Search::ParentsThenKids(3, 3).for_folder("src").unwrap();
         let ref font = assets.join("VeraMono.ttf");
@@ -93,9 +93,6 @@ pub fn run(matches: clap::ArgMatches) {
 
         while let Some(e) = window.next() {
             if let Some(Button::Keyboard(key)) = e.press_args() {
-                if step && key == Key::Space {
-                    do_frame(&mut window, &mut cpu, &mut ppu, &mut apu, &mut cpu_dots, &mut apu_dots, inputs, instrument_cpu, instrument_ppu, time_frame)
-                }
                 match key {
                     Key::A => inputs.b = true,
                     Key::S => inputs.a = true,
@@ -105,6 +102,8 @@ pub fn run(matches: clap::ArgMatches) {
                     Key::Down => inputs.down = true,
                     Key::Left => inputs.left = true,
                     Key::Right => inputs.right = true,
+
+                    Key::R => reset = true,
                     _ => (),
                 }
             }
@@ -124,9 +123,11 @@ pub fn run(matches: clap::ArgMatches) {
             }
 
             if let Some(_u) = e.update_args() {
-                if !step {
-                    do_frame(&mut window, &mut cpu, &mut ppu, &mut apu, &mut cpu_dots, &mut apu_dots, inputs, instrument_cpu, instrument_ppu, time_frame);
+                if reset {
+                    reset = false;
+                    cpu.reset();
                 }
+                do_frame(&mut window, &mut cpu, &mut ppu, &mut apu, &mut cpu_dots, &mut apu_dots, inputs, instrument_cpu, instrument_ppu, time_frame);
             }
 
             if let Some(_r) = e.render_args() {

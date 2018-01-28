@@ -178,4 +178,12 @@ impl PpuBus {
             _ => panic!()
         }
     }
+
+    pub fn reset(&mut self) {
+        self.ctrl = Ctrl::from_u8(0);
+        self.mask = Mask::from_u8(0);
+        self.scroll = None;
+        self.addr = None;
+        self.data = None;
+    }
 }

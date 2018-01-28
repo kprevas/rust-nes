@@ -810,6 +810,16 @@ impl<'a> Cpu<'a> {
         }
     }
 
+    pub fn reset(&mut self) {
+        self.sp -= 3;
+        self.p |= 0x4;
+        self.pc = self.read_word(0xFFFC);
+
+        self.write_memory(0x4015, 0);
+        self.write_memory(0x2000, 0);
+        self.write_memory(0x2001, 0);
+    }
+
     pub fn setup_for_test(&mut self, p_start: u8, pc_start: u16) {
         self.p = p_start;
         self.pc = pc_start;

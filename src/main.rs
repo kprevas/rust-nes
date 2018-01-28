@@ -18,7 +18,6 @@ fn main() {
             (@arg instrument_cpu: -c "instruments CPU")
             (@arg instrument_ppu: -p "instruments PPU")
             (@arg time_frame: -t "logs frame timing")
-            (@arg step: -s "frame-by-frames step with spacebar")
             (@arg dump_vram: -v "dumps vram")
         )
     ).get_matches();
