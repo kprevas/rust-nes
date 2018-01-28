@@ -30,11 +30,15 @@ impl Pulse {
     }
 
     fn sweep_target_period(&self, ctrl_bus: &SquareCtrl) -> u16 {
-        let shift_amount = ctrl_bus.timer >> ctrl_bus.sweep.shift_count;
-        if ctrl_bus.sweep.negate {
-            ctrl_bus.timer - shift_amount - if ctrl_bus.sweep.ones_complement_adj { 1 } else { 0 }
+        if ctrl_bus.sweep.enabled {
+            let shift_amount = ctrl_bus.timer >> ctrl_bus.sweep.shift_count;
+            if ctrl_bus.sweep.negate {
+                ctrl_bus.timer - shift_amount - if ctrl_bus.sweep.ones_complement_adj { 1 } else { 0 }
+            } else {
+                ctrl_bus.timer + shift_amount
+            }
         } else {
-            ctrl_bus.timer + shift_amount
+            ctrl_bus.timer
         }
     }
 
