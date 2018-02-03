@@ -26,19 +26,15 @@ pub fn run_test(rom: &mut Read, pc_start: Option<u16>, pc_end: u16, assert: &[(u
     }
 
     let mut cpu_dots: f32 = 0.0;
-    let mut cpu_cycles: u32 = 0;
-    while cpu.pc_for_test() != pc_end && cpu_cycles < 900000 {
+    while cpu.pc_for_test() != pc_end {
         if cpu_dots <= 0.0 {
             cpu.tick(true, inputs);
             cpu_dots += CPU_PER_PPU;
-            cpu_cycles += 1;
-        } else {
-            cpu_dots -= 1.0;
         }
+        cpu_dots -= 1.0;
         ppu.tick(true, None);
     }
 
-    assert_ne!(900000, cpu_cycles);
     for &(addr, val) in assert {
         assert_eq!(val, cpu.read_memory(addr), "0x{:02X}", cpu.read_memory(addr));
     }
