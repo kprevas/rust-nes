@@ -69,15 +69,9 @@ pub fn run(matches: clap::ArgMatches) {
         let instrument_cpu = matches.is_present("instrument_cpu");
         let instrument_ppu = matches.is_present("instrument_ppu");
         let time_frame = matches.is_present("time_frame");
-        let dump_vram = matches.is_present("dump_vram");
 
         let mut inputs: input::ControllerState = Default::default();
         let mut reset = false;
-
-        let assets = find_folder::Search::ParentsThenKids(3, 3).for_folder("src").unwrap();
-        let ref font = assets.join("VeraMono.ttf");
-        let factory = window.factory.clone();
-        let mut glyphs = Glyphs::new(font, factory, TextureSettings::new()).unwrap();
 
         let ppu_bus = RefCell::new(ppu::bus::PpuBus::new());
         let apu_bus = RefCell::new(apu::bus::ApuBus::new());
@@ -105,9 +99,6 @@ pub fn run(matches: clap::ArgMatches) {
             if let Some(_r) = e.render_args() {
                 window.draw_2d(&e, |c, gl| {
                     ppu.render(c, gl);
-                    if dump_vram {
-                        ppu.dump_ram(c, gl, &mut glyphs);
-                    }
                 });
             }
 

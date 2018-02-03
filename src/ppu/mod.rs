@@ -4,7 +4,6 @@ use std::cell::RefCell;
 use std::borrow::BorrowMut;
 use image::{GenericImage, DynamicImage, Rgba};
 use piston_window::*;
-use hex_slice::AsHex;
 
 use self::bus::*;
 use cartridge::CartridgeBus;
@@ -520,17 +519,5 @@ impl<'a> Ppu<'a> {
         if let Some(ref texture) = self.texture {
             image(texture, c.transform.scale(8.0 / 7.0, 1.0), gl);
         }
-    }
-
-    pub fn dump_ram(&self, c: Context, gl: &mut G2d, glyphs: &mut Glyphs) {
-        let mut trans = c.transform;
-        self.internal_ram.chunks(32).map(|chunk| {
-            trans = trans.trans(0.0, 7.0);
-            text::Text::new_color([1.0, 1.0, 1.0, 1.0], 4).draw(
-                &format!("{:02X}", chunk.as_hex()),
-                glyphs,
-                &c.draw_state,
-                trans, gl).unwrap();
-        }).collect::<Vec<_>>();
     }
 }
