@@ -92,35 +92,7 @@ pub fn run(matches: clap::ArgMatches) {
         let mut apu_dots = 0.0;
 
         while let Some(e) = window.next() {
-            if let Some(Button::Keyboard(key)) = e.press_args() {
-                match key {
-                    Key::A => inputs.b = true,
-                    Key::S => inputs.a = true,
-                    Key::Tab => inputs.select = true,
-                    Key::Return => inputs.start = true,
-                    Key::Up => inputs.up = true,
-                    Key::Down => inputs.down = true,
-                    Key::Left => inputs.left = true,
-                    Key::Right => inputs.right = true,
-
-                    Key::R => reset = true,
-                    _ => (),
-                }
-            }
-
-            if let Some(Button::Keyboard(key)) = e.release_args() {
-                match key {
-                    Key::A => inputs.b = false,
-                    Key::S => inputs.a = false,
-                    Key::Tab => inputs.select = false,
-                    Key::Return => inputs.start = false,
-                    Key::Up => inputs.up = false,
-                    Key::Down => inputs.down = false,
-                    Key::Left => inputs.left = false,
-                    Key::Right => inputs.right = false,
-                    _ => (),
-                }
-            }
+            inputs.event(&e, &mut reset);
 
             if let Some(_u) = e.update_args() {
                 if reset {
