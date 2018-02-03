@@ -1,4 +1,5 @@
 use apu::bus::*;
+use cartridge::CartridgeBus;
 
 pub const TIMER_VALUES: [u16; 16] = [428, 380, 340, 320, 286, 254, 226, 214, 190, 160, 142, 128, 106, 84, 72, 54];
 
@@ -27,7 +28,7 @@ impl Dmc {
         }
     }
 
-    pub fn tick(&mut self, cpu_bus: &mut ApuBus, cpu_reader: &mut FnMut(u16) -> u8) -> f32 {
+    pub fn tick(&mut self, cpu_bus: &mut ApuBus, cartridge: &Box<CartridgeBus>) -> f32 {
         let ctrl_bus = &mut cpu_bus.dmc;
         if !self.started && ctrl_bus.enabled {
             self.started = true;
@@ -37,7 +38,7 @@ impl Dmc {
         if ctrl_bus.enabled {
             if self.sample_buffer.is_none() && ctrl_bus.bytes_remaining > 0 {
                 cpu_bus.dmc_delay = true;
-                self.sample_buffer = Some(cpu_reader(self.address));
+                self.sample_buffer = Some(cartridge.read_memory(self.address));
                 if self.address == 0xFFFF {
                     self.address = 0x8000;
                 } else {

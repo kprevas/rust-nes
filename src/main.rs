@@ -17,8 +17,6 @@ fn main() {
             (@arg INPUT: "the input file to use")
             (@arg instrument_cpu: -c "instruments CPU")
             (@arg instrument_ppu: -p "instruments PPU")
-            (@arg time_frame: -t "logs frame timing")
-            (@arg dump_vram: -v "dumps vram")
         )
     ).get_matches();
     nes::run(matches);

@@ -18,6 +18,7 @@ use self::noise::*;
 use self::dmc::*;
 
 use self::bus::*;
+use cartridge::CartridgeBus;
 
 const CHANNELS: i32 = 1;
 const FRAMES: u32 = 735;
@@ -111,7 +112,7 @@ impl<'a> Apu<'a> {
         self.noise.clock_length(&mut bus.noise);
     }
 
-    pub fn tick(&mut self, cpu_reader: &mut FnMut(u16) -> u8) {
+    pub fn tick(&mut self, cartridge: &Box<CartridgeBus>) {
         self.frame_counter += 1;
         let mut bus = self.bus.borrow_mut();
         match self.frame_counter {
@@ -147,13 +148,12 @@ impl<'a> Apu<'a> {
         let pulse_2 = self.pulse_2.tick(&mut bus.pulse_2);
         let triangle = self.triangle.tick(&mut bus.triangle);
         let noise = self.noise.tick(&mut bus.noise);
-        let dmc = self.dmc.tick(&mut bus, cpu_reader);
+        let dmc = self.dmc.tick(&mut bus, cartridge);
         self.output_buffer.write_blocking(
             &[(pulse_1 + pulse_2) * 0.00752 + triangle * 0.00851 + noise * 0.00494 + dmc * 0.00335]);
     }
 
-    pub fn close(&mut self) -> Result<(), Error> {
-        self.stream.abort()?;
-        Ok(())
+    pub fn close(&mut self) {
+        self.stream.abort().unwrap();
     }
 }

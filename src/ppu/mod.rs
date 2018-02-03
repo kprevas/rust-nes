@@ -45,6 +45,7 @@ impl Default for Sprite {
 
 pub struct Ppu<'a> {
     image: DynamicImage,
+    image_buffer: DynamicImage,
     texture: Option<G2dTexture>,
 
     scanline: u16,
@@ -80,16 +81,19 @@ pub struct Ppu<'a> {
     cartridge: &'a mut Box<CartridgeBus>,
 
     bus: &'a RefCell<PpuBus>,
+
+    instrumented: bool,
 }
 
 impl<'a> Ppu<'a> {
-    pub fn new<'b>(cartridge: &'b mut Box<CartridgeBus>, bus: &'b RefCell<PpuBus>, window: Option<&mut PistonWindow>) -> Ppu<'b> {
+    pub fn new<'b>(cartridge: &'b mut Box<CartridgeBus>, bus: &'b RefCell<PpuBus>, window: Option<&mut PistonWindow>, instrumented: bool) -> Ppu<'b> {
         let image = DynamicImage::new_rgba8(256, 240);
         let texture = window.map(|window| {
             G2dTexture::from_image(window.factory.borrow_mut(), image.as_rgba8().unwrap(), &TextureSettings::new()).unwrap()
         });
         Ppu {
             image,
+            image_buffer: DynamicImage::new_rgba8(256, 240),
             texture,
             scanline: 0,
             dot: 0,
@@ -115,6 +119,7 @@ impl<'a> Ppu<'a> {
             oam_ram: vec![0; 0x100].into_boxed_slice(),
             cartridge,
             bus,
+            instrumented,
         }
     }
 
@@ -197,8 +202,8 @@ impl<'a> Ppu<'a> {
         }
     }
 
-    pub fn tick(&mut self, instrument: bool, encoder: Option<&mut GfxEncoder>) {
-        if instrument {
+    pub fn tick(&mut self) {
+        if self.instrumented {
             debug!(target: "ppu", "{}x{} V:{:04X} T:{:04X} fX:{} nt:{:04X} at:{:02X}{:02X} bg:{:04X} {:04X}",
                    self.scanline, self.dot, self.vram_addr, self.tmp_vram_addr, self.fine_x_scroll,
                    self.nametable, self.shift_attrtable_high, self.shift_attrtable_low,
@@ -208,9 +213,7 @@ impl<'a> Ppu<'a> {
         self.process_data_write();
         match self.scanline {
             0 ... 239 => self.tick_render(),
-            240 => if let Some(encoder) = encoder {
-                self.tick_post_render(encoder)
-            },
+            240 => self.tick_post_render(),
             241 ... 260 => self.tick_vblank(),
             261 => self.tick_prerender(),
             _ => panic!("Bad scanline {}", self.scanline)
@@ -487,11 +490,9 @@ impl<'a> Ppu<'a> {
         // TODO signal scanline to mapper
     }
 
-    fn tick_post_render(&mut self, encoder: &mut GfxEncoder) {
+    fn tick_post_render(&mut self) {
         if self.dot == 0 {
-            if let Some(ref mut texture) = self.texture {
-                texture.update(encoder, self.image.as_rgba8().unwrap()).unwrap();
-            }
+            self.image_buffer.copy_from(&self.image, 0, 0);
         }
     }
 
@@ -515,8 +516,9 @@ impl<'a> Ppu<'a> {
         }
     }
 
-    pub fn render(&self, c: Context, gl: &mut G2d) {
-        if let Some(ref texture) = self.texture {
+    pub fn render(&mut self, c: Context, gl: &mut G2d) {
+        if let Some(ref mut texture) = self.texture {
+            texture.update(gl.encoder, self.image_buffer.as_rgba8().unwrap()).unwrap();
             image(texture, c.transform.scale(8.0 / 7.0, 1.0), gl);
         }
     }

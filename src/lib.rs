@@ -3,7 +3,6 @@ extern crate log;
 extern crate clap;
 extern crate piston_window;
 extern crate image;
-extern crate time;
 extern crate find_folder;
 extern crate hex_slice;
 extern crate nfd;
@@ -23,9 +22,6 @@ pub mod cpu;
 pub mod cartridge;
 pub mod input;
 pub mod ppu;
-
-const CPU_PER_PPU: f32 = 3.0;
-const APU_PER_PPU: f32 = CPU_PER_PPU * 2.0;
 
 pub fn run(matches: clap::ArgMatches) {
     if let Some(matches) = matches.subcommand_matches("disassemble") {
@@ -68,7 +64,6 @@ pub fn run(matches: clap::ArgMatches) {
 
         let instrument_cpu = matches.is_present("instrument_cpu");
         let instrument_ppu = matches.is_present("instrument_ppu");
-        let time_frame = matches.is_present("time_frame");
 
         let mut inputs: input::ControllerState = Default::default();
         let mut reset = false;
@@ -76,65 +71,31 @@ pub fn run(matches: clap::ArgMatches) {
         let ppu_bus = RefCell::new(ppu::bus::PpuBus::new());
         let apu_bus = RefCell::new(apu::bus::ApuBus::new());
 
-        let mut ppu = ppu::Ppu::new(&mut cartridge.ppu_bus, &ppu_bus, Some(&mut window));
+        let ppu = ppu::Ppu::new(&mut cartridge.ppu_bus, &ppu_bus, Some(&mut window), instrument_ppu);
+        let apu = apu::Apu::new(&apu_bus).unwrap();
 
-        let mut cpu = cpu::Cpu::boot(&mut cartridge.cpu_bus, &ppu_bus, &apu_bus);
-
-        let mut apu = apu::Apu::new(&apu_bus).unwrap();
-
-        let mut cpu_dots = 0.0;
-        let mut apu_dots = 0.0;
+        let mut cpu = cpu::Cpu::boot(&mut cartridge.cpu_bus, ppu, &ppu_bus, apu, &apu_bus, instrument_cpu);
 
         while let Some(e) = window.next() {
             inputs.event(&e, &mut reset);
 
-            if let Some(_u) = e.update_args() {
+            if let Some(u) = e.update_args() {
                 if reset {
                     reset = false;
                     cpu.reset();
                 }
-                do_frame(&mut window, &mut cpu, &mut ppu, &mut apu, &mut cpu_dots, &mut apu_dots, inputs, instrument_cpu, instrument_ppu, time_frame);
+                cpu.do_frame(u.dt, inputs);
             }
 
             if let Some(_r) = e.render_args() {
                 window.draw_2d(&e, |c, gl| {
-                    ppu.render(c, gl);
+                    cpu.render(c, gl);
                 });
             }
 
             if let Some(_c) = e.close_args() {
-                apu.close().unwrap();
+                cpu.close();
             }
         }
-    }
-}
-
-fn do_frame(window: &mut PistonWindow,
-            cpu: &mut cpu::Cpu,
-            ppu: &mut ppu::Ppu,
-            apu: &mut apu::Apu,
-            cpu_dots: &mut f32,
-            apu_dots: &mut f32,
-            inputs: input::ControllerState,
-            instrument_cpu: bool,
-            instrument_ppu: bool,
-            time_frame: bool) -> () {
-    let start_time = time::PreciseTime::now();
-    let dots = ppu.dots_per_frame();
-    for _ in 0..dots {
-        if *cpu_dots <= 0.0 {
-            cpu.tick(instrument_cpu, inputs);
-            *cpu_dots += CPU_PER_PPU;
-        }
-        *cpu_dots -= 1.0;
-        if *apu_dots <= 0.0 {
-            apu.tick(&mut |addr| { cpu.read_memory(addr) });
-            *apu_dots += APU_PER_PPU;
-        }
-        *apu_dots -= 1.0;
-        ppu.tick(instrument_ppu, Some(&mut window.encoder));
-    }
-    if time_frame {
-        debug!(target: "timing", "frame took {}", start_time.to(time::PreciseTime::now()));
     }
 }
