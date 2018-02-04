@@ -671,9 +671,9 @@ impl<'a> Cpu<'a> {
             }
 
             RTS => {
+                self.tick();
                 let pc = self.pop_word();
                 self.pc = pc + 1;
-                self.tick();
                 self.tick();
             }
 
