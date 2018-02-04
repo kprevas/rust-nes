@@ -227,10 +227,6 @@ impl<'a> Ppu<'a> {
         }
     }
 
-    pub fn dots_per_frame(&self) -> u32 {
-        341 * 262 - if self.odd_frame { 1 } else { 0 }
-    }
-
     fn reload_shift(&mut self) {
         self.shift_bgd_low = (self.shift_bgd_low & 0xFF00) | u16::from(self.latch_bgd_low);
         self.shift_bgd_high = (self.shift_bgd_high & 0xFF00) | u16::from(self.latch_bgd_high);
