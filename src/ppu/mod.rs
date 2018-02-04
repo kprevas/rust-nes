@@ -522,4 +522,8 @@ impl<'a> Ppu<'a> {
             image(texture, c.transform.scale(8.0 / 7.0, 1.0), gl);
         }
     }
+
+    pub fn instrumentation_short(&self) -> String {
+        format!("{}x{}", self.scanline, self.dot)
+    }
 }

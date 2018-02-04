@@ -303,7 +303,7 @@ impl<'a> Cpu<'a> {
         self.pc += u16::from(mode.bytes());
 
         if self.instrumented {
-            debug!(target: "cpu", "{:04X}\t{:02X} {}\t{:?} {}\t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X}",
+            debug!(target: "cpu", "{:04X}\t{:02X} {}\t{:?} {}\t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} {}",
                    self.pc - u16::from(mode.bytes()) - 1,
                    opcode_hex,
                    match mode.bytes() {
@@ -313,7 +313,8 @@ impl<'a> Cpu<'a> {
                    },
                    opcode,
                    mode.format_operand(operand, self.pc),
-                   self.a, self.x, self.y, self.p, self.sp);
+                   self.a, self.x, self.y, self.p, self.sp,
+                   self.ppu.instrumentation_short());
         }
 
         match *opcode {
