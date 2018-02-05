@@ -227,6 +227,7 @@ impl<'a> Ppu<'a> {
                 self.odd_frame = !self.odd_frame;
             }
         }
+        self.bus.borrow_mut().status.just_read = false;
     }
 
     fn reload_shift(&mut self) {
@@ -497,9 +498,11 @@ impl<'a> Ppu<'a> {
     fn tick_vblank(&mut self) {
         if self.scanline == 241 && self.dot == 1 {
             let mut bus = self.bus.borrow_mut();
-            bus.status.vertical_blank = true;
-            if bus.ctrl.gen_nmi {
-                bus.nmi_interrupt = true;
+            if !bus.status.just_read {
+                bus.status.vertical_blank = true;
+                if bus.ctrl.gen_nmi {
+                    bus.nmi_interrupt = true;
+                }
             }
         }
     }

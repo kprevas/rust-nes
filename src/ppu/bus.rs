@@ -52,6 +52,7 @@ pub struct Status {
     pub sprite_overflow: bool,
     pub sprite_0_hit: bool,
     pub vertical_blank: bool,
+    pub just_read: bool,
 }
 
 impl Status {
@@ -101,6 +102,7 @@ impl PpuBus {
                 sprite_overflow: false,
                 sprite_0_hit: false,
                 vertical_blank: false,
+                just_read: false,
             },
             oam_addr: 0,
             oam_data: None,
@@ -126,6 +128,7 @@ impl PpuBus {
                 let value = self.status.to_u8();
                 self.status.vertical_blank = false;
                 self.first_write = false;
+                self.status.just_read = true;
                 value
             }
             3 => self.oam_addr,
