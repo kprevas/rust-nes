@@ -5,11 +5,36 @@ mod test;
 use test::run_test;
 
 #[test]
-fn frame_basics_test() {
+fn test_1_frame_basics_test() {
     run_test(&mut include_bytes!("roms/1.frame_basics.nes").as_ref(), None, 0xe01d, &[(0xf8, 1)]);
 }
 
 #[test]
-fn vbl_timing_test() {
+fn test_2_vbl_timing_test() {
     run_test(&mut include_bytes!("roms/2.vbl_timing.nes").as_ref(), None, 0xe01d, &[(0xf8, 1)]);
+}
+
+#[test]
+fn test_3_even_odd_frames_test() {
+    run_test(&mut include_bytes!("roms/3.even_odd_frames.nes").as_ref(), None, 0xe01d, &[(0xf8, 1)]);
+}
+
+#[test]
+fn test_4_vbl_clear_timing_test() {
+    run_test(&mut include_bytes!("roms/4.vbl_clear_timing.nes").as_ref(), None, 0xe01d, &[(0xf8, 1)]);
+}
+
+#[test]
+fn test_5_nmi_suppression_test() {
+    run_test(&mut include_bytes!("roms/5.nmi_suppression.nes").as_ref(), None, 0xe01d, &[(0xf8, 1)]);
+}
+
+#[test]
+fn test_6_nmi_disable_test() {
+    run_test(&mut include_bytes!("roms/6.nmi_disable.nes").as_ref(), None, 0xe01d, &[(0xf8, 1)]);
+}
+
+#[test]
+fn test_7_nmi_timing_test() {
+    run_test(&mut include_bytes!("roms/7.nmi_timing.nes").as_ref(), None, 0xe01d, &[(0xf8, 1)]);
 }
