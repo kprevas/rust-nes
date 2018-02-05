@@ -223,7 +223,9 @@ impl<'a> Ppu<'a> {
             self.dot = 0;
             self.scanline += 1;
             self.scanline %= 262;
-            self.odd_frame = !self.odd_frame;
+            if self.scanline == 0 {
+                self.odd_frame = !self.odd_frame;
+            }
         }
     }
 
