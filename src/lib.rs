@@ -15,7 +15,10 @@ use std::io::prelude::*;
 
 use piston_window::*;
 
+use clap::ArgMatches;
 use nfd::Response;
+
+use cartridge::Cartridge;
 
 pub mod apu;
 pub mod cpu;
@@ -25,13 +28,12 @@ pub mod ppu;
 
 pub fn run(matches: clap::ArgMatches) {
     if let Some(matches) = matches.subcommand_matches("disassemble") {
-        let input_file = matches.value_of("INPUT").unwrap();
         let output_path = matches.value_of("OUTPUT");
         let mut out = match output_path {
             Some(ref path) => Box::new(File::create(&Path::new(path)).unwrap()) as Box<Write>,
             None => Box::new(std::io::stdout()) as Box<Write>,
         };
-        let cartridge = cartridge::read(File::open(input_file).as_mut().unwrap()).unwrap();
+        let cartridge = if let Some(cartridge) = load_cartridge(matches) { cartridge } else { return };
         cpu::disassembler::disassemble(cartridge.cpu_bus, 0xc000, &mut out).unwrap();
     } else if let Some(matches) = matches.subcommand_matches("run") {
         let window: PistonWindow = WindowSettings::new(
@@ -43,24 +45,7 @@ pub fn run(matches: clap::ArgMatches) {
             .unwrap();
         let mut window = window.ups(60).ups_reset(0);
 
-        let mut cartridge: cartridge::Cartridge = loop {
-            let input_file = match matches.value_of("INPUT") {
-                Some(i) => PathBuf::from(i),
-                None => {
-                    match nfd::open_file_dialog(None, None).unwrap() {
-                        Response::Okay(p) => PathBuf::from(p),
-                        Response::OkayMultiple(v) => PathBuf::from(&v[0]),
-                        Response::Cancel => return,
-                    }
-                }
-            };
-            match cartridge::read(File::open(input_file).as_mut().unwrap()) {
-                Ok(c) => break c,
-                Err(e) => if matches.is_present("INPUT") {
-                    panic!(e);
-                },
-            };
-        };
+        let mut cartridge = if let Some(cartridge) = load_cartridge(matches) { cartridge } else { return };
 
         let instrument_cpu = matches.is_present("instrument_cpu");
         let instrument_ppu = matches.is_present("instrument_ppu");
@@ -98,4 +83,30 @@ pub fn run(matches: clap::ArgMatches) {
             }
         }
     }
+}
+
+fn load_cartridge(matches: &ArgMatches) -> Option<Cartridge> {
+    let cartridge: cartridge::Cartridge = loop {
+        let input_file = match matches.value_of("INPUT") {
+            Some(i) => Some(PathBuf::from(i)),
+            None => {
+                match nfd::open_file_dialog(None, None).unwrap() {
+                    Response::Okay(p) => Some(PathBuf::from(p)),
+                    Response::OkayMultiple(v) => Some(PathBuf::from(&v[0])),
+                    Response::Cancel => None,
+                }
+            }
+        };
+        if let Some(input_file) = input_file {
+            match cartridge::read(File::open(input_file).as_mut().unwrap()) {
+                Ok(c) => break c,
+                Err(e) => if matches.is_present("INPUT") {
+                    panic!(e);
+                },
+            };
+        } else {
+            return None;
+        }
+    };
+    Some(cartridge)
 }

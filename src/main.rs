@@ -9,8 +9,8 @@ fn main() {
     let matches = clap_app!(myapp =>
         (@subcommand disassemble =>
             (about: "disassemble a .nes file")
-            (@arg INPUT: +required "the input file to use")
-            (@arg OUTPUT: "the output file (stdout if not provided)")
+            (@arg INPUT: "the input file to use")
+            (@arg OUTPUT: -o "the output file (stdout if not provided)")
         )
         (@subcommand run =>
             (about: "run a .nes file")
