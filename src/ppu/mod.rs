@@ -209,6 +209,12 @@ impl<'a> Ppu<'a> {
                    self.nametable, self.shift_attrtable_high, self.shift_attrtable_low,
                    self.shift_bgd_high, self.shift_bgd_low);
         }
+        {
+            let mut bus = self.bus.borrow_mut();
+            if bus.nmi_interrupt && bus.nmi_interrupt_age < 255 {
+                bus.nmi_interrupt_age += 1;
+            }
+        }
         self.update_tmp_addr();
         self.process_data_write();
         match self.scanline {
@@ -502,6 +508,7 @@ impl<'a> Ppu<'a> {
                 bus.status.vertical_blank = true;
                 if bus.ctrl.gen_nmi {
                     bus.nmi_interrupt = true;
+                    bus.nmi_interrupt_age = 0;
                 }
             }
         }

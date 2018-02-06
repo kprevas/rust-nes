@@ -74,6 +74,7 @@ pub struct PpuBus {
     pub data: Option<u8>,
     pub first_write: bool,
     pub nmi_interrupt: bool,
+    pub nmi_interrupt_age: u8,
 }
 
 impl PpuBus {
@@ -111,6 +112,7 @@ impl PpuBus {
             data: None,
             first_write: false,
             nmi_interrupt: false,
+            nmi_interrupt_age: 0,
         }
     }
 
@@ -129,6 +131,9 @@ impl PpuBus {
                 self.status.vertical_blank = false;
                 self.first_write = false;
                 self.status.just_read = true;
+                if self.nmi_interrupt_age < 2 {
+                    self.nmi_interrupt = false;
+                }
                 value
             }
             3 => self.oam_addr,
@@ -160,7 +165,12 @@ impl PpuBus {
 
     pub fn write(&mut self, addr: u16, value: u8) {
         match addr % 8 {
-            0 => self.ctrl = Ctrl::from_u8(value),
+            0 => {
+                self.ctrl = Ctrl::from_u8(value);
+                if !self.ctrl.gen_nmi && self.nmi_interrupt_age < 2 {
+                    self.nmi_interrupt = false;
+                }
+            },
             1 => self.mask = Mask::from_u8(value),
             2 => debug!(target: "bus", "tried to write to PPU status register"),
             3 => self.oam_addr = value,
