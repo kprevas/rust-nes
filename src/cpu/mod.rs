@@ -123,6 +123,10 @@ impl<'a> Cpu<'a> {
 
     pub fn read_memory(&mut self, address: u16) -> u8 {
         self.tick();
+        self.read_memory_no_tick(address)
+    }
+
+    pub fn read_memory_no_tick(&mut self, address: u16) -> u8 {
         match address {
             0x0000 ... 0x1FFF => self.internal_ram[(address % 0x800) as usize],
             0x2000 ... 0x3FFF => self.ppu_bus.borrow_mut().read(address),
