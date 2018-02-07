@@ -1,19 +1,17 @@
-mod opcodes;
-pub mod disassembler;
-
-use std::cell::RefCell;
-use piston_window::{Context, G2d};
-
-use self::opcodes::Opcode;
-use self::opcodes::AddressingMode;
-use self::opcodes::AddressingMode::*;
-
-use cartridge::CartridgeBus;
-use input::ControllerState;
-use ppu::*;
-use ppu::bus::*;
 use apu::*;
 use apu::bus::*;
+use cartridge::CartridgeBus;
+use input::ControllerState;
+use piston_window::{Context, G2d};
+use ppu::*;
+use ppu::bus::*;
+use self::opcodes::AddressingMode;
+use self::opcodes::AddressingMode::*;
+use self::opcodes::Opcode;
+use std::cell::RefCell;
+
+mod opcodes;
+pub mod disassembler;
 
 const CPU_TICKS_PER_SECOND: f64 = 1_789_773.0;
 
@@ -832,7 +830,7 @@ impl<'a> Cpu<'a> {
             let data = self.read_memory(u16::from(addr) * 0x100 + u16::from(i));
             self.write_memory(0x2014, data);
             self.oam_dma_write = if i < 255 { Some((addr, i + 1)) } else { None };
-        } else if self.ppu_bus.borrow().nmi_interrupt {
+        } else if self.ppu_bus.borrow().nmi_interrupt && self.ppu_bus.borrow().nmi_interrupt_age > 1 {
             let old_pc = self.pc;
             let p = self.p | 0b00100000;
 

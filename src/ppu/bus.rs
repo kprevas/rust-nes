@@ -170,6 +170,10 @@ impl PpuBus {
                 if !self.ctrl.gen_nmi && self.nmi_interrupt_age < 2 {
                     self.nmi_interrupt = false;
                 }
+                if self.ctrl.gen_nmi && self.status.vertical_blank {
+                    self.nmi_interrupt = true;
+                    self.nmi_interrupt_age = 0;
+                }
             },
             1 => self.mask = Mask::from_u8(value),
             2 => debug!(target: "bus", "tried to write to PPU status register"),
