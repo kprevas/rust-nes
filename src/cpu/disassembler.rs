@@ -1,6 +1,6 @@
-use std::io::prelude::*;
-use std::error::Error;
 use cartridge::CartridgeBus;
+use std::error::Error;
+use std::io::prelude::*;
 
 pub fn disassemble(cartridge: Box<CartridgeBus>, start: u16, out: &mut Write) -> Result<(), Box<Error>> {
     use super::opcodes::OPCODES;
@@ -22,7 +22,9 @@ pub fn disassemble(cartridge: Box<CartridgeBus>, start: u16, out: &mut Write) ->
             operand += u16::from(operand_byte) << shift;
             shift += 8;
             write!(out, "{:02X} ", operand_byte)?;
-            pc += 1;
+            if pc < 0xffff {
+                pc += 1;
+            }
         }
 
         write!(out, "\t{:?} {}\n", opcode, mode.format_operand(operand, pc))?;
