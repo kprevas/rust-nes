@@ -36,12 +36,12 @@ fn test_5_nmi_suppression_test() {
 
 #[test]
 fn test_6_nmi_disable_test() {
-    run_test_to_pc(&mut include_bytes!("roms/6.nmi_disable.nes").as_ref(),
+    run_test_to_pc(&mut include_bytes!("roms/vbl_nmi_timing/6.nmi_disable.nes").as_ref(),
                    None, 0xe01d, &[(0xf8, 1)]);
 }
 
 #[test]
 fn test_7_nmi_timing_test() {
-    run_test_to_pc(&mut include_bytes!("roms/7.nmi_timing.nes").as_ref(),
+    run_test_to_pc(&mut include_bytes!("roms/vbl_nmi_timing/7.nmi_timing.nes").as_ref(),
                    None, 0xe01d, &[(0xf8, 1)]);
 }
