@@ -55,7 +55,7 @@ fn run_test(rom: &mut Read,
     let apu_bus = RefCell::new(ApuBus::new());
     let mut cartridge = cartridge::read(rom).unwrap();
     let ppu = Ppu::new(&mut cartridge.ppu_bus, &ppu_bus, None, true);
-    let apu = Apu::new(&apu_bus).unwrap();
+    let apu = Apu::new(&apu_bus, None).unwrap();
     let mut cpu = Cpu::boot(&mut cartridge.cpu_bus, ppu, &ppu_bus, apu, &apu_bus, true);
     let inputs = ControllerState::default();
 

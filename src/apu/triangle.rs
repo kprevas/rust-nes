@@ -1,5 +1,4 @@
 use apu::*;
-use apu::bus::*;
 
 pub struct Triangle {
     linear_counter: u8,

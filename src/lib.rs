@@ -7,11 +7,13 @@ extern crate find_folder;
 extern crate hex_slice;
 extern crate nfd;
 extern crate simple_error;
+extern crate portaudio;
 
 use cartridge::Cartridge;
 use clap::ArgMatches;
 use nfd::Response;
 use piston_window::*;
+use portaudio::PortAudio;
 use std::cell::RefCell;
 use std::fs::File;
 use std::io::prelude::*;
@@ -54,7 +56,7 @@ pub fn run(matches: clap::ArgMatches) {
         let apu_bus = RefCell::new(apu::bus::ApuBus::new());
 
         let ppu = ppu::Ppu::new(&mut cartridge.ppu_bus, &ppu_bus, Some(&mut window), instrument_ppu);
-        let apu = apu::Apu::new(&apu_bus).unwrap();
+        let apu = apu::Apu::new(&apu_bus, Some(PortAudio::new().unwrap())).unwrap();
 
         let mut cpu = cpu::Cpu::boot(&mut cartridge.cpu_bus, ppu, &ppu_bus, apu, &apu_bus, instrument_cpu);
 

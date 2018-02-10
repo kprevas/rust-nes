@@ -42,15 +42,12 @@ pub struct Apu<'a> {
     frame_counter: i16,
     odd_frame: bool,
     output_buffer: Producer<f32>,
-    stream: OutputStream,
+    stream: Option<OutputStream>,
     bus: &'a RefCell<ApuBus>,
 }
 
 impl<'a> Apu<'a> {
-    pub fn new(bus: &RefCell<ApuBus>) -> Result<Apu, Error> {
-        let pa = PortAudio::new()?;
-        let settings = pa.default_output_stream_settings::<f32>(CHANNELS, TARGET_HZ, FRAMES)?;
-
+    pub fn new(bus: &RefCell<ApuBus>, pa: Option<PortAudio>) -> Result<Apu, Error> {
         let buffer = SpscRb::new(500_000);
         let (buffer_producer, buffer_consumer) = (buffer.producer(), buffer.consumer());
 
@@ -82,8 +79,12 @@ impl<'a> Apu<'a> {
             }
             Continue
         };
-        let mut stream = pa.open_non_blocking_stream(settings, callback)?;
-        stream.start()?;
+        let stream = pa.map(|pa| {
+            let settings = pa.default_output_stream_settings::<f32>(CHANNELS, TARGET_HZ, FRAMES).unwrap();
+            let mut stream = pa.open_non_blocking_stream(settings, callback).unwrap();
+            stream.start().unwrap();
+            stream
+        });
 
         Ok(Apu {
             pulse_1: Pulse::new(),
@@ -163,14 +164,18 @@ impl<'a> Apu<'a> {
         let triangle = self.triangle.tick(&mut bus.triangle);
         let noise = self.noise.tick(&mut bus.noise);
         let dmc = self.dmc.tick(&mut bus, cartridge);
-        self.output_buffer.write_blocking(
-            &[(pulse_1 + pulse_2) * 0.00752 + triangle * 0.00851 + noise * 0.00494 + dmc * 0.00335]);
+        if !self.stream.is_none() {
+            self.output_buffer.write_blocking(
+                &[(pulse_1 + pulse_2) * 0.00752 + triangle * 0.00851 + noise * 0.00494 + dmc * 0.00335]);
+        }
         let odd_frame = !self.odd_frame;
         self.odd_frame = odd_frame;
     }
 
     pub fn close(&mut self) {
-        self.stream.abort().unwrap();
+        if let Some(ref mut stream) = self.stream {
+            stream.abort().unwrap();
+        }
     }
 
     pub fn instrumentation_short(&self) -> String {
