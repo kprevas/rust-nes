@@ -3,22 +3,21 @@ extern crate portaudio;
 extern crate rb;
 extern crate time;
 
+use cartridge::CartridgeBus;
+use self::bus::*;
+use self::dmc::*;
+use self::noise::*;
+use self::portaudio::*;
+use self::pulse::*;
+use self::rb::{Producer, RB, RbConsumer, RbInspector, RbProducer, SpscRb};
+use self::triangle::*;
+use std::cell::RefCell;
+
 pub mod bus;
 mod pulse;
 mod triangle;
 mod noise;
 mod dmc;
-
-use std::cell::RefCell;
-use self::rb::{SpscRb, RB, Producer, RbProducer, RbConsumer, RbInspector};
-use self::portaudio::*;
-use self::pulse::*;
-use self::triangle::*;
-use self::noise::*;
-use self::dmc::*;
-
-use self::bus::*;
-use cartridge::CartridgeBus;
 
 const CHANNELS: i32 = 1;
 const FRAMES: u32 = 735;
@@ -40,7 +39,8 @@ pub struct Apu<'a> {
     triangle: Triangle,
     noise: Noise,
     dmc: Dmc,
-    frame_counter: u16,
+    frame_counter: i16,
+    odd_frame: bool,
     output_buffer: Producer<f32>,
     stream: OutputStream,
     bus: &'a RefCell<ApuBus>,
@@ -92,6 +92,7 @@ impl<'a> Apu<'a> {
             noise: Noise::new(),
             dmc: Dmc::new(),
             frame_counter: 0,
+            odd_frame: false,
             output_buffer: buffer_producer,
             stream,
             bus,
@@ -115,33 +116,46 @@ impl<'a> Apu<'a> {
     pub fn tick(&mut self, cartridge: &Box<CartridgeBus>) {
         self.frame_counter += 1;
         let mut bus = self.bus.borrow_mut();
-        match self.frame_counter {
-            3729 => {
-                self.clock_envelope(&mut bus);
-            },
-            7457 => {
-                self.clock_envelope(&mut bus);
-                self.clock_length_and_sweep(&mut bus);
-            },
-            11186 => {
-                self.clock_envelope(&mut bus);
-            },
-            14915 => {
-                if !bus.frame_mode {
+        if bus.frame_mode_written {
+            if self.odd_frame || bus.frame_mode_age < 2 {
+                bus.frame_mode_age += 1;
+            } else {
+                self.frame_counter = 0;
+                bus.frame_mode_written = false;
+                if bus.frame_mode {
                     self.clock_envelope(&mut bus);
                     self.clock_length_and_sweep(&mut bus);
-                    self.frame_counter = 0;
-                    if !bus.frame_irq_inhibit {
-                        bus.frame_interrupt = true;
+                }
+            }
+        } else {
+            match self.frame_counter {
+                3729 => {
+                    self.clock_envelope(&mut bus);
+                }
+                7457 => {
+                    self.clock_envelope(&mut bus);
+                    self.clock_length_and_sweep(&mut bus);
+                }
+                11186 => {
+                    self.clock_envelope(&mut bus);
+                }
+                14915 => {
+                    if !bus.frame_mode {
+                        self.clock_envelope(&mut bus);
+                        self.clock_length_and_sweep(&mut bus);
+                        self.frame_counter = 0;
+                        if !bus.frame_irq_inhibit {
+                            bus.frame_interrupt = true;
+                        }
                     }
                 }
-            },
-            18641 => {
-                self.clock_envelope(&mut bus);
-                self.clock_length_and_sweep(&mut bus);
-                self.frame_counter = 0;
-            },
-            _ => (),
+                18641 => {
+                    self.clock_envelope(&mut bus);
+                    self.clock_length_and_sweep(&mut bus);
+                    self.frame_counter = -1;
+                }
+                _ => (),
+            }
         }
 
         let pulse_1 = self.pulse_1.tick(&mut bus.pulse_1);
@@ -151,9 +165,15 @@ impl<'a> Apu<'a> {
         let dmc = self.dmc.tick(&mut bus, cartridge);
         self.output_buffer.write_blocking(
             &[(pulse_1 + pulse_2) * 0.00752 + triangle * 0.00851 + noise * 0.00494 + dmc * 0.00335]);
+        let odd_frame = !self.odd_frame;
+        self.odd_frame = odd_frame;
     }
 
     pub fn close(&mut self) {
         self.stream.abort().unwrap();
+    }
+
+    pub fn instrumentation_short(&self) -> String {
+        format!("{}", self.frame_counter)
     }
 }

@@ -70,7 +70,7 @@ fn run_test(rom: &mut Read,
             if reset_delay > 0 {
                 reset_delay -= 1;
             } else if cpu.read_memory_no_tick(addr) == val {
-                cpu.reset();
+                cpu.reset(true);
                 reset_delay = 1_000_000;
             }
         }

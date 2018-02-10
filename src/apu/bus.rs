@@ -168,6 +168,8 @@ pub struct ApuBus {
 
     pub frame_mode: bool,
     pub frame_irq_inhibit: bool,
+    pub frame_mode_written: bool,
+    pub frame_mode_age: u8,
 
     pub dmc_delay: bool,
     pub frame_interrupt: bool,
@@ -244,6 +246,8 @@ impl ApuBus {
             },
             frame_mode: false,
             frame_irq_inhibit: false,
+            frame_mode_written: false,
+            frame_mode_age: 0,
             dmc_delay: false,
             frame_interrupt: false,
             dmc_interrupt: false,
@@ -268,6 +272,8 @@ impl ApuBus {
             0x4017 => {
                 self.frame_mode = value & 0x80 > 0;
                 self.frame_irq_inhibit = value & 0x40 > 0;
+                self.frame_mode_written = true;
+                self.frame_mode_age = 0;
             }
             _ => panic!("bad APU bus write {:04X}", address),
         }

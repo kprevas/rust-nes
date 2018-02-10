@@ -8,17 +8,14 @@ extern crate hex_slice;
 extern crate nfd;
 extern crate simple_error;
 
-use std::cell::RefCell;
-use std::fs::File;
-use std::path::{Path, PathBuf};
-use std::io::prelude::*;
-
-use piston_window::*;
-
+use cartridge::Cartridge;
 use clap::ArgMatches;
 use nfd::Response;
-
-use cartridge::Cartridge;
+use piston_window::*;
+use std::cell::RefCell;
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::{Path, PathBuf};
 
 pub mod apu;
 pub mod cpu;
@@ -67,7 +64,7 @@ pub fn run(matches: clap::ArgMatches) {
             if let Some(u) = e.update_args() {
                 if reset {
                     reset = false;
-                    cpu.reset();
+                    cpu.reset(true);
                 }
                 cpu.do_frame(u.dt, inputs);
             }

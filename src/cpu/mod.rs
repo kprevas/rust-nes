@@ -53,8 +53,8 @@ impl<'a> Cpu<'a> {
             a: 0,
             x: 0,
             y: 0,
-            p: 0x34,
-            sp: 0xfd,
+            p: 0,
+            sp: 0,
             pc: 0,
             oam_dma_write: None,
             internal_ram: vec![0; 0x800].into_boxed_slice(),
@@ -71,7 +71,7 @@ impl<'a> Cpu<'a> {
             instrumented,
         };
 
-        cpu.pc = cpu.read_word(0xfffc);
+        cpu.reset(false);
 
         cpu
     }
@@ -107,6 +107,10 @@ impl<'a> Cpu<'a> {
 
     fn read_word(&mut self, address: u16) -> u16 {
         (u16::from(self.read_memory(address + 1)) << 8) + u16::from(self.read_memory(address))
+    }
+
+    fn read_word_no_tick(&mut self, address: u16) -> u16 {
+        (u16::from(self.read_memory_no_tick(address + 1)) << 8) + u16::from(self.read_memory_no_tick(address))
     }
 
     fn read_word_zeropage_wrapped(&mut self, address: u16) -> u16 {
@@ -147,12 +151,16 @@ impl<'a> Cpu<'a> {
 
     fn write_memory(&mut self, address: u16, value: u8) {
         self.tick();
+        self.write_memory_no_tick(address, value);
+    }
+
+    fn write_memory_no_tick(&mut self, address: u16, value: u8) {
         match address {
             0x0000 ... 0x1FFF => self.internal_ram[(address % 0x800) as usize] = value,
             0x2000 ... 0x3FFF => self.ppu_bus.borrow_mut().write(address, value),
             0x4014 => {
-                let data = self.read_memory(u16::from(value) * 0x100);
-                self.write_memory(0x2014, data);
+                let data = self.read_memory_no_tick(u16::from(value) * 0x100);
+                self.write_memory_no_tick(0x2014, data);
                 self.oam_dma_write = Some((value, 1));
             }
             0x4000 ... 0x4013 | 0x4015 | 0x4017 => self.apu_bus.borrow_mut().write(address, value),
@@ -305,7 +313,7 @@ impl<'a> Cpu<'a> {
         self.pc += u16::from(mode.bytes());
 
         if self.instrumented {
-            debug!(target: "cpu", "{:04X}\t{:02X} {}\t{:?} {}\t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} {}",
+            debug!(target: "cpu", "{:04X}\t{:02X} {}\t{:?} {}\t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} ppu:{} apu:{}",
                    self.pc - u16::from(mode.bytes()) - 1,
                    opcode_hex,
                    match mode.bytes() {
@@ -316,7 +324,8 @@ impl<'a> Cpu<'a> {
                    opcode,
                    mode.format_operand(operand, self.pc),
                    self.a, self.x, self.y, self.p, self.sp,
-                   self.ppu.instrumentation_short());
+                   self.ppu.instrumentation_short(),
+                   self.apu.instrumentation_short());
         }
 
         match *opcode {
@@ -866,14 +875,31 @@ impl<'a> Cpu<'a> {
         self.ppu.render(c, gl);
     }
 
-    pub fn reset(&mut self) {
-        self.sp -= 3;
-        self.p |= 0x4;
-        self.pc = self.read_word(0xFFFC);
+    pub fn reset(&mut self, soft: bool) {
+        let apu_mode;
+        if soft {
+            self.sp -= 3;
+            self.p |= 0x4;
+            apu_mode = self.read_memory_no_tick(0x4017);
+        } else {
+            self.sp = 0xfd;
+            self.p = 0x34;
+            apu_mode = 0;
+        };
+        self.pc = self.read_word_no_tick(0xFFFC);
 
-        self.write_memory(0x4015, 0);
-        self.write_memory(0x2000, 0);
-        self.write_memory(0x2001, 0);
+        self.write_memory_no_tick(0x4015, 0);
+        self.read_memory_no_tick(0x4015);
+        self.write_memory_no_tick(0x4017, apu_mode);
+        self.write_memory_no_tick(0x2000, 0);
+        self.write_memory_no_tick(0x2001, 0);
+
+        for _ in 0..28 {
+            self.ppu.tick();
+        };
+        for _ in 0..6 {
+            self.apu.tick(self.cartridge);
+        }
     }
 
     pub fn close(&mut self) {
