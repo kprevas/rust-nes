@@ -838,9 +838,16 @@ impl<'a> Cpu<'a> {
         }
         let irq_interrupt;
         {
-            let mut apu_bus = self.apu_bus.borrow_mut();
-            if apu_bus.dmc_delay {
-                apu_bus.dmc_delay = false;
+            let dmc_delay;
+            {
+                let mut apu_bus = self.apu_bus.borrow_mut();
+                dmc_delay = apu_bus.dmc_delay;
+                if dmc_delay {
+                    apu_bus.dmc_delay = false;
+                }
+                irq_interrupt = apu_bus.irq_interrupt();
+            }
+            if dmc_delay {
                 self.tick();
                 self.tick();
                 if !self.oam_dma_write.is_none() {
@@ -848,7 +855,6 @@ impl<'a> Cpu<'a> {
                     self.tick();
                 };
             }
-            irq_interrupt = apu_bus.irq_interrupt();
         }
         if let Some((addr, i)) = self.oam_dma_write {
             let data = self.read_memory(u16::from(addr) * 0x100 + u16::from(i));
