@@ -57,7 +57,6 @@ impl Dmc {
 
             if self.curr_timer == 0 {
                 if self.silence {
-                    debug!("silence");
                     self.output_level = 0;
                 } else {
                     if self.shift_register & 1 > 0 {
@@ -68,9 +67,6 @@ impl Dmc {
                         if self.output_level >= 2 {
                             self.output_level -= 2;
                         }
-                    }
-                    if ctrl_bus.direct_load.is_none() {
-                        debug!("{}", self.output_level);
                     }
                 }
                 self.shift_register >>= 1;
