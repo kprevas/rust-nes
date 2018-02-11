@@ -146,7 +146,7 @@ impl<'a> Cpu<'a> {
                 let value = self.last_inputs & 1;
                 self.last_inputs >>= 1;
                 value
-            },
+            }
             0x4017 =>
             // TODO joypad 2
                 0,
@@ -154,7 +154,8 @@ impl<'a> Cpu<'a> {
             _ => self.cartridge.read_memory(address),
         };
         if self.instrumented && self.memory_watches.contains(&address) {
-            warn!(target: "cpu", "read memory {:04X} {:02X}", address, value);
+            warn!(target: "cpu", "read memory {:04X} {:02X} {} {}", address, value,
+                  self.ppu.instrumentation_short(), self.apu.instrumentation_short());
         }
         value
     }
@@ -166,7 +167,8 @@ impl<'a> Cpu<'a> {
 
     fn write_memory_no_tick(&mut self, address: u16, value: u8) {
         if self.instrumented && self.memory_watches.contains(&address) {
-            warn!(target: "cpu", "write memory {:04X} {:02X}", address, value);
+            warn!(target: "cpu", "write memory {:04X} {:02X} {} {}", address, value,
+                  self.ppu.instrumentation_short(), self.apu.instrumentation_short());
         }
         match address {
             0x0000 ... 0x1FFF => self.internal_ram[(address % 0x800) as usize] = value,
