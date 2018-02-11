@@ -69,3 +69,14 @@ fn works_immediately() {
                                   0x81,
                                   &[(0x6000, 0)]);
 }
+
+#[test]
+fn apu_test() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/apu_test/apu_test.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
