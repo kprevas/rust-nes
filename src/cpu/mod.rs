@@ -9,6 +9,7 @@ use self::opcodes::AddressingMode;
 use self::opcodes::AddressingMode::*;
 use self::opcodes::Opcode;
 use std::cell::RefCell;
+use std::collections::HashSet;
 
 mod opcodes;
 pub mod disassembler;
@@ -35,6 +36,8 @@ pub struct Cpu<'a> {
     ticks: f64,
     tick_adjust: u8,
     instrumented: bool,
+
+    memory_watches: Box<HashSet<u16>>,
 }
 
 const CARRY: u8 = 0b1;
@@ -69,6 +72,7 @@ impl<'a> Cpu<'a> {
             ticks: 0.0,
             tick_adjust: 0,
             instrumented,
+            memory_watches: Box::new(HashSet::new()),
         };
 
         cpu.reset(false);
@@ -131,7 +135,7 @@ impl<'a> Cpu<'a> {
     }
 
     pub fn read_memory_no_tick(&mut self, address: u16) -> u8 {
-        match address {
+        let value = match address {
             0x0000 ... 0x1FFF => self.internal_ram[(address % 0x800) as usize],
             0x2000 ... 0x3FFF => self.ppu_bus.borrow_mut().read(address),
             0x4000 ... 0x4014 => panic!("bad CPU memory read {:04X}", address),
@@ -146,7 +150,11 @@ impl<'a> Cpu<'a> {
                 0,
             0x4018 ... 0x401F => 0,
             _ => self.cartridge.read_memory(address),
+        };
+        if self.instrumented && self.memory_watches.contains(&address) {
+            warn!(target: "cpu", "read memory {:04X} {:02X}", address, value);
         }
+        value
     }
 
     fn write_memory(&mut self, address: u16, value: u8) {
@@ -155,6 +163,9 @@ impl<'a> Cpu<'a> {
     }
 
     fn write_memory_no_tick(&mut self, address: u16, value: u8) {
+        if self.instrumented && self.memory_watches.contains(&address) {
+            warn!(target: "cpu", "write memory {:04X} {:02X}", address, value);
+        }
         match address {
             0x0000 ... 0x1FFF => self.internal_ram[(address % 0x800) as usize] = value,
             0x2000 ... 0x3FFF => self.ppu_bus.borrow_mut().write(address, value),
@@ -876,21 +887,16 @@ impl<'a> Cpu<'a> {
     }
 
     pub fn reset(&mut self, soft: bool) {
-        let apu_mode;
         if soft {
             self.sp -= 3;
             self.p |= 0x4;
-            apu_mode = self.read_memory_no_tick(0x4017);
         } else {
             self.sp = 0xfd;
             self.p = 0x34;
-            apu_mode = 0;
         };
         self.pc = self.read_word_no_tick(0xFFFC);
 
-        self.write_memory_no_tick(0x4015, 0);
-        self.read_memory_no_tick(0x4015);
-        self.write_memory_no_tick(0x4017, apu_mode);
+        self.apu_bus.borrow_mut().reset(soft);
         self.write_memory_no_tick(0x2000, 0);
         self.write_memory_no_tick(0x2001, 0);
 
@@ -913,5 +919,9 @@ impl<'a> Cpu<'a> {
 
     pub fn pc_for_test(&self) -> u16 {
         self.pc
+    }
+
+    pub fn set_memory_watch(&mut self, addr: u16) {
+        self.memory_watches.insert(addr);
     }
 }

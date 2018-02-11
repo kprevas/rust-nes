@@ -306,6 +306,22 @@ impl ApuBus {
         status
     }
 
+    pub fn reset(&mut self, retain_mode: bool) {
+        self.pulse_1.enabled = false;
+        self.pulse_2.enabled = false;
+        self.triangle.enabled = false;
+        self.noise.enabled = false;
+        self.dmc.enabled = false;
+        self.dmc_interrupt = false;
+        self.frame_interrupt = false;
+        if !retain_mode {
+            self.frame_mode = false;
+        }
+        self.frame_irq_inhibit = false;
+        self.frame_mode_written = true;
+        self.frame_mode_age = 0;
+    }
+
     pub fn irq_interrupt(&self) -> bool {
         self.frame_interrupt || self.dmc_interrupt
     }
