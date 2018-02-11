@@ -240,7 +240,7 @@ impl ApuBus {
                 loop_sample: false,
                 rate: 0,
                 direct_load: None,
-                sample_address: 0,
+                sample_address: 0xC000,
                 sample_length: 0,
                 bytes_remaining: 0,
             },
