@@ -278,6 +278,9 @@ impl ApuBus {
             0x4017 => {
                 self.frame_mode = value & 0x80 > 0;
                 self.frame_irq_inhibit = value & 0x40 > 0;
+                if self.frame_irq_inhibit {
+                    self.frame_interrupt = false;
+                }
                 self.frame_mode_written = true;
                 self.frame_mode_age = 0;
             }
