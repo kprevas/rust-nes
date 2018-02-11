@@ -2,18 +2,19 @@ use simple_error::*;
 use std::io::prelude::*;
 
 mod mapper0;
+mod mapper1;
 
 enum NametableMirroring {
     Vertical,
     Horizontal,
     SingleScreen,
-    FourScreen,
-    Diagonal,
-    LShaped,
-    ThreeScreenVertical,
-    ThreeScreenHorizontal,
-    ThreeScreenDiagonal,
-    SingleScreenFixed,
+    _FourScreen,
+    _Diagonal,
+    _LShaped,
+    _ThreeScreenVertical,
+    _ThreeScreenHorizontal,
+    _ThreeScreenDiagonal,
+    _SingleScreenFixed,
 }
 
 pub struct Cartridge {
