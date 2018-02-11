@@ -41,14 +41,14 @@ pub fn run_test_until_memory_matches(rom: &mut Read,
                  let status = cpu.read_memory_no_tick(status_addr);
                  status != running_status && status != reset_status
              },
-             Some((status_addr, reset_status)),
+             Some((status_addr, running_status, reset_status)),
              assert);
 }
 
 fn run_test(rom: &mut Read,
             pc_start: Option<u16>,
             terminate_condition: &mut FnMut(&mut Cpu) -> bool,
-            reset_signal: Option<(u16, u8)>,
+            status: Option<(u16, u8, u8)>,
             assert: &[(u16, u8)]) {
     let _ = env_logger::init();
     let ppu_bus = RefCell::new(PpuBus::new());
@@ -64,14 +64,20 @@ fn run_test(rom: &mut Read,
     }
 
     let mut reset_delay = 0;
+    let mut did_reset = false;
     while !terminate_condition(&mut cpu) {
         cpu.next_operation(inputs);
-        if let Some((addr, val)) = reset_signal {
+        if let Some((addr, running, reset)) = status {
             if reset_delay > 0 {
                 reset_delay -= 1;
-            } else if cpu.read_memory_no_tick(addr) == val {
-                cpu.reset(true);
-                reset_delay = 1_000_000;
+                if reset_delay == 0 {
+                    cpu.reset(true);
+                }
+            } else if cpu.read_memory_no_tick(addr) == running && did_reset {
+                did_reset = false;
+            } else if cpu.read_memory_no_tick(addr) == reset && !did_reset {
+                did_reset = true;
+                reset_delay = 20_000;
             }
         }
     }
