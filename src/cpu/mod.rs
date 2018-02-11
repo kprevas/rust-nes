@@ -38,6 +38,7 @@ pub struct Cpu<'a> {
     instrumented: bool,
 
     memory_watches: Box<HashSet<u16>>,
+    pc_watches: Box<HashSet<u16>>,
 }
 
 const CARRY: u8 = 0b1;
@@ -72,6 +73,7 @@ impl<'a> Cpu<'a> {
             ticks: 0.0,
             tick_adjust: 0,
             instrumented,
+            pc_watches: Box::new(HashSet::new()),
             memory_watches: Box::new(HashSet::new()),
         };
 
@@ -324,19 +326,36 @@ impl<'a> Cpu<'a> {
         self.pc += u16::from(mode.bytes());
 
         if self.instrumented {
-            debug!(target: "cpu", "{:04X}\t{:02X} {}\t{:?} {}\t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} ppu:{} apu:{}",
-                   self.pc - u16::from(mode.bytes()) - 1,
-                   opcode_hex,
-                   match mode.bytes() {
-                       1 => format!("{:02X}", operand),
-                       2 => format!("{:02X} {:02X}", operand & 0xff, operand >> 8),
-                       _ => String::from(""),
-                   },
-                   opcode,
-                   mode.format_operand(operand, self.pc),
-                   self.a, self.x, self.y, self.p, self.sp,
-                   self.ppu.instrumentation_short(),
-                   self.apu.instrumentation_short());
+            let pc = self.pc - u16::from(mode.bytes()) - 1;
+            if self.pc_watches.contains(&pc) {
+                warn!(target: "cpu", "{:04X}\t{:02X} {}\t{:?} {}\t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} ppu:{} apu:{}",
+                      pc,
+                      opcode_hex,
+                      match mode.bytes() {
+                          1 => format!("{:02X}", operand),
+                          2 => format!("{:02X} {:02X}", operand & 0xff, operand >> 8),
+                          _ => String::from(""),
+                      },
+                      opcode,
+                      mode.format_operand(operand, self.pc),
+                      self.a, self.x, self.y, self.p, self.sp,
+                      self.ppu.instrumentation_short(),
+                      self.apu.instrumentation_short());
+            } else {
+                debug!(target: "cpu", "{:04X}\t{:02X} {}\t{:?} {}\t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} ppu:{} apu:{}",
+                       pc,
+                       opcode_hex,
+                       match mode.bytes() {
+                           1 => format!("{:02X}", operand),
+                           2 => format!("{:02X} {:02X}", operand & 0xff, operand >> 8),
+                           _ => String::from(""),
+                       },
+                       opcode,
+                       mode.format_operand(operand, self.pc),
+                       self.a, self.x, self.y, self.p, self.sp,
+                       self.ppu.instrumentation_short(),
+                       self.apu.instrumentation_short());
+            }
         }
 
         match *opcode {
@@ -925,6 +944,10 @@ impl<'a> Cpu<'a> {
 
     pub fn pc_for_test(&self) -> u16 {
         self.pc
+    }
+
+    pub fn set_pc_watch(&mut self, addr: u16) {
+        self.pc_watches.insert(addr);
     }
 
     pub fn set_memory_watch(&mut self, addr: u16) {
