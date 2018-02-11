@@ -118,15 +118,15 @@ impl<'a> Apu<'a> {
         self.frame_counter += 1;
         let mut bus = self.bus.borrow_mut();
         if bus.frame_mode_written {
+            if bus.frame_mode_age == 0 && bus.frame_mode {
+                self.clock_envelope(&mut bus);
+                self.clock_length_and_sweep(&mut bus);
+            }
             if self.odd_frame || bus.frame_mode_age < 2 {
                 bus.frame_mode_age += 1;
             } else {
                 self.frame_counter = 0;
                 bus.frame_mode_written = false;
-                if bus.frame_mode {
-                    self.clock_envelope(&mut bus);
-                    self.clock_length_and_sweep(&mut bus);
-                }
             }
         } else {
             match self.frame_counter {
