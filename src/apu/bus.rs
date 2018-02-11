@@ -51,7 +51,9 @@ impl SquareCtrl {
             3 => {
                 let timer = (self.timer & 0xFF) + (u16::from(value & 0x7) << 8);
                 self.timer = timer;
-                self.length_counter_load = Some((value & (!0x7)) >> 3);
+                if self.enabled {
+                    self.length_counter_load = Some((value & (!0x7)) >> 3);
+                }
             }
             _ => panic!("bad APU channel control write {:04X}", address),
         }
@@ -85,7 +87,9 @@ impl TriangleCtrl {
             3 => {
                 let timer = (self.timer & 0xFF) + (u16::from(value & 0x7) << 8);
                 self.timer = timer;
-                self.length_counter_load = Some((value & (!0x7)) >> 3);
+                if self.enabled {
+                    self.length_counter_load = Some((value & (!0x7)) >> 3);
+                }
                 self.linear_counter_reload = true;
             }
             _ => panic!("bad APU channel control write {:04X}", address),
@@ -121,7 +125,9 @@ impl NoiseCtrl {
                 self.timer = super::noise::TIMER_VALUES[(value & 0xF) as usize];
             }
             3 => {
-                self.length_counter_load = Some((value & (!0x7)) >> 3);
+                if self.enabled {
+                    self.length_counter_load = Some((value & (!0x7)) >> 3);
+                }
             }
             _ => panic!("bad APU channel control write {:04X}", address),
         }
