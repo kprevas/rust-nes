@@ -40,7 +40,6 @@ pub struct Apu<'a> {
     noise: Noise,
     dmc: Dmc,
     frame_counter: i16,
-    odd_frame: bool,
     output_buffer: Producer<f32>,
     stream: Option<OutputStream>,
     bus: &'a RefCell<ApuBus>,
@@ -93,7 +92,6 @@ impl<'a> Apu<'a> {
             noise: Noise::new(),
             dmc: Dmc::new(),
             frame_counter: 0,
-            odd_frame: false,
             output_buffer: buffer_producer,
             stream,
             bus,
@@ -122,7 +120,7 @@ impl<'a> Apu<'a> {
                 self.clock_envelope(&mut bus);
                 self.clock_length_and_sweep(&mut bus);
             }
-            if self.odd_frame || bus.frame_mode_age < 2 {
+            if bus.frame_mode_age < 2 {
                 bus.frame_mode_age += 1;
             } else {
                 self.frame_counter = 0;
@@ -139,6 +137,13 @@ impl<'a> Apu<'a> {
                 }
                 11186 => {
                     self.clock_envelope(&mut bus);
+                }
+                14914 => {
+                    if !bus.frame_mode {
+                        if !bus.frame_irq_inhibit {
+                            bus.frame_interrupt = true;
+                        }
+                    }
                 }
                 14915 => {
                     if !bus.frame_mode {
@@ -168,8 +173,6 @@ impl<'a> Apu<'a> {
             self.output_buffer.write_blocking(
                 &[(pulse_1 + pulse_2) * 0.00752 + triangle * 0.00851 + noise * 0.00494 + dmc * 0.00335]);
         }
-        let odd_frame = !self.odd_frame;
-        self.odd_frame = odd_frame;
     }
 
     pub fn close(&mut self) {
