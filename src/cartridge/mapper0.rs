@@ -3,7 +3,6 @@ use cartridge::CartridgeBus;
 use cartridge::Header;
 use cartridge::NametableMirroring;
 use cartridge::NametableMirroring::*;
-
 use std::cmp::max;
 
 struct Mapper0Cpu {
@@ -84,10 +83,12 @@ impl CartridgeBus for Mapper0Ppu {
             0x2400 ... 0x27FF => match self.mirroring {
                 Vertical => address - 0x2000,
                 Horizontal => address - 0x2400,
+                _ => unimplemented!(),
             },
             0x2800 ... 0x2BFF => match self.mirroring {
                 Vertical => address - 0x2800,
                 Horizontal => address - 0x2400,
+                _ => unimplemented!(),
             },
             0x2C00 ... 0x2FFF => address - 0x2800,
             _ => panic!("Bad nametable mirror request {:04X}", address),

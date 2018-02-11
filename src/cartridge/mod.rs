@@ -6,6 +6,14 @@ mod mapper0;
 enum NametableMirroring {
     Vertical,
     Horizontal,
+    SingleScreen,
+    FourScreen,
+    Diagonal,
+    LShaped,
+    ThreeScreenVertical,
+    ThreeScreenHorizontal,
+    ThreeScreenDiagonal,
+    SingleScreenFixed,
 }
 
 pub struct Cartridge {
@@ -58,6 +66,7 @@ pub fn read(src: &mut Read) -> SimpleResult<Cartridge> {
 
     match mapper {
         0 => Ok(mapper0::read(&header, prg_rom, chr_rom)),
+        1 => Ok(mapper1::read(&header, prg_rom, chr_rom)),
         _ => unimplemented!()
     }
 }
