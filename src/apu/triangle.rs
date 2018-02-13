@@ -24,7 +24,7 @@ impl Triangle {
 
         if ctrl_bus.length_counter > 0 && self.linear_counter > 0 {
             if self.timer_tick >= ctrl_bus.timer + 1 {
-                self.timer_tick -= ctrl_bus.timer + 1;
+                self.timer_tick -= if ctrl_bus.timer == 0 { 2 } else { ctrl_bus.timer + 1 };
                 self.timer_phase += 1;
                 self.timer_phase %= 32;
             }
