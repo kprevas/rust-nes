@@ -95,9 +95,8 @@ impl Dmc {
                     }
                 }
                 self.curr_timer = ctrl_bus.rate;
-            } else {
-                self.curr_timer -= 2;
             }
+            self.curr_timer -= 2;
         } else {
             self.silence = true;
             self.sample_buffer = None;
