@@ -147,7 +147,17 @@ impl<'a> Apu<'a> {
             }
             29829 => {
                 if !bus.frame_mode {
-                    self.frame_counter = -1;
+                    if !bus.frame_irq_inhibit {
+                        bus.frame_interrupt = true;
+                    }
+                }
+            }
+            29830 => {
+                if !bus.frame_mode {
+                    if !bus.frame_irq_inhibit {
+                        bus.frame_interrupt = true;
+                    }
+                    self.frame_counter = 0;
                 }
             }
             37280 => {
