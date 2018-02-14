@@ -136,6 +136,7 @@ impl NoiseCtrl {
 
 pub struct DmcCtrl {
     pub enabled: bool,
+    pub enabled_set: bool,
 
     pub irq_enabled: bool,
     pub loop_sample: bool,
@@ -241,6 +242,7 @@ impl ApuBus {
             },
             dmc: DmcCtrl {
                 enabled: false,
+                enabled_set: false,
                 irq_enabled: false,
                 loop_sample: false,
                 rate: 0,
@@ -264,13 +266,19 @@ impl ApuBus {
             0x4004 ... 0x4007 => self.pulse_2.write(address - 0x4004, value),
             0x4008 ... 0x400B => self.triangle.write(address - 0x4008, value),
             0x400C ... 0x400F => self.noise.write(address - 0x400C, value),
-            0x4010 ... 0x4013 => self.dmc.write(address - 0x4010, value),
+            0x4010 ... 0x4013 => {
+                self.dmc.write(address - 0x4010, value);
+                if !self.dmc.irq_enabled {
+                    self.dmc_interrupt = false;
+                }
+            },
             0x4015 => {
                 self.pulse_1.enabled = value & 1 > 0;
                 self.pulse_2.enabled = value & 2 > 0;
                 self.triangle.enabled = value & 4 > 0;
                 self.noise.enabled = value & 8 > 0;
                 self.dmc.enabled = value & 0x10 > 0;
+                self.dmc.enabled_set = true;
                 self.dmc_interrupt = false;
             }
             0x4017 => {
