@@ -32,7 +32,6 @@ pub struct Cpu<'a> {
     apu_bus: &'a RefCell<ApuBus>,
     controller_strobe: bool,
     last_inputs: u8,
-    apu_tick: bool,
     ticks: f64,
     tick_adjust: u8,
     instrumented: bool,
@@ -69,7 +68,6 @@ impl<'a> Cpu<'a> {
             apu_bus,
             controller_strobe: false,
             last_inputs: Default::default(),
-            apu_tick: false,
             ticks: 0.0,
             tick_adjust: 0,
             instrumented,
@@ -90,12 +88,7 @@ impl<'a> Cpu<'a> {
             for _ in 0..3 {
                 self.ppu.tick();
             }
-            if self.apu_tick {
-                self.apu.tick(self.cartridge);
-                self.apu_tick = false;
-            } else {
-                self.apu_tick = true;
-            }
+            self.apu.tick(self.cartridge);
         }
     }
 
@@ -930,7 +923,7 @@ impl<'a> Cpu<'a> {
         for _ in 0..28 {
             self.ppu.tick();
         };
-        for _ in 0..6 {
+        for _ in 0..9 {
             self.apu.tick(self.cartridge);
         }
     }

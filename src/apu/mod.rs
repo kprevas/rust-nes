@@ -39,7 +39,8 @@ pub struct Apu<'a> {
     triangle: Triangle,
     noise: Noise,
     dmc: Dmc,
-    frame_counter: i16,
+    frame_counter: i32,
+    apu_tick: bool,
     output_buffer: Producer<f32>,
     stream: Option<OutputStream>,
     bus: &'a RefCell<ApuBus>,
@@ -92,6 +93,7 @@ impl<'a> Apu<'a> {
             noise: Noise::new(),
             dmc: Dmc::new(),
             frame_counter: 0,
+            apu_tick: false,
             output_buffer: buffer_producer,
             stream,
             bus,
@@ -113,66 +115,65 @@ impl<'a> Apu<'a> {
     }
 
     pub fn tick(&mut self, cartridge: &Box<CartridgeBus>) {
-        self.frame_counter += 1;
         let mut bus = self.bus.borrow_mut();
+        self.frame_counter += 1;
         if bus.frame_mode_written {
-            if bus.frame_mode_age == 0 && bus.frame_mode {
+            if bus.frame_mode {
                 self.clock_envelope(&mut bus);
                 self.clock_length_and_sweep(&mut bus);
             }
-            if bus.frame_mode_age < 2 {
-                bus.frame_mode_age += 1;
-            } else {
-                self.frame_counter = 0;
-                bus.frame_mode_written = false;
+            self.frame_counter = if self.apu_tick { -2 } else { -3 };
+            bus.frame_mode_written = false;
+        }
+        match self.frame_counter {
+            7456 => {
+                self.clock_envelope(&mut bus);
             }
-        } else {
-            match self.frame_counter {
-                3729 => {
-                    self.clock_envelope(&mut bus);
-                }
-                7457 => {
+            14912 => {
+                self.clock_envelope(&mut bus);
+                self.clock_length_and_sweep(&mut bus);
+            }
+            22370 => {
+                self.clock_envelope(&mut bus);
+            }
+            29828 => {
+                if !bus.frame_mode {
+                    if !bus.frame_irq_inhibit {
+                        bus.frame_interrupt = true;
+                    }
                     self.clock_envelope(&mut bus);
                     self.clock_length_and_sweep(&mut bus);
                 }
-                11186 => {
-                    self.clock_envelope(&mut bus);
-                }
-                14914 => {
-                    if !bus.frame_mode {
-                        if !bus.frame_irq_inhibit {
-                            bus.frame_interrupt = true;
-                        }
-                    }
-                }
-                14915 => {
-                    if !bus.frame_mode {
-                        self.clock_envelope(&mut bus);
-                        self.clock_length_and_sweep(&mut bus);
-                        self.frame_counter = 0;
-                        if !bus.frame_irq_inhibit {
-                            bus.frame_interrupt = true;
-                        }
-                    }
-                }
-                18641 => {
-                    self.clock_envelope(&mut bus);
-                    self.clock_length_and_sweep(&mut bus);
+            }
+            29829 => {
+                if !bus.frame_mode {
                     self.frame_counter = -1;
                 }
-                _ => (),
+            }
+            37280 => {
+                self.clock_envelope(&mut bus);
+                self.clock_length_and_sweep(&mut bus);
+            }
+            37281 => {
+                self.frame_counter = -1;
+            }
+            _ => (),
+        }
+
+        if self.apu_tick {
+            let pulse_1 = self.pulse_1.tick(&mut bus.pulse_1);
+            let pulse_2 = self.pulse_2.tick(&mut bus.pulse_2);
+            let triangle = self.triangle.tick(&mut bus.triangle);
+            let noise = self.noise.tick(&mut bus.noise);
+            let dmc = self.dmc.tick(&mut bus, cartridge);
+            if !self.stream.is_none() {
+                self.output_buffer.write_blocking(
+                    &[(pulse_1 + pulse_2) * 0.00752 + triangle * 0.00851 + noise * 0.00494 + dmc * 0.00335]);
             }
         }
 
-        let pulse_1 = self.pulse_1.tick(&mut bus.pulse_1);
-        let pulse_2 = self.pulse_2.tick(&mut bus.pulse_2);
-        let triangle = self.triangle.tick(&mut bus.triangle);
-        let noise = self.noise.tick(&mut bus.noise);
-        let dmc = self.dmc.tick(&mut bus, cartridge);
-        if !self.stream.is_none() {
-            self.output_buffer.write_blocking(
-                &[(pulse_1 + pulse_2) * 0.00752 + triangle * 0.00851 + noise * 0.00494 + dmc * 0.00335]);
-        }
+        let apu_tick = !self.apu_tick;
+        self.apu_tick = apu_tick;
     }
 
     pub fn close(&mut self) {
