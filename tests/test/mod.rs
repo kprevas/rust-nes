@@ -18,7 +18,27 @@ pub fn run_test_to_pc(rom: &mut Read,
              pc_start,
              &mut |cpu| { cpu.pc_for_test() == pc_end },
              None,
-             assert);
+             &mut |cpu| {
+                 for &(addr, val) in assert {
+                     assert_eq!(val, cpu.read_memory_no_tick(addr), "0x{:02X}", cpu.read_memory_no_tick(addr));
+                 }
+             });
+}
+
+pub fn run_test_to_success_or_fail_pc(rom: &mut Read,
+                                      pc_start: Option<u16>,
+                                      pc_success: u16,
+                                      pc_fail: u16,
+                                      error_code_addr: u16) {
+    run_test(rom,
+             pc_start,
+             &mut |cpu| { cpu.pc_for_test() == pc_success || cpu.pc_for_test() == pc_fail },
+             None,
+             &mut |cpu| {
+                 if cpu.pc_for_test() == pc_fail {
+                     assert_eq!(0, cpu.read_memory_no_tick(error_code_addr));
+                 }
+             });
 }
 
 pub fn run_test_until_memory_matches(rom: &mut Read,
@@ -42,14 +62,18 @@ pub fn run_test_until_memory_matches(rom: &mut Read,
                  status != running_status && status != reset_status
              },
              Some((status_addr, running_status, reset_status)),
-             assert);
+             &mut |cpu| {
+                 for &(addr, val) in assert {
+                     assert_eq!(val, cpu.read_memory_no_tick(addr), "0x{:02X}", cpu.read_memory_no_tick(addr));
+                 }
+             });
 }
 
 fn run_test(rom: &mut Read,
             pc_start: Option<u16>,
             terminate_condition: &mut FnMut(&mut Cpu) -> bool,
             status: Option<(u16, u8, u8)>,
-            assert: &[(u16, u8)]) {
+            assert: &mut FnMut(&mut Cpu)) {
     let _ = env_logger::init();
     let ppu_bus = RefCell::new(PpuBus::new());
     let apu_bus = RefCell::new(ApuBus::new());
@@ -82,7 +106,5 @@ fn run_test(rom: &mut Read,
         }
     }
 
-    for &(addr, val) in assert {
-        assert_eq!(val, cpu.read_memory_no_tick(addr), "0x{:02X}", cpu.read_memory_no_tick(addr));
-    }
+    assert(&mut cpu);
 }

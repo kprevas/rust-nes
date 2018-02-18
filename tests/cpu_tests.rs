@@ -1,6 +1,7 @@
 extern crate nes;
 
 use test::run_test_to_pc;
+use test::run_test_to_success_or_fail_pc;
 
 mod test;
 
@@ -26,4 +27,10 @@ fn test_branch_timing_2_backward_branch() {
 fn test_branch_timing_3_forward_branch() {
     run_test_to_pc(&mut include_bytes!("roms/branch_timing_tests/3.Forward_Branch.nes").as_ref(),
                    None, 0xe01d, &[(0xf8, 1)]);
+}
+
+#[test]
+fn test_dummy_reads() {
+    run_test_to_success_or_fail_pc(&mut include_bytes!("roms/cpu_dummy_reads/cpu_dummy_reads.nes").as_ref(),
+                                   None, 0xe36d, 0xe372, 0x16);
 }

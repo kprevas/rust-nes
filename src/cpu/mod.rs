@@ -133,7 +133,10 @@ impl<'a> Cpu<'a> {
         let value = match address {
             0x0000 ... 0x1FFF => self.internal_ram[(address % 0x800) as usize],
             0x2000 ... 0x3FFF => self.ppu_bus.borrow_mut().read(address),
-            0x4000 ... 0x4014 => panic!("bad CPU memory read {:04X}", address),
+            0x4000 ... 0x4014 => {
+                warn!(target: "cpu", "questionable CPU memory read {:04X}", address);
+                0
+            },
             0x4015 => self.apu_bus.borrow_mut().read_status(),
             0x4016 => {
                 let value = self.last_inputs & 1;
@@ -183,24 +186,28 @@ impl<'a> Cpu<'a> {
             Accumulator => self.a,
             Immediate => operand as u8,
             _ => {
-                let target = self.apply_memory_mode(mode, operand, page_boundary_penalty);
+                let target = self.apply_memory_mode(mode, operand, page_boundary_penalty, false);
                 self.read_memory(target)
             }
         }
     }
 
     fn write_memory_mode(&mut self, mode: &AddressingMode, operand: u16, value: u8) {
+        self.write_memory_mode_with_dummy_read(mode, operand, value, false)
+    }
+
+    fn write_memory_mode_with_dummy_read(&mut self, mode: &AddressingMode, operand: u16, value: u8, dummy_read: bool) {
         match *mode {
             Accumulator => self.a = value,
             Immediate => panic!("Attempted to write with immediate addressing"),
             _ => {
-                let address = self.apply_memory_mode(mode, operand, false);
+                let address = self.apply_memory_mode(mode, operand, false, dummy_read);
                 self.write_memory(address, value)
             }
         }
     }
 
-    fn apply_memory_mode(&mut self, mode: &AddressingMode, operand: u16, page_boundary_penalty: bool) -> u16 {
+    fn apply_memory_mode(&mut self, mode: &AddressingMode, operand: u16, page_boundary_penalty: bool, dummy_read: bool) -> u16 {
         match *mode {
             ZeropageX => {
                 self.tick();
@@ -213,8 +220,10 @@ impl<'a> Cpu<'a> {
             Zeropage => operand & 0xff,
             AbsoluteIndexedX => {
                 let address = operand.wrapping_add(u16::from(self.x));
-                if page_boundary_penalty && address & (!0xff) != operand & (!0xff) {
-                    self.tick();
+                if (page_boundary_penalty || dummy_read) && address & (!0xff) != operand & (!0xff) {
+                    self.read_memory(if address >= 0x100 { address - 0x100 } else { address + 0xFF00 });
+                } else if dummy_read {
+                    self.read_memory(address);
                 }
                 address
             }
@@ -234,8 +243,10 @@ impl<'a> Cpu<'a> {
                 let offset = u16::from(self.y);
                 let target_start = self.read_word_zeropage_wrapped(operand);
                 let address = target_start.wrapping_add(offset);
-                if page_boundary_penalty && address & (!0xff) != target_start & (!0xff) {
-                    self.tick();
+                if (page_boundary_penalty || dummy_read) && address & (!0xff) != target_start & (!0xff) {
+                    self.read_memory(if address >= 0x100 { address - 0x100 } else { address + 0xFF00 });
+                } else if dummy_read {
+                    self.read_memory(address);
                 }
                 address
             }
@@ -565,13 +576,13 @@ impl<'a> Cpu<'a> {
             }
 
             JMP => {
-                self.pc = self.apply_memory_mode(mode, operand, false);
+                self.pc = self.apply_memory_mode(mode, operand, false, false);
             }
 
             JSR => {
                 let old_pc = self.pc - 1;
                 self.push_word(old_pc);
-                let new_pc = self.apply_memory_mode(mode, operand, false);
+                let new_pc = self.apply_memory_mode(mode, operand, false, false);
                 self.pc = new_pc;
                 self.tick();
             }
@@ -765,11 +776,12 @@ impl<'a> Cpu<'a> {
 
             STA => {
                 let value = self.a;
-                self.write_memory_mode(mode, operand, value);
+                self.write_memory_mode_with_dummy_read(mode, operand, value, true);
                 let mut cycles = 0;
                 match *mode {
-                    IndirectIndexed => cycles = 4,
-                    AbsoluteIndexedX | AbsoluteIndexedY => cycles = 2,
+                    IndirectIndexed => cycles = 3,
+                    AbsoluteIndexedX => cycles = 1,
+                    AbsoluteIndexedY => cycles = 2,
                     _ => ()
                 }
                 for _ in 0..cycles {
