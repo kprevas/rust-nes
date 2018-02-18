@@ -37,6 +37,7 @@ pub struct Cpu<'a> {
     tick_adjust: u8,
     open_bus: u8,
     instrumented: bool,
+    delayed_irq_flag: Option<bool>,
 
     memory_watches: Box<HashSet<u16>>,
     pc_watches: Box<HashSet<u16>>,
@@ -80,6 +81,7 @@ impl<'a> Cpu<'a> {
             memory_watches: Box::new(HashSet::new()),
             pc_breaks: Box::new(HashSet::new()),
             pc_ignores: Box::new(Vec::new()),
+            delayed_irq_flag: None,
         };
 
         cpu.reset(false);
@@ -500,6 +502,7 @@ impl<'a> Cpu<'a> {
             }
 
             CLI => {
+                self.delayed_irq_flag = Some(self.flag(INTERRUPT));
                 self.set_flag(INTERRUPT, false);
             }
 
@@ -692,6 +695,7 @@ impl<'a> Cpu<'a> {
             }
 
             PLP => {
+                self.delayed_irq_flag = Some(self.flag(INTERRUPT));
                 let value = self.pop();
                 self.p = (value & 0b11101111) | 0b00100000;
                 self.tick();
@@ -783,6 +787,7 @@ impl<'a> Cpu<'a> {
             }
 
             SEI => {
+                self.delayed_irq_flag = Some(self.flag(INTERRUPT));
                 self.set_flag(INTERRUPT, true);
             }
 
@@ -928,14 +933,19 @@ impl<'a> Cpu<'a> {
             self.push(p);
             self.pc = self.read_word(0xFFFA);
             self.ppu_bus.borrow_mut().nmi_interrupt = false;
-        } else if irq_interrupt && (self.p & 0x4) == 0 {
-            let old_pc = self.pc;
-            let p = self.p | 0b00100000;
+        } else if irq_interrupt && !match self.delayed_irq_flag.take() {
+            Some(val) => val,
+            None => self.flag(INTERRUPT)
+        }
+            {
+                let old_pc = self.pc;
+                let p = self.p | 0b00100000;
 
-            self.push_word(old_pc);
-            self.push(p);
-            self.pc = self.read_word(0xFFFE);
-        } else {
+                self.push_word(old_pc);
+                self.push(p);
+                self.pc = self.read_word(0xFFFE);
+                self.set_flag(INTERRUPT, true);
+            } else {
             self.execute_opcode();
         }
     }

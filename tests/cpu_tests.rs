@@ -57,3 +57,58 @@ fn test_cpu_exec_space_ppuio() {
                                   0x81,
                                   &[(0x6000, 0)]);
 }
+
+#[test]
+fn test_interrupts_1_cli_latency() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/cpu_interrupts/1-cli_latency.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_interrupts_2_nmi_and_brk() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/cpu_interrupts/2-nmi_and_brk.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_interrupts_3_nmi_and_irq() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/cpu_interrupts/3-nmi_and_irq.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_interrupts_4_irq_and_dma() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/cpu_interrupts/4-irq_and_dma.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_interrupts_5_branch_delays_irq() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/cpu_interrupts/5-branch_delays_irq.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
