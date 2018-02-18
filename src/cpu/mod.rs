@@ -323,7 +323,7 @@ impl<'a> Cpu<'a> {
         let operand_pc = self.pc;
         let operand = match mode.bytes() {
             0 => {
-                self.tick();
+                self.read_memory(operand_pc);
                 0
             }
             1 => u16::from(self.read_memory(operand_pc)),
