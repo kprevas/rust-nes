@@ -38,6 +38,7 @@ pub struct Cpu<'a> {
     open_bus: u8,
     instrumented: bool,
     delayed_irq_flag: Option<bool>,
+    last_instruction_brk: bool,
 
     memory_watches: Box<HashSet<u16>>,
     pc_watches: Box<HashSet<u16>>,
@@ -82,6 +83,7 @@ impl<'a> Cpu<'a> {
             pc_breaks: Box::new(HashSet::new()),
             pc_ignores: Box::new(Vec::new()),
             delayed_irq_flag: None,
+            last_instruction_brk: false,
         };
 
         cpu.reset(false);
@@ -473,12 +475,13 @@ impl<'a> Cpu<'a> {
             }
 
             BRK => {
-                let old_pc = self.pc;
+                let old_pc = self.pc + 1;
                 let p = self.p | 0b00110000;
 
                 self.push_word(old_pc);
+                let vector = if self.ppu_bus.borrow().nmi_interrupt { 0xFFFA } else { 0xFFFE };
                 self.push(p);
-                self.pc = self.read_word(0xFFFE);
+                self.pc = self.read_word(vector);
             }
 
             BVC => {
@@ -895,6 +898,11 @@ impl<'a> Cpu<'a> {
             }
             _ => ()
         }
+
+        self.last_instruction_brk = match *opcode {
+            BRK => true,
+            _ => false,
+        }
     }
 
     pub fn next_operation(&mut self, inputs: ControllerState) {
@@ -921,31 +929,34 @@ impl<'a> Cpu<'a> {
                 };
             }
         }
+        let irq_interrupt = irq_interrupt && !match self.delayed_irq_flag.take() {
+            Some(val) => val,
+            None => self.flag(INTERRUPT)
+        };
+        let nmi_interrupt = self.ppu_bus.borrow().nmi_interrupt && self.ppu_bus.borrow().nmi_interrupt_age > 1;
         if let Some((addr, i)) = self.oam_dma_write {
             let data = self.read_memory(u16::from(addr) * 0x100 + u16::from(i));
             self.write_memory(0x2014, data);
             self.oam_dma_write = if i < 255 { Some((addr, i + 1)) } else { None };
-        } else if self.ppu_bus.borrow().nmi_interrupt && self.ppu_bus.borrow().nmi_interrupt_age > 1 {
+        } else if nmi_interrupt && !self.last_instruction_brk {
             let old_pc = self.pc;
             let p = self.p | 0b00100000;
 
             self.push_word(old_pc);
+            let vector = if irq_interrupt { 0xFFFE } else { 0xFFFA };
             self.push(p);
-            self.pc = self.read_word(0xFFFA);
+            self.pc = self.read_word(vector);
             self.ppu_bus.borrow_mut().nmi_interrupt = false;
-        } else if irq_interrupt && !match self.delayed_irq_flag.take() {
-            Some(val) => val,
-            None => self.flag(INTERRUPT)
-        }
-            {
-                let old_pc = self.pc;
-                let p = self.p | 0b00100000;
+        } else if irq_interrupt && !self.last_instruction_brk {
+            let old_pc = self.pc;
+            let p = self.p | 0b00100000;
 
-                self.push_word(old_pc);
-                self.push(p);
-                self.pc = self.read_word(0xFFFE);
-                self.set_flag(INTERRUPT, true);
-            } else {
+            self.push_word(old_pc);
+            let vector = if nmi_interrupt { 0xFFFA } else { 0xFFFE };
+            self.push(p);
+            self.pc = self.read_word(vector);
+            self.set_flag(INTERRUPT, true);
+        } else {
             self.execute_opcode();
         }
     }
