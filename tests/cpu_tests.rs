@@ -2,6 +2,7 @@ extern crate nes;
 
 use test::run_test_to_pc;
 use test::run_test_to_success_or_fail_pc;
+use test::run_test_until_memory_matches;
 
 mod test;
 
@@ -33,4 +34,26 @@ fn test_branch_timing_3_forward_branch() {
 fn test_dummy_reads() {
     run_test_to_success_or_fail_pc(&mut include_bytes!("roms/cpu_dummy_reads/cpu_dummy_reads.nes").as_ref(),
                                    None, 0xe36d, 0xe372, 0x16);
+}
+
+#[test]
+fn test_cpu_exec_space_apu() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/cpu_exec_space/test_cpu_exec_space_apu.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_cpu_exec_space_ppuio() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/cpu_exec_space/test_cpu_exec_space_ppuio.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
 }

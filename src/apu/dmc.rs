@@ -44,7 +44,7 @@ impl Dmc {
         if ctrl_bus.enabled {
             if self.sample_buffer.is_none() && ctrl_bus.bytes_remaining > 0 {
                 cpu_bus.dmc_delay = true;
-                self.sample_buffer = Some(cartridge.read_memory(self.address));
+                self.sample_buffer = Some(cartridge.read_memory(self.address, 0));
                 if self.address == 0xFFFF {
                     self.address = 0x8000;
                 } else {

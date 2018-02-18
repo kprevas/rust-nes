@@ -171,7 +171,7 @@ impl<'a> Ppu<'a> {
 
     fn read_memory(&self, address: u16, grayscale: bool) -> u8 {
         match address {
-            0x0000 ... 0x1FFF => self.cartridge.read_memory(address),
+            0x0000 ... 0x1FFF => self.cartridge.read_memory(address, 0),
             0x2000 ... 0x2FFF => self.internal_ram[self.cartridge.mirror_nametable(address) as usize],
             0x3000 ... 0x3EFF => self.internal_ram[(self.cartridge.mirror_nametable(address - 0x1000)) as usize],
             0x3F00 ... 0x3FFF => {

@@ -10,6 +10,7 @@ use self::opcodes::AddressingMode::*;
 use self::opcodes::Opcode;
 use std::cell::RefCell;
 use std::collections::HashSet;
+use std::ops::Range;
 
 mod opcodes;
 pub mod disassembler;
@@ -34,10 +35,13 @@ pub struct Cpu<'a> {
     last_inputs: u8,
     ticks: f64,
     tick_adjust: u8,
+    open_bus: u8,
     instrumented: bool,
 
     memory_watches: Box<HashSet<u16>>,
     pc_watches: Box<HashSet<u16>>,
+    pc_breaks: Box<HashSet<u16>>,
+    pc_ignores: Box<Vec<Range<u16>>>,
 }
 
 const CARRY: u8 = 0b1;
@@ -70,9 +74,12 @@ impl<'a> Cpu<'a> {
             last_inputs: Default::default(),
             ticks: 0.0,
             tick_adjust: 0,
+            open_bus: 0,
             instrumented,
             pc_watches: Box::new(HashSet::new()),
             memory_watches: Box::new(HashSet::new()),
+            pc_breaks: Box::new(HashSet::new()),
+            pc_ignores: Box::new(Vec::new()),
         };
 
         cpu.reset(false);
@@ -106,7 +113,9 @@ impl<'a> Cpu<'a> {
     }
 
     fn read_word(&mut self, address: u16) -> u16 {
-        (u16::from(self.read_memory(address + 1)) << 8) + u16::from(self.read_memory(address))
+        let lo_byte = u16::from(self.read_memory(address));
+        let hi_byte = u16::from(self.read_memory(address + 1));
+        (hi_byte << 8) + lo_byte
     }
 
     fn read_word_no_tick(&mut self, address: u16) -> u16 {
@@ -127,28 +136,29 @@ impl<'a> Cpu<'a> {
 
     pub fn read_memory(&mut self, address: u16) -> u8 {
         self.tick();
-        self.read_memory_no_tick(address)
+        let value = self.read_memory_no_tick(address);
+        self.open_bus = value;
+        value
     }
 
     pub fn read_memory_no_tick(&mut self, address: u16) -> u8 {
         let value = match address {
             0x0000 ... 0x1FFF => self.internal_ram[(address % 0x800) as usize],
             0x2000 ... 0x3FFF => self.ppu_bus.borrow_mut().read(address),
-            0x4000 ... 0x4014 => {
-                warn!(target: "cpu", "questionable CPU memory read {:04X}", address);
-                0
-            },
+            0x4000 ... 0x4014 => self.open_bus,
             0x4015 => self.apu_bus.borrow_mut().read_status(),
             0x4016 => {
                 let value = self.last_inputs & 1;
                 self.last_inputs >>= 1;
-                value
+                value | (self.open_bus & 0xF0)
             }
-            0x4017 =>
-            // TODO joypad 2
-                0,
-            0x4018 ... 0x401F => 0,
-            _ => self.cartridge.read_memory(address),
+            0x4017 => {
+                // TODO joypad 2
+                let value = 0;
+                value | (self.open_bus & 0xF0)
+            }
+            0x4018 ... 0x401F => self.open_bus,
+            _ => self.cartridge.read_memory(address, self.open_bus),
         };
         if self.instrumented && self.memory_watches.contains(&address) {
             warn!(target: "cpu", "read memory {:04X} {:02X} {} {}", address, value,
@@ -334,7 +344,21 @@ impl<'a> Cpu<'a> {
 
         if self.instrumented {
             let pc = self.pc - u16::from(mode.bytes()) - 1;
-            if self.pc_watches.contains(&pc) {
+            if self.pc_breaks.contains(&pc) {
+                panic!("{:04X}\t{:02X} {}\t{:?} {}\t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} ppu:{} apu:{}",
+                       pc,
+                       opcode_hex,
+                       match mode.bytes() {
+                           1 => format!("{:02X}", operand),
+                           2 => format!("{:02X} {:02X}", operand & 0xff, operand >> 8),
+                           _ => String::from(""),
+                       },
+                       opcode,
+                       mode.format_operand(operand, self.pc),
+                       self.a, self.x, self.y, self.p, self.sp,
+                       self.ppu.instrumentation_short(),
+                       self.apu.instrumentation_short());
+            } else if self.pc_watches.contains(&pc) {
                 warn!(target: "cpu", "{:04X}\t{:02X} {}\t{:?} {}\t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} ppu:{} apu:{}",
                       pc,
                       opcode_hex,
@@ -349,19 +373,28 @@ impl<'a> Cpu<'a> {
                       self.ppu.instrumentation_short(),
                       self.apu.instrumentation_short());
             } else {
-                debug!(target: "cpu", "{:04X}\t{:02X} {}\t{:?} {}\t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} ppu:{} apu:{}",
-                       pc,
-                       opcode_hex,
-                       match mode.bytes() {
-                           1 => format!("{:02X}", operand),
-                           2 => format!("{:02X} {:02X}", operand & 0xff, operand >> 8),
-                           _ => String::from(""),
-                       },
-                       opcode,
-                       mode.format_operand(operand, self.pc),
-                       self.a, self.x, self.y, self.p, self.sp,
-                       self.ppu.instrumentation_short(),
-                       self.apu.instrumentation_short());
+                let mut ignore = false;
+                for ignore_range in self.pc_ignores.iter() {
+                    if ignore_range.start <= pc && ignore_range.end >= pc {
+                        ignore = true;
+                        break;
+                    }
+                }
+                if !ignore {
+                    debug!(target: "cpu", "{:04X}\t{:02X} {}\t{:?} {}\t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} ppu:{} apu:{}",
+                           pc,
+                           opcode_hex,
+                           match mode.bytes() {
+                               1 => format!("{:02X}", operand),
+                               2 => format!("{:02X} {:02X}", operand & 0xff, operand >> 8),
+                               _ => String::from(""),
+                           },
+                           opcode,
+                           mode.format_operand(operand, self.pc),
+                           self.a, self.x, self.y, self.p, self.sp,
+                           self.ppu.instrumentation_short(),
+                           self.apu.instrumentation_short());
+                }
             }
         }
 
@@ -850,7 +883,7 @@ impl<'a> Cpu<'a> {
                     AbsoluteIndexedX | AbsoluteIndexedY => {
                         self.tick();
                         self.tick();
-                    },
+                    }
                     IndexedIndirect => self.tick_adjust += 2,
                     _ => self.tick(),
                 };
@@ -956,6 +989,14 @@ impl<'a> Cpu<'a> {
 
     pub fn set_pc_watch(&mut self, addr: u16) {
         self.pc_watches.insert(addr);
+    }
+
+    pub fn set_pc_break(&mut self, addr: u16) {
+        self.pc_breaks.insert(addr);
+    }
+
+    pub fn add_pc_ignore_range(&mut self, range: Range<u16>) {
+        self.pc_ignores.push(range);
     }
 
     pub fn set_memory_watch(&mut self, addr: u16) {

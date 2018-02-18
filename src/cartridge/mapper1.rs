@@ -176,13 +176,13 @@ pub fn read(header: &Header, prg_rom: &[u8], chr_rom: &[u8]) -> Cartridge {
 }
 
 impl CartridgeBus for Mapper1Cpu {
-    fn read_memory(&self, address: u16) -> u8 {
+    fn read_memory(&self, address: u16, open_bus: u8) -> u8 {
         let ctrl = self.ctrl.borrow();
         match address {
             0x6000 ... 0x7FFF => self.prg_ram[(address - 0x6000) as usize],
             0x8000 ... 0xBFFF => self.prg_rom[ctrl.prg_low_bank(address - 0x8000)],
             0xC000 ... 0xFFFF => self.prg_rom[ctrl.prg_hi_bank(address - 0xC000, self.prg_rom.len())],
-            _ => panic!("bad memory read 0x{:04X}", address),
+            _ => open_bus,
         }
     }
 
@@ -207,12 +207,12 @@ impl CartridgeBus for Mapper1Cpu {
 }
 
 impl CartridgeBus for Mapper1Ppu {
-    fn read_memory(&self, address: u16) -> u8 {
+    fn read_memory(&self, address: u16, open_bus: u8) -> u8 {
         let ctrl = self.ctrl.borrow();
         match address {
             0x0000 ... 0x0FFF => self.chr_rom[ctrl.chr_low_bank(address)],
             0x1000 ... 0x1FFF => self.chr_rom[ctrl.chr_hi_bank(address - 0x1000)],
-            _ => panic!("bad memory read 0x{:04X}", address),
+            _ => open_bus,
         }
     }
 

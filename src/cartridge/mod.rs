@@ -24,7 +24,7 @@ pub struct Cartridge {
 }
 
 pub trait CartridgeBus {
-    fn read_memory(&self, address: u16) -> u8;
+    fn read_memory(&self, address: u16, open_bus: u8) -> u8;
     fn write_memory(&mut self, address: u16, value: u8);
     fn mirror_nametable(&self, address: u16) -> u16;
 }
