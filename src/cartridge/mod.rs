@@ -55,7 +55,7 @@ pub fn read(src: &mut Read) -> SimpleResult<Cartridge> {
         _flags_9: contents[9],
         _flags_10: contents[10],
     };
-    info!("header: {:?}", header);
+    info!(target: "cartridge", "header: {:?}", header);
     assert_eq!([0, 0, 0, 0, 0], contents[11..16]);
     // TODO check for trainer
     let prg_end = 16 + (u32::from(header.prg_rom_blocks) * 0x4000) as usize;
@@ -64,7 +64,7 @@ pub fn read(src: &mut Read) -> SimpleResult<Cartridge> {
     let chr_rom = &contents[prg_end..chr_end];
 
     let mapper = (header.flags_6 >> 4) + (header.flags_7 & 0b11110000);
-    info!("Using mapper {}", mapper);
+    info!(target: "cartridge", "Using mapper {}", mapper);
 
     match mapper {
         0 => Ok(mapper0::read(&header, prg_rom, chr_rom)),
