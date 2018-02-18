@@ -145,7 +145,7 @@ impl<'a> Ppu<'a> {
                     | ((u16::from(scroll) >> 3) << 5);
             }
         }
-        if let Some(addr) = bus.addr.take() {
+        if let Some(addr) = bus.addr_write.take() {
             if bus.first_write {
                 self.tmp_vram_addr = (self.tmp_vram_addr & 0xFF) | ((u16::from(addr) & 0x3F) << 8);
             } else {
@@ -157,7 +157,7 @@ impl<'a> Ppu<'a> {
 
     fn process_data_write(&mut self) {
         let mut bus = self.bus.borrow_mut();
-        if let Some(data) = bus.data.take() {
+        if let Some(data) = bus.data_write.take() {
             let addr = self.vram_addr;
             self.write_memory(addr, data);
             self.vram_addr += if bus.ctrl.address_increment_vertical { 32 } else { 1 };
@@ -169,7 +169,7 @@ impl<'a> Ppu<'a> {
         }
     }
 
-    fn read_memory(&self, address: u16) -> u8 {
+    fn read_memory(&self, address: u16, grayscale: bool) -> u8 {
         match address {
             0x0000 ... 0x1FFF => self.cartridge.read_memory(address),
             0x2000 ... 0x2FFF => self.internal_ram[self.cartridge.mirror_nametable(address) as usize],
@@ -179,10 +179,14 @@ impl<'a> Ppu<'a> {
                 if palette_address & 0x13 == 0x10 {
                     palette_address &= !0x10;
                 }
-                self.palette_ram[(palette_address % 0x20) as usize] & (if self.bus.borrow().mask.grayscale { 0x30 } else { 0xFF })
+                self.palette_ram[(palette_address % 0x20) as usize] & (if grayscale { 0x30 } else { 0xFF })
             }
             _ => panic!("Bad PPU memory read {:04X}", address),
         }
+    }
+
+    fn read_memory_under_palette(&self, address: u16) -> u8 {
+        self.internal_ram[(self.cartridge.mirror_nametable(address - 0x1000)) as usize]
     }
 
     fn write_memory(&mut self, address: u16, value: u8) {
@@ -213,6 +217,16 @@ impl<'a> Ppu<'a> {
             if bus.nmi_interrupt && bus.nmi_interrupt_age < 255 {
                 bus.nmi_interrupt_age += 1;
             }
+            if self.vram_addr >= 0x3F00 && self.vram_addr < 0x4000 {
+                bus.palette_data = self.read_memory(self.vram_addr, bus.mask.grayscale);
+                if bus.read_buffer.is_none() {
+                    bus.read_buffer = Some(self.read_memory_under_palette(self.vram_addr));
+                }
+            } else {
+                if bus.read_buffer.is_none() {
+                    bus.read_buffer = Some(self.read_memory(self.vram_addr, bus.mask.grayscale));
+                }
+            }
         }
         self.update_tmp_addr();
         self.process_data_write();
@@ -234,7 +248,7 @@ impl<'a> Ppu<'a> {
         }
         let mut bus = self.bus.borrow_mut();
         bus.status.just_read = false;
-        bus.addr_is_palette = self.vram_addr >= 0x3F00;
+        bus.addr = self.vram_addr;
     }
 
     fn reload_shift(&mut self) {
@@ -296,7 +310,7 @@ impl<'a> Ppu<'a> {
                     palette = obj_palette;
                 }
             }
-            let color = self.read_memory(0x3F00 + if self.rendering() { palette } else { 0 });
+            let color = self.read_memory(0x3F00 + if self.rendering() { palette } else { 0 }, self.bus.borrow().mask.grayscale);
             self.image.put_pixel(u32::from(self.dot) - 2, u32::from(self.scanline), Rgba(NES_RGB[color as usize]))
         }
         self.shift_bgd_low <<= 1;
@@ -349,6 +363,7 @@ impl<'a> Ppu<'a> {
     }
 
     fn read_into_latches(&mut self) {
+        let bus = self.bus.borrow();
         match self.dot % 8 {
             1 => {
                 self.addr = 0x2000 | (self.vram_addr & 0xFFF);
@@ -357,13 +372,13 @@ impl<'a> Ppu<'a> {
                 }
             }
             2 => {
-                self.nametable = self.read_memory(self.addr);
+                self.nametable = self.read_memory(self.addr, bus.mask.grayscale);
             }
             3 => {
                 self.addr = 0x23C0 | (self.vram_addr & 0x0C00) | ((self.vram_addr >> 4) & 0x38) | ((self.vram_addr >> 2) & 0x07);
             }
             4 => {
-                self.latch_attrtable = self.read_memory(self.addr);
+                self.latch_attrtable = self.read_memory(self.addr, bus.mask.grayscale);
                 if ((self.vram_addr >> 5) & 2) > 0 {
                     self.latch_attrtable >>= 4;
                 }
@@ -376,13 +391,13 @@ impl<'a> Ppu<'a> {
                     u16::from(self.nametable) * 16 + ((self.vram_addr & 0x7000) >> 12);
             }
             6 => {
-                self.latch_bgd_low = self.read_memory(self.addr);
+                self.latch_bgd_low = self.read_memory(self.addr, bus.mask.grayscale);
             }
             7 => {
                 self.addr += 8;
             }
             0 => {
-                self.latch_bgd_high = self.read_memory(self.addr);
+                self.latch_bgd_high = self.read_memory(self.addr, bus.mask.grayscale);
                 self.scroll_horizontal();
             }
             _ => panic!("bad dot"),
@@ -445,8 +460,8 @@ impl<'a> Ppu<'a> {
                 }
                 addr += sprite_y + (sprite_y & 8);
 
-                sprite.data_low = self.read_memory(addr);
-                sprite.data_high = self.read_memory(addr + 8);
+                sprite.data_low = self.read_memory(addr, bus.mask.grayscale);
+                sprite.data_high = self.read_memory(addr + 8, bus.mask.grayscale);
             }
             self.oam[i] = sprite;
         }
@@ -486,7 +501,7 @@ impl<'a> Ppu<'a> {
                 self.read_into_latches();
             }
             338 | 340 => {
-                self.nametable = self.read_memory(self.addr);
+                self.nametable = self.read_memory(self.addr, self.bus.borrow().mask.grayscale);
             }
             1 | 339 => {
                 self.addr = 0x2000 | (self.vram_addr & 0xFFF);

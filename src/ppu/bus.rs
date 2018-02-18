@@ -121,13 +121,15 @@ pub struct PpuBus {
     pub oam_addr: u8,
     pub oam_data: Option<u8>,
     pub scroll: Option<u8>,
-    pub addr: Option<u8>,
-    pub data: Option<u8>,
+    pub addr_write: Option<u8>,
+    pub data_write: Option<u8>,
+    pub addr: u16,
+    pub read_buffer: Option<u8>,
+    pub palette_data: u8,
     pub first_write: bool,
     pub nmi_interrupt: bool,
     pub nmi_interrupt_age: u8,
     decay_register: DecayRegister,
-    pub addr_is_palette: bool,
 }
 
 impl PpuBus {
@@ -161,14 +163,16 @@ impl PpuBus {
             oam_addr: 0,
             oam_data: None,
             scroll: None,
-            addr: None,
-            data: None,
+            addr_write: None,
+            data_write: None,
+            addr: 0,
+            read_buffer: Some(0),
+            palette_data: 0,
             first_write: false,
             nmi_interrupt: false,
             nmi_interrupt_age: 0,
             decay_register: DecayRegister::new(
                 [0xFF, 0xFF, 0x1F, 0xFF, 0x00, 0xFF, 0xFF, 0x00]),
-            addr_is_palette: false,
         }
     }
 
@@ -195,13 +199,17 @@ impl PpuBus {
                                      },
                                      5 => 0,
                                      6 => 0,
-                                     7 => match self.data {
-                                         Some(value) => value,
-                                         None => 0,
+                                     7 => {
+                                         let buffer_data = self.read_buffer.take();
+                                         if self.addr >= 0x3F00 {
+                                             self.palette_data
+                                         } else {
+                                             buffer_data.unwrap()
+                                         }
                                      },
                                      _ => panic!()
                                  },
-                                 addr == 7 && self.addr_is_palette)
+                                 addr == 7 && self.addr >= 0x3F00)
     }
 
     pub fn write(&mut self, addr: u16, value: u8) {
@@ -229,11 +237,11 @@ impl PpuBus {
                 self.first_write = !self.first_write;
             }
             6 => {
-                self.addr = Some(value);
+                self.addr_write = Some(value);
                 self.first_write = !self.first_write;
             }
             7 => {
-                self.data = Some(value);
+                self.data_write = Some(value);
             }
             _ => panic!()
         }
@@ -247,7 +255,7 @@ impl PpuBus {
         self.ctrl = Ctrl::from_u8(0);
         self.mask = Mask::from_u8(0);
         self.scroll = None;
-        self.addr = None;
-        self.data = None;
+        self.addr_write = None;
+        self.data_write = None;
     }
 }
