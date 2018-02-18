@@ -1,6 +1,7 @@
 extern crate nes;
 
 use test::run_test_to_pc;
+use test::run_test_until_memory_matches;
 
 mod test;
 
@@ -44,4 +45,15 @@ fn test_6_nmi_disable_test() {
 fn test_7_nmi_timing_test() {
     run_test_to_pc(&mut include_bytes!("roms/vbl_nmi_timing/7.nmi_timing.nes").as_ref(),
                    None, 0xe01d, &[(0xf8, 1)]);
+}
+
+#[test]
+fn test_ppu_open_bus() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/ppu_open_bus/ppu_open_bus.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
 }

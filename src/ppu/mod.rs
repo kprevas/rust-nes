@@ -1,12 +1,11 @@
-pub mod bus;
-
-use std::cell::RefCell;
-use std::borrow::BorrowMut;
-use image::{GenericImage, DynamicImage, Rgba};
-use piston_window::*;
-
-use self::bus::*;
 use cartridge::CartridgeBus;
+use image::{DynamicImage, GenericImage, Rgba};
+use piston_window::*;
+use self::bus::*;
+use std::borrow::BorrowMut;
+use std::cell::RefCell;
+
+pub mod bus;
 
 const NES_RGB: [[u8; 4]; 64] =
     [[0x7C, 0x7C, 0x7C, 0xFF], [0x00, 0x00, 0xFC, 0xFF], [0x00, 0x00, 0xBC, 0xFF], [0x44, 0x28, 0xBC, 0xFF], [0x94, 0x00, 0x84, 0xFF], [0xA8, 0x00, 0x20, 0xFF], [0xA8, 0x10, 0x00, 0xFF], [0x88, 0x14, 0x00, 0xFF],
@@ -233,7 +232,9 @@ impl<'a> Ppu<'a> {
                 self.odd_frame = !self.odd_frame;
             }
         }
-        self.bus.borrow_mut().status.just_read = false;
+        let mut bus = self.bus.borrow_mut();
+        bus.status.just_read = false;
+        bus.addr_is_palette = self.vram_addr >= 0x3F00;
     }
 
     fn reload_shift(&mut self) {

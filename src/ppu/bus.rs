@@ -63,6 +63,57 @@ impl Status {
     }
 }
 
+const DECAY_REGISTER_TTL: u32 = 1073863;
+
+struct DecayRegister {
+    pub masks: [u8; 8],
+    pub value: u8,
+    pub ttl: [u32; 8],
+}
+
+impl DecayRegister {
+    fn new(masks: [u8; 8]) -> DecayRegister {
+        DecayRegister {
+            masks,
+            value: 0,
+            ttl: [0, 0, 0, 0, 0, 0, 0, 0],
+        }
+    }
+
+    fn tick(&mut self) {
+        for i in 0..8 {
+            if self.ttl[i] > 0 {
+                self.ttl[i] -= 1;
+                if self.ttl[i] == 0 {
+                    self.value &= !(1 << i);
+                }
+            }
+        }
+    }
+
+    fn write(&mut self, value: u8) {
+        self.refresh_bits(value, 0xFF);
+    }
+
+    fn read(&mut self, addr: usize, value: u8, palette: bool) -> u8 {
+        let mask = if palette { 0xC0 } else { self.masks[addr] };
+        let inv_mask = !mask;
+        self.refresh_bits(value, inv_mask);
+        (self.value & mask) | (value & (inv_mask))
+    }
+
+    fn refresh_bits(&mut self, value: u8, mask: u8) {
+        self.value = (self.value & !mask) | (value & mask);
+        let mut mask = mask;
+        for i in 0..8 {
+            if mask & 1 > 0 {
+                self.ttl[i] = DECAY_REGISTER_TTL;
+            }
+            mask >>= 1;
+        }
+    }
+}
+
 pub struct PpuBus {
     pub ctrl: Ctrl,
     pub mask: Mask,
@@ -75,6 +126,8 @@ pub struct PpuBus {
     pub first_write: bool,
     pub nmi_interrupt: bool,
     pub nmi_interrupt_age: u8,
+    decay_register: DecayRegister,
+    pub addr_is_palette: bool,
 }
 
 impl PpuBus {
@@ -113,58 +166,48 @@ impl PpuBus {
             first_write: false,
             nmi_interrupt: false,
             nmi_interrupt_age: 0,
+            decay_register: DecayRegister::new(
+                [0xFF, 0xFF, 0x1F, 0xFF, 0x00, 0xFF, 0xFF, 0x00]),
+            addr_is_palette: false,
         }
     }
 
     pub fn read(&mut self, addr: u16) -> u8 {
-        match addr % 8 {
-            0 => {
-                debug!(target: "bus", "tried to read from PPU control register");
-                0
-            }
-            1 => {
-                debug!(target: "bus", "tried to read from PPU mask register");
-                0
-            }
-            2 => {
-                let value = self.status.to_u8();
-                self.status.vertical_blank = false;
-                self.first_write = false;
-                self.status.just_read = true;
-                if self.nmi_interrupt_age < 2 {
-                    self.nmi_interrupt = false;
-                }
-                value
-            }
-            3 => self.oam_addr,
-            4 => match self.oam_data {
-                Some(value) => value,
-                None => {
-                    debug!(target: "bus", "tried to read OAM data when none present");
-                    0
-                }
-            },
-            5 => {
-                debug!(target: "bus", "tried to read from PPU scroll register");
-                0
-            }
-            6 => {
-                debug!(target: "bus", "tried to read from PPU address register");
-                0
-            }
-            7 => match self.data {
-                Some(value) => value,
-                None => {
-                    debug!(target: "bus", "tried to read PPU data when none present");
-                    0
-                }
-            },
-            _ => panic!()
-        }
+        let addr = (addr % 8) as usize;
+        self.decay_register.read(addr,
+                                 match addr {
+                                     0 => 0,
+                                     1 => 0,
+                                     2 => {
+                                         let value = self.status.to_u8();
+                                         self.status.vertical_blank = false;
+                                         self.first_write = false;
+                                         self.status.just_read = true;
+                                         if self.nmi_interrupt_age < 2 {
+                                             self.nmi_interrupt = false;
+                                         }
+                                         value
+                                     }
+                                     3 => self.oam_addr,
+                                     4 => match self.oam_data {
+                                         Some(value) => value,
+                                         None => 0,
+                                     },
+                                     5 => 0,
+                                     6 => 0,
+                                     7 => match self.data {
+                                         Some(value) => value,
+                                         None => 0,
+                                     },
+                                     _ => panic!()
+                                 },
+                                 addr == 7 && self.addr_is_palette)
     }
 
     pub fn write(&mut self, addr: u16, value: u8) {
-        match addr % 8 {
+        let addr = (addr % 8) as usize;
+        self.decay_register.write(value);
+        match addr {
             0 => {
                 self.ctrl = Ctrl::from_u8(value);
                 if !self.ctrl.gen_nmi && self.nmi_interrupt_age < 2 {
@@ -174,9 +217,9 @@ impl PpuBus {
                     self.nmi_interrupt = true;
                     self.nmi_interrupt_age = 0;
                 }
-            },
+            }
             1 => self.mask = Mask::from_u8(value),
-            2 => debug!(target: "bus", "tried to write to PPU status register"),
+            2 => {}
             3 => self.oam_addr = value,
             4 => {
                 self.oam_data = Some(value);
@@ -194,6 +237,10 @@ impl PpuBus {
             }
             _ => panic!()
         }
+    }
+
+    pub fn tick(&mut self) {
+        self.decay_register.tick();
     }
 
     pub fn reset(&mut self) {

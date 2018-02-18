@@ -89,6 +89,7 @@ impl<'a> Cpu<'a> {
                 self.ppu.tick();
             }
             self.apu.tick(self.cartridge);
+            self.ppu_bus.borrow_mut().tick();
         }
     }
 
