@@ -56,10 +56,18 @@ impl AddressingMode {
 pub enum Opcode {
     ADC,
     // add with carry
+    ALR,
+    // and then logical shift right
+    ARR,
+    // and then rotate right
+    ANC,
+    // and (with accumulator)
     AND,
     // and (with accumulator)
     ASL,
     // arithmetic shift left
+    AXS,
+    // A&X minus immediate into X
     BCC,
     // branch on carry clear
     BCS,
@@ -198,7 +206,7 @@ pub const OPCODES: [(Opcode, AddressingMode); 256] = [
     (Opcode::PHP, AddressingMode::Implied),
     (Opcode::ORA, AddressingMode::Immediate),
     (Opcode::ASL, AddressingMode::Accumulator),
-    (Opcode::XXX, AddressingMode::Immediate),
+    (Opcode::ANC, AddressingMode::Immediate),
     (Opcode::NOP, AddressingMode::Absolute),
     (Opcode::ORA, AddressingMode::Absolute),
     (Opcode::ASL, AddressingMode::Absolute),
@@ -234,7 +242,7 @@ pub const OPCODES: [(Opcode, AddressingMode); 256] = [
     (Opcode::PLP, AddressingMode::Implied),
     (Opcode::AND, AddressingMode::Immediate),
     (Opcode::ROL, AddressingMode::Accumulator),
-    (Opcode::XXX, AddressingMode::Immediate),
+    (Opcode::ANC, AddressingMode::Immediate),
     (Opcode::BIT, AddressingMode::Absolute),
     (Opcode::AND, AddressingMode::Absolute),
     (Opcode::ROL, AddressingMode::Absolute),
@@ -270,7 +278,7 @@ pub const OPCODES: [(Opcode, AddressingMode); 256] = [
     (Opcode::PHA, AddressingMode::Implied),
     (Opcode::EOR, AddressingMode::Immediate),
     (Opcode::LSR, AddressingMode::Accumulator),
-    (Opcode::XXX, AddressingMode::Immediate),
+    (Opcode::ALR, AddressingMode::Immediate),
     (Opcode::JMP, AddressingMode::Absolute),
     (Opcode::EOR, AddressingMode::Absolute),
     (Opcode::LSR, AddressingMode::Absolute),
@@ -306,7 +314,7 @@ pub const OPCODES: [(Opcode, AddressingMode); 256] = [
     (Opcode::PLA, AddressingMode::Implied),
     (Opcode::ADC, AddressingMode::Immediate),
     (Opcode::ROR, AddressingMode::Accumulator),
-    (Opcode::XXX, AddressingMode::Immediate),
+    (Opcode::ARR, AddressingMode::Immediate),
     (Opcode::JMP, AddressingMode::Indirect),
     (Opcode::ADC, AddressingMode::Absolute),
     (Opcode::ROR, AddressingMode::Absolute),
@@ -414,7 +422,7 @@ pub const OPCODES: [(Opcode, AddressingMode); 256] = [
     (Opcode::INY, AddressingMode::Implied),
     (Opcode::CMP, AddressingMode::Immediate),
     (Opcode::DEX, AddressingMode::Implied),
-    (Opcode::XXX, AddressingMode::Immediate),
+    (Opcode::AXS, AddressingMode::Immediate),
     (Opcode::CPY, AddressingMode::Absolute),
     (Opcode::CMP, AddressingMode::Absolute),
     (Opcode::DEC, AddressingMode::Absolute),

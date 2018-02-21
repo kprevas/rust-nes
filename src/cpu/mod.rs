@@ -337,6 +337,16 @@ impl<'a> Cpu<'a> {
         }
     }
 
+    fn adc(&mut self, operand_value: u8) {
+        let prev_a = self.a;
+        let result = u16::from(self.a) + u16::from(operand_value) + (if self.flag(CARRY) { 1 } else { 0 });
+        self.a = (result & 0xff) as u8;
+        self.set_zero_flag(result as u8);
+        self.set_negative_flag(result as u8);
+        self.set_carry_flag(result);
+        self.set_overflow_flag(result, prev_a, operand_value, false);
+    }
+
     fn execute_opcode(&mut self) {
         use self::opcodes::OPCODES;
         use self::Opcode::*;
@@ -416,18 +426,41 @@ impl<'a> Cpu<'a> {
 
         match *opcode {
             ADC => {
-                let prev_a = self.a;
                 let operand_value = self.read_memory_mode(mode, operand, true);
-                let result = u16::from(self.a) + u16::from(operand_value) + (if self.flag(CARRY) { 1 } else { 0 });
-                self.a = (result & 0xff) as u8;
-                self.set_zero_flag(result as u8);
-                self.set_negative_flag(result as u8);
-                self.set_carry_flag(result);
-                self.set_overflow_flag(result, prev_a, operand_value, false);
+                self.adc(operand_value);
+            }
+
+            ALR => {
+                let operand_value = self.read_memory_mode(mode, operand, true);
+                let and_result = self.a & operand_value;
+                let result = and_result >> 1;
+                self.set_zero_flag(result);
+                self.set_negative_flag(result);
+                self.set_flag(CARRY, and_result & 0b1 > 0);
+                self.a = result;
+            }
+
+            ANC => {
+                let result = self.a & self.read_memory_mode(mode, operand, true);
+                self.set_zero_flag(result);
+                self.set_negative_flag(result);
+                self.set_flag(CARRY, result & (1 << 7) > 0);
+                self.a = result;
             }
 
             AND => {
                 let result = self.a & self.read_memory_mode(mode, operand, true);
+                self.set_zero_flag(result);
+                self.set_negative_flag(result);
+                self.a = result;
+            }
+
+            ARR => {
+                let operand_value = self.read_memory_mode(mode, operand, true);
+                let and_result = self.a & operand_value;
+                let result = (and_result >> 1) + if self.flag(CARRY) { 0x80 } else { 0 };
+                self.set_flag(CARRY, result & (1 << 6) > 0);
+                self.set_flag(OVERFLOW, (result & (1 << 6) > 0) != (result & (1 << 5) > 0));
                 self.set_zero_flag(result);
                 self.set_negative_flag(result);
                 self.a = result;
@@ -440,6 +473,17 @@ impl<'a> Cpu<'a> {
                 self.set_zero_flag(result as u8);
                 self.set_negative_flag(result as u8);
                 self.set_carry_flag(result);
+            }
+
+            AXS => {
+                let operand_value = self.read_memory_mode(mode, operand, true);
+                let left_operand = self.a & self.x;
+                let result = left_operand.wrapping_sub(operand_value);
+                let carry = left_operand >= operand_value;
+                self.set_flag(CARRY, carry);
+                self.set_zero_flag(result);
+                self.set_negative_flag(result);
+                self.x = result;
             }
 
             BCC => {
@@ -783,14 +827,8 @@ impl<'a> Cpu<'a> {
             }
 
             SBC => {
-                let prev_a = self.a;
                 let operand_value = self.read_memory_mode(mode, operand, true);
-                let result = u16::from(self.a).wrapping_sub(u16::from(operand_value) + (if self.flag(CARRY) { 0 } else { 1 }));
-                self.a = (result & 0xff) as u8;
-                self.set_zero_flag(result as u8);
-                self.set_negative_flag(result as u8);
-                self.set_flag(CARRY, prev_a >= operand_value);
-                self.set_overflow_flag(result, prev_a, operand_value, true);
+                self.adc(!operand_value);
             }
 
             SEC => {
