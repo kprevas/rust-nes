@@ -838,6 +838,22 @@ impl<'a> Cpu<'a> {
                 self.set_flag(INTERRUPT, true);
             }
 
+            SHX => {
+                let addr = self.apply_memory_mode(mode, operand, true, false);
+                let addr_high = addr >> 8;
+                let addr_low = addr & 0xFF;
+                let value = self.x & ((addr_high + 1) as u8);
+                self.write_memory((u16::from(value) << 8) | addr_low, value);
+            }
+
+            SHY => {
+                let addr = self.apply_memory_mode(mode, operand, true, false);
+                let addr_high = addr >> 8;
+                let addr_low = addr & 0xFF;
+                let value = self.y & ((addr_high + 1) as u8);
+                self.write_memory((u16::from(value) << 8) | addr_low, value);
+            }
+
             SLO => {
                 let operand_value = self.read_memory_mode(mode, operand, false);
                 let asl_result = u16::from(operand_value) << 1;

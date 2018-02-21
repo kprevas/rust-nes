@@ -168,6 +168,10 @@ pub enum Opcode {
     // set interrupt disable
     SAX,
     // store accumulator & X
+    SHX,
+    // store X & H
+    SHY,
+    // store Y & H
     SLO,
     // shift left then or
     SRE,
@@ -369,9 +373,9 @@ pub const OPCODES: [(Opcode, AddressingMode); 256] = [
     (Opcode::STA, AddressingMode::AbsoluteIndexedY),
     (Opcode::TXS, AddressingMode::Implied),
     (Opcode::XXX, AddressingMode::AbsoluteIndexedY),
-    (Opcode::XXX, AddressingMode::AbsoluteIndexedX),
+    (Opcode::SHY, AddressingMode::AbsoluteIndexedX),
     (Opcode::STA, AddressingMode::AbsoluteIndexedX),
-    (Opcode::XXX, AddressingMode::AbsoluteIndexedY),
+    (Opcode::SHX, AddressingMode::AbsoluteIndexedY),
     (Opcode::XXX, AddressingMode::AbsoluteIndexedY),
 
     // Ax
