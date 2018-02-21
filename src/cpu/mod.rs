@@ -197,8 +197,8 @@ impl<'a> Cpu<'a> {
             0x0000 ... 0x1FFF => self.internal_ram[(address % 0x800) as usize] = value,
             0x2000 ... 0x3FFF => self.ppu_bus.borrow_mut().write(address, value),
             0x4014 => {
-                let data = self.read_memory_no_tick(u16::from(value) * 0x100);
-                self.write_memory_no_tick(0x2014, data);
+                let data = self.read_memory(u16::from(value) * 0x100);
+                self.write_memory_no_tick(0x2004, data);
                 self.oam_dma_write = Some((value, 1));
             }
             0x4000 ... 0x4013 | 0x4015 | 0x4017 => self.apu_bus.borrow_mut().write(address, value),
@@ -956,7 +956,7 @@ impl<'a> Cpu<'a> {
         }
         if let Some((addr, i)) = self.oam_dma_write {
             let data = self.read_memory(u16::from(addr) * 0x100 + u16::from(i));
-            self.write_memory(0x2014, data);
+            self.write_memory(0x2004, data);
             self.oam_dma_write = if i < 255 { Some((addr, i + 1)) } else { None };
         } else {
             if self.prev_irq && !self.last_instruction_brk {
