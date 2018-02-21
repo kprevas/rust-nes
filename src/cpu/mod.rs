@@ -662,13 +662,7 @@ impl<'a> Cpu<'a> {
                 let operand_value = self.read_memory_mode(mode, operand, false);
                 let inc_result = operand_value.wrapping_add(1);
                 self.write_memory_mode(mode, operand, inc_result);
-                let prev_a = self.a;
-                let result = u16::from(self.a).wrapping_sub(u16::from(inc_result) + (if self.flag(CARRY) { 0 } else { 1 }));
-                self.a = (result & 0xff) as u8;
-                self.set_zero_flag(result as u8);
-                self.set_negative_flag(result as u8);
-                self.set_flag(CARRY, prev_a >= inc_result);
-                self.set_overflow_flag(result, prev_a, inc_result, true);
+                self.adc(!inc_result);
             }
 
             JMP => {
