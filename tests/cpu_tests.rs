@@ -112,3 +112,168 @@ fn test_interrupts_5_branch_delays_irq() {
                                   0x81,
                                   &[(0x6000, 0)]);
 }
+
+#[test]
+fn test_instr_01_implied() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/instr_test-v3/01-implied.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_instr_02_immediate() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/instr_test-v3/02-immediate.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_instr_03_zero_page() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/instr_test-v3/03-zero_page.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_instr_04_zp_xy() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/instr_test-v3/04-zp_xy.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_instr_05_absolute() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/instr_test-v3/05-absolute.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_instr_06_abs_xy() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/instr_test-v3/06-abs_xy.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_instr_07_ind_x() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/instr_test-v3/07-ind_x.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_instr_08_ind_y() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/instr_test-v3/08-ind_y.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_instr_09_branches() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/instr_test-v3/09-branches.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_instr_10_stack() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/instr_test-v3/10-stack.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_instr_11_jmp_jsr() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/instr_test-v3/11-jmp_jsr.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_instr_12_rts() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/instr_test-v3/12-rts.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_instr_13_rti() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/instr_test-v3/13-rti.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_instr_14_brk() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/instr_test-v3/14-brk.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_instr_15_special() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/instr_test-v3/15-special.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
