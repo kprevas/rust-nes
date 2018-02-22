@@ -538,6 +538,7 @@ impl<'a> Cpu<'a> {
                 let vector = if self.ppu_bus.borrow().nmi_interrupt { 0xFFFA } else { 0xFFFE };
                 self.push(p);
                 self.pc = self.read_word(vector);
+                self.set_flag(INTERRUPT, true);
             }
 
             BVC => {
