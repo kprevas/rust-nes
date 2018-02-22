@@ -330,7 +330,7 @@ impl<'a> Cpu<'a> {
         if offset >= 0 {
             self.pc = self.pc.wrapping_add(offset as u16);
         } else {
-            self.pc = self.pc.wrapping_sub((-offset) as u16);
+            self.pc = self.pc.wrapping_sub((-(offset as i16)) as u16);
         }
         if prev_pc >> 8 != self.pc >> 8 {
             self.tick();
