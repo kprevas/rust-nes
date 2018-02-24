@@ -18,10 +18,9 @@ addons:
 env:
     - LD_LIBRARY_PATH=/usr/local/lib
 
-install:
-    - curl -O http://www.portaudio.com/archives/pa_stable_v19_20140130.tgz
-    - tar xfz pa_stable_v19_20140130.tgz
-    - (cd portaudio/ && ./configure && make && sudo make install)
+before_install:
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install portaudio; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install pkg-config; fi
 
 script:
   - cargo build
