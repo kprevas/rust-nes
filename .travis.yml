@@ -1,14 +1,24 @@
 language: rust
 cache: cargo
 dist: trusty
+
 os:
   - linux
   - osx
+
 rust:
   - stable
+
+addons:
+  apt:
+    packages:
+      - gtk+-3.0
+      - glib-2.0
+
 before_install:
-  - sudo apt-get -qq update
-  - sudo apt-get install -y gtk+-3.0 glib-2.0
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then sudo brew install portaudio; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then sudo brew install pkg-config; fi
+
 script:
   - cargo build
   - cargo test
