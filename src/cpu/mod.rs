@@ -40,6 +40,7 @@ pub struct Cpu<'a> {
     delayed_irq_flag: Option<bool>,
     irq: bool,
     prev_irq: bool,
+    cycle_count: u64,
 
     memory_watches: Box<HashSet<u16>>,
     pc_watches: Box<HashSet<u16>>,
@@ -86,6 +87,7 @@ impl<'a> Cpu<'a> {
             delayed_irq_flag: None,
             irq: false,
             prev_irq: false,
+            cycle_count: 0,
         };
 
         cpu.reset(false);
@@ -104,14 +106,17 @@ impl<'a> Cpu<'a> {
             self.apu.tick(self.cartridge);
             self.ppu_bus.borrow_mut().tick();
         }
-        let irq_interrupt = self.apu_bus.borrow().irq_interrupt() && !match self.delayed_irq_flag {
-            Some(val) => val,
-            None => self.flag(INTERRUPT)
-        };
-        let ppu_bus = self.ppu_bus.borrow();
-        let nmi_interrupt = ppu_bus.nmi_interrupt && ppu_bus.nmi_interrupt_age > 1;
-        self.prev_irq = self.irq || nmi_interrupt;
-        self.irq = irq_interrupt;
+        if self.oam_dma_write.is_none() {
+            let irq_interrupt = self.apu_bus.borrow().irq_interrupt() && !match self.delayed_irq_flag {
+                Some(val) => val,
+                None => self.flag(INTERRUPT)
+            };
+            let ppu_bus = self.ppu_bus.borrow();
+            let nmi_interrupt = ppu_bus.nmi_interrupt && ppu_bus.nmi_interrupt_age > 1;
+            self.prev_irq = self.irq || nmi_interrupt;
+            self.irq = irq_interrupt;
+        }
+        self.cycle_count.wrapping_add(1);
     }
 
     fn flag(&self, flag: u8) -> bool {
@@ -195,10 +200,12 @@ impl<'a> Cpu<'a> {
             0x0000 ... 0x1FFF => self.internal_ram[(address % 0x800) as usize] = value,
             0x2000 ... 0x3FFF => self.ppu_bus.borrow_mut().write(address, value),
             0x4014 => {
-                let data = self.read_memory(u16::from(value) * 0x100);
-                self.write_memory_no_tick(0x2004, data);
-                self.oam_dma_write = Some((value, 1));
-            }
+                self.oam_dma_write = Some((value, 0));
+                if self.cycle_count & 1 == 0 {
+                    self.tick();
+                }
+                self.tick();
+            },
             0x4000 ... 0x4013 | 0x4015 | 0x4017 => self.apu_bus.borrow_mut().write(address, value),
             0x4016 => self.controller_strobe = value & 1 > 0,
             0x4018 ... 0x401F => (),
@@ -980,7 +987,7 @@ impl<'a> Cpu<'a> {
             if dmc_delay {
                 self.tick();
                 self.tick();
-                if !self.oam_dma_write.is_none() {
+                if self.oam_dma_write.is_some() {
                     self.tick();
                     self.tick();
                 };

@@ -1,6 +1,6 @@
-extern crate sample;
 extern crate portaudio;
 extern crate rb;
+extern crate sample;
 extern crate time;
 
 use cartridge::CartridgeBus;
@@ -174,7 +174,7 @@ impl<'a> Apu<'a> {
             let triangle = self.triangle.tick(&mut bus.triangle);
             let noise = self.noise.tick(&mut bus.noise);
             let dmc = self.dmc.tick(&mut bus, cartridge);
-            if !self.stream.is_none() {
+            if self.stream.is_some() {
                 self.output_buffer.write_blocking(
                     &[(pulse_1 + pulse_2) * 0.00752 + triangle * 0.00851 + noise * 0.00494 + dmc * 0.00335]);
             }

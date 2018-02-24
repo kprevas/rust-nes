@@ -65,7 +65,7 @@ impl Dmc {
             }
         }
 
-        if ctrl_bus.enabled || !self.sample_buffer.is_none() {
+        if ctrl_bus.enabled || self.sample_buffer.is_some() {
             if self.curr_timer == 0 {
                 if self.silence {
                     self.output_level = 0;
