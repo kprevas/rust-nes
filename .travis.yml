@@ -16,8 +16,8 @@ addons:
       - glib-2.0
 
 before_install:
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then sudo brew install portaudio; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then sudo brew install pkg-config; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install portaudio; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install pkg-config; fi
 
 script:
   - cargo build
