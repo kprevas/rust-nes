@@ -38,7 +38,6 @@ pub struct Cpu<'a> {
     open_bus: u8,
     instrumented: bool,
     delayed_irq_flag: Option<bool>,
-    last_instruction_brk: bool,
     irq: bool,
     prev_irq: bool,
 
@@ -85,7 +84,6 @@ impl<'a> Cpu<'a> {
             pc_breaks: Box::new(HashSet::new()),
             pc_ignores: Box::new(Vec::new()),
             delayed_irq_flag: None,
-            last_instruction_brk: false,
             irq: false,
             prev_irq: false,
         };
@@ -539,6 +537,8 @@ impl<'a> Cpu<'a> {
                 self.push(p);
                 self.pc = self.read_word(vector);
                 self.set_flag(INTERRUPT, true);
+
+                self.prev_irq = false;
             }
 
             BVC => {
@@ -959,11 +959,6 @@ impl<'a> Cpu<'a> {
             }
             _ => ()
         }
-
-        self.last_instruction_brk = match *opcode {
-            BRK => true,
-            _ => false,
-        }
     }
 
     fn irq(&mut self) {
@@ -1008,11 +1003,11 @@ impl<'a> Cpu<'a> {
             self.write_memory(0x2004, data);
             self.oam_dma_write = if i < 255 { Some((addr, i + 1)) } else { None };
         } else {
-            if self.prev_irq && !self.last_instruction_brk {
-                self.irq();
-            }
             self.delayed_irq_flag = None;
             self.execute_opcode();
+            if self.prev_irq {
+                self.irq();
+            }
         }
     }
 
