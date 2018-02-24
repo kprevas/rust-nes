@@ -328,7 +328,6 @@ impl<'a> Cpu<'a> {
     }
 
     fn branch(&mut self, offset: i8) {
-        self.tick();
         let prev_pc = self.pc;
         if offset >= 0 {
             self.pc = self.pc.wrapping_add(offset as u16);
@@ -337,7 +336,10 @@ impl<'a> Cpu<'a> {
         }
         if prev_pc >> 8 != self.pc >> 8 {
             self.tick();
+        } else if self.irq && !self.prev_irq {
+            self.irq = false;
         }
+        self.tick();
     }
 
     fn adc(&mut self, operand_value: u8) {
