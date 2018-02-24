@@ -28,5 +28,5 @@ before_install:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install pkg-config; fi
 
 script:
-  - cargo build
-  - cargo test --test $SUITE
+  - cargo build --release
+  - cargo test --release --test $SUITE
