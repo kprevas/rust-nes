@@ -286,3 +286,25 @@ fn test_cpu_timing() {
                                          0xe970,
                                          0x02)
 }
+
+#[test]
+fn test_reset_ram_after_reset() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/cpu_reset/ram_after_reset.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_reset_registers() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/cpu_reset/registers.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
