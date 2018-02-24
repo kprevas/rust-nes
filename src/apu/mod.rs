@@ -126,14 +126,14 @@ impl<'a> Apu<'a> {
             bus.frame_mode_written = false;
         }
         match self.frame_counter {
-            7456 => {
+            7457 => {
                 self.clock_envelope(&mut bus);
             }
-            14912 => {
+            14913 => {
                 self.clock_envelope(&mut bus);
                 self.clock_length_and_sweep(&mut bus);
             }
-            22370 => {
+            22371 => {
                 self.clock_envelope(&mut bus);
             }
             29828 => {
@@ -141,8 +141,6 @@ impl<'a> Apu<'a> {
                     if !bus.frame_irq_inhibit {
                         bus.frame_interrupt = true;
                     }
-                    self.clock_envelope(&mut bus);
-                    self.clock_length_and_sweep(&mut bus);
                 }
             }
             29829 => {
@@ -150,6 +148,8 @@ impl<'a> Apu<'a> {
                     if !bus.frame_irq_inhibit {
                         bus.frame_interrupt = true;
                     }
+                    self.clock_envelope(&mut bus);
+                    self.clock_length_and_sweep(&mut bus);
                 }
             }
             29830 => {
@@ -160,11 +160,9 @@ impl<'a> Apu<'a> {
                     self.frame_counter = 0;
                 }
             }
-            37280 => {
+            37281 => {
                 self.clock_envelope(&mut bus);
                 self.clock_length_and_sweep(&mut bus);
-            }
-            37281 => {
                 self.frame_counter = -1;
             }
             _ => (),
