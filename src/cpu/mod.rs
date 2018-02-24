@@ -245,18 +245,12 @@ impl<'a> Cpu<'a> {
             Zeropage => operand & 0xff,
             AbsoluteIndexedX => {
                 let address = operand.wrapping_add(u16::from(self.x));
-                if (page_boundary_penalty || dummy_read) && address & (!0xff) != operand & (!0xff) {
-                    self.read_memory(if address >= 0x100 { address - 0x100 } else { address + 0xFF00 });
-                } else if dummy_read {
-                    self.read_memory(address);
-                }
+                self.dummy_read(operand, page_boundary_penalty, dummy_read, address);
                 address
             }
             AbsoluteIndexedY => {
                 let address = operand.wrapping_add(u16::from(self.y));
-                if page_boundary_penalty && address & (!0xff) != operand & (!0xff) {
-                    self.tick();
-                }
+                self.dummy_read(operand, page_boundary_penalty, dummy_read, address);
                 address
             }
             IndexedIndirect => {
@@ -268,16 +262,20 @@ impl<'a> Cpu<'a> {
                 let offset = u16::from(self.y);
                 let target_start = self.read_word_zeropage_wrapped(operand);
                 let address = target_start.wrapping_add(offset);
-                if (page_boundary_penalty || dummy_read) && address & (!0xff) != target_start & (!0xff) {
-                    self.read_memory(if address >= 0x100 { address - 0x100 } else { address + 0xFF00 });
-                } else if dummy_read {
-                    self.read_memory(address);
-                }
+                self.dummy_read(target_start, page_boundary_penalty, dummy_read, address);
                 address
             }
             Indirect => self.read_word_page_wrapped(operand),
             Absolute => operand,
             _ => panic!("Invalid memory mode {:?}", mode)
+        }
+    }
+
+    fn dummy_read(&mut self, operand: u16, page_boundary_penalty: bool, dummy_read: bool, address: u16) {
+        if (page_boundary_penalty || dummy_read) && address & (!0xff) != operand & (!0xff) {
+            self.read_memory(if address >= 0x100 { address - 0x100 } else { address + 0xFF00 });
+        } else if dummy_read {
+            self.read_memory(address);
         }
     }
 
@@ -465,7 +463,7 @@ impl<'a> Cpu<'a> {
             }
 
             ASL => {
-                let operand_value = self.read_memory_mode(mode, operand, true);
+                let operand_value = self.read_memory_mode(mode, operand, false);
                 let result = u16::from(operand_value) << 1;
                 self.write_memory_mode(mode, operand, result as u8);
                 self.set_zero_flag(result as u8);
@@ -609,7 +607,7 @@ impl<'a> Cpu<'a> {
             }
 
             DEC => {
-                let operand_value = self.read_memory_mode(mode, operand, true);
+                let operand_value = self.read_memory_mode(mode, operand, false);
                 let result = operand_value.wrapping_sub(1);
                 self.write_memory_mode(mode, operand, result);
                 self.set_zero_flag(result);
@@ -638,7 +636,7 @@ impl<'a> Cpu<'a> {
             }
 
             INC => {
-                let operand_value = self.read_memory_mode(mode, operand, true);
+                let operand_value = self.read_memory_mode(mode, operand, false);
                 let result = operand_value.wrapping_add(1);
                 self.write_memory_mode(mode, operand, result);
                 self.set_zero_flag(result);
@@ -768,7 +766,7 @@ impl<'a> Cpu<'a> {
             }
 
             ROL => {
-                let operand_value = self.read_memory_mode(mode, operand, true);
+                let operand_value = self.read_memory_mode(mode, operand, false);
                 let new_carry = operand_value & 0x80 > 0;
                 let result = (operand_value << 1) + if self.flag(CARRY) { 1 } else { 0 };
                 self.write_memory_mode(mode, operand, result);
@@ -778,7 +776,7 @@ impl<'a> Cpu<'a> {
             }
 
             ROR => {
-                let operand_value = self.read_memory_mode(mode, operand, true);
+                let operand_value = self.read_memory_mode(mode, operand, false);
                 let new_carry = operand_value & 0x1 > 0;
                 let result = (operand_value >> 1) + if self.flag(CARRY) { 0x80 } else { 0 };
                 self.write_memory_mode(mode, operand, result);
@@ -880,16 +878,6 @@ impl<'a> Cpu<'a> {
             STA => {
                 let value = self.a;
                 self.write_memory_mode_with_dummy_read(mode, operand, value, true);
-                let mut cycles = 0;
-                match *mode {
-                    IndirectIndexed => cycles = 3,
-                    AbsoluteIndexedX => cycles = 1,
-                    AbsoluteIndexedY => cycles = 2,
-                    _ => ()
-                }
-                for _ in 0..cycles {
-                    self.tick();
-                }
             }
 
             STX => {
@@ -1056,6 +1044,10 @@ impl<'a> Cpu<'a> {
 
     pub fn pc_for_test(&self) -> u16 {
         self.pc
+    }
+
+    pub fn a_for_test(&self) -> u8 {
+        self.a
     }
 
     pub fn set_pc_watch(&mut self, addr: u16) {

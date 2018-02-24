@@ -1,6 +1,7 @@
 extern crate nes;
 
 use test::run_test_to_pc;
+use test::run_test_to_pc_and_check_accumulator;
 use test::run_test_to_success_or_fail_pc;
 use test::run_test_until_memory_matches;
 
@@ -276,4 +277,12 @@ fn test_instr_15_special() {
                                   0x80,
                                   0x81,
                                   &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_cpu_timing() {
+    run_test_to_pc_and_check_accumulator(&mut include_bytes!("roms/cpu_timing_test6/cpu_timing_test.nes").as_ref(),
+                                         None,
+                                         0xe970,
+                                         0x02)
 }

@@ -25,6 +25,19 @@ pub fn run_test_to_pc(rom: &mut Read,
              });
 }
 
+pub fn run_test_to_pc_and_check_accumulator(rom: &mut Read,
+                                            pc_start: Option<u16>,
+                                            pc_end: u16,
+                                            expected_accumulator: u8) {
+    run_test(rom,
+             pc_start,
+             &mut |cpu| { cpu.pc_for_test() == pc_end },
+             None,
+             &mut |cpu| {
+                 assert_eq!(expected_accumulator, cpu.a_for_test(), "0x{:02X}", cpu.a_for_test());
+             });
+}
+
 pub fn run_test_to_success_or_fail_pc(rom: &mut Read,
                                       pc_start: Option<u16>,
                                       pc_success: u16,
