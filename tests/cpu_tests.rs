@@ -330,3 +330,47 @@ fn test_branch_timing() {
                                   0x81,
                                   &[(0x6000, 0)]);
 }
+
+#[test]
+fn test_instr_misc_abs_x_wrap() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/instr_misc/01-abs_x_wrap.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_instr_misc_branch_wrap() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/instr_misc/02-branch_wrap.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_instr_misc_dummy_reads() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/instr_misc/03-dummy_reads.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_instr_misc_dummy_reads_apu() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/instr_misc/04-dummy_reads_apu.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
