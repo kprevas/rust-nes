@@ -192,12 +192,10 @@ impl CartridgeBus for Mapper1Cpu {
             0x6000 ... 0x7FFF => {
                 if self.prg_ram_enabled {
                     self.prg_ram[(address - 0x6000) as usize] = value;
-                } else {
-                    panic!("bad memory write 0x{:04X}", address);
                 }
             }
             0x8000 ... 0xFFFF => ctrl.write(address, value),
-            _ => panic!("bad memory write 0x{:04X}", address),
+            _ => (),
         }
     }
 
@@ -222,10 +220,8 @@ impl CartridgeBus for Mapper1Ppu {
             match address {
                 0x0000 ... 0x0FFF => self.chr_rom[ctrl.chr_low_bank(address)] = value,
                 0x1000 ... 0x1FFF => self.chr_rom[ctrl.chr_hi_bank(address - 0x1000)] = value,
-                _ => panic!("bad memory write 0x{:04X}", address),
+                _ => (),
             }
-        } else {
-            panic!("bad memory write 0x{:04X}", address);
         }
     }
 

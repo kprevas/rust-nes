@@ -51,7 +51,7 @@ impl CartridgeBus for Mapper3Cpu {
             0x8000 ... 0xFFFF => {
                 self.chr_bank.replace((value & 0x3) as usize);
             }
-            _ => panic!("bad memory write 0x{:04X}", address),
+            _ => (),
         }
     }
 
@@ -68,9 +68,7 @@ impl CartridgeBus for Mapper3Ppu {
         }
     }
 
-    fn write_memory(&mut self, address: u16, _value: u8) {
-        panic!("bad memory write 0x{:04X}", address);
-    }
+    fn write_memory(&mut self, _address: u16, _value: u8) {}
 
     fn mirror_nametable(&self, address: u16) -> u16 {
         match address {
