@@ -34,7 +34,6 @@ pub struct Cpu<'a> {
     controller_strobe: bool,
     last_inputs: u8,
     ticks: f64,
-    tick_adjust: u8,
     open_bus: u8,
     instrumented: bool,
     delayed_irq_flag: Option<bool>,
@@ -78,7 +77,6 @@ impl<'a> Cpu<'a> {
             controller_strobe: false,
             last_inputs: Default::default(),
             ticks: 0.0,
-            tick_adjust: 0,
             open_bus: 0,
             instrumented,
             pc_watches: Box::new(HashSet::new()),
@@ -101,16 +99,12 @@ impl<'a> Cpu<'a> {
         if self.dmc_delay > 0 {
             self.dmc_delay -= 1;
         }
-        if self.tick_adjust > 0 {
-            self.tick_adjust -= 1;
-        } else {
-            self.ticks -= 1.0;
-            for _ in 0..3 {
-                self.ppu.tick();
-            }
-            self.apu.tick(self.cartridge);
-            self.ppu_bus.borrow_mut().tick();
+        self.ticks -= 1.0;
+        for _ in 0..3 {
+            self.ppu.tick();
         }
+        self.apu.tick(self.cartridge);
+        self.ppu_bus.borrow_mut().tick();
         let mut apu_bus = self.apu_bus.borrow_mut();
         if apu_bus.dmc_delay {
             apu_bus.dmc_delay = false;
@@ -245,11 +239,15 @@ impl<'a> Cpu<'a> {
     }
 
     fn read_memory_mode(&mut self, mode: &AddressingMode, operand: u16, page_boundary_penalty: bool) -> u8 {
+        self.read_memory_mode_with_dummy_read(mode, operand, page_boundary_penalty, false)
+    }
+
+    fn read_memory_mode_with_dummy_read(&mut self, mode: &AddressingMode, operand: u16, page_boundary_penalty: bool, dummy_read: bool) -> u8 {
         match *mode {
             Accumulator => self.a,
             Immediate => operand as u8,
             _ => {
-                let target = self.apply_memory_mode(mode, operand, page_boundary_penalty, false);
+                let target = self.apply_memory_mode(mode, operand, page_boundary_penalty, dummy_read);
                 self.read_memory(target)
             }
         }
@@ -315,6 +313,25 @@ impl<'a> Cpu<'a> {
         } else if dummy_read {
             self.read_memory(address);
         }
+    }
+
+    fn read_modify_write(&mut self, mode: &AddressingMode, operand: u16, modify: &mut FnMut(u8, &mut Cpu) -> u8) -> u8 {
+        let (addr, operand_value) = match *mode {
+            Accumulator => (0, self.a),
+            _ => {
+                let addr = self.apply_memory_mode(mode, operand, false, true);
+                (addr, self.read_memory(addr))
+            }
+        };
+        let result = modify(operand_value, self);
+        match *mode {
+            Accumulator => self.a = result,
+            _ => {
+                self.write_memory(addr, operand_value);
+                self.write_memory(addr, result as u8);
+            }
+        }
+        result
     }
 
     fn set_zero_flag(&mut self, result: u8) {
@@ -513,12 +530,13 @@ impl<'a> Cpu<'a> {
             }
 
             ASL => {
-                let operand_value = self.read_memory_mode(mode, operand, false);
-                let result = u16::from(operand_value) << 1;
-                self.write_memory_mode(mode, operand, result as u8);
-                self.set_zero_flag(result as u8);
-                self.set_negative_flag(result as u8);
-                self.set_carry_flag(result);
+                let result = self.read_modify_write(mode, operand, &mut |operand_value, cpu| {
+                    let result = u16::from(operand_value) << 1;
+                    cpu.set_carry_flag(result);
+                    result as u8
+                });
+                self.set_zero_flag(result);
+                self.set_negative_flag(result);
             }
 
             AXS => {
@@ -646,20 +664,21 @@ impl<'a> Cpu<'a> {
             }
 
             DCP => {
-                let operand_value = self.read_memory_mode(mode, operand, false);
-                let dec_result = operand_value.wrapping_sub(1);
-                self.write_memory_mode(mode, operand, dec_result);
-                let result = self.a.wrapping_sub(dec_result);
-                let carry = self.a >= dec_result;
-                self.set_flag(CARRY, carry);
-                self.set_zero_flag(result);
-                self.set_negative_flag(result);
+                self.read_modify_write(mode, operand, &mut |operand_value, cpu| {
+                    let dec_result = operand_value.wrapping_sub(1);
+                    let result = cpu.a.wrapping_sub(dec_result);
+                    let carry = cpu.a >= dec_result;
+                    cpu.set_flag(CARRY, carry);
+                    cpu.set_zero_flag(result);
+                    cpu.set_negative_flag(result);
+                    dec_result
+                });
             }
 
             DEC => {
-                let operand_value = self.read_memory_mode(mode, operand, false);
-                let result = operand_value.wrapping_sub(1);
-                self.write_memory_mode(mode, operand, result);
+                let result = self.read_modify_write(mode, operand, &mut |operand_value, _cpu| {
+                    operand_value.wrapping_sub(1)
+                });
                 self.set_zero_flag(result);
                 self.set_negative_flag(result);
             }
@@ -686,9 +705,9 @@ impl<'a> Cpu<'a> {
             }
 
             INC => {
-                let operand_value = self.read_memory_mode(mode, operand, false);
-                let result = operand_value.wrapping_add(1);
-                self.write_memory_mode(mode, operand, result);
+                let result = self.read_modify_write(mode, operand, &mut |operand_value, _cpu| {
+                    operand_value.wrapping_add(1)
+                });
                 self.set_zero_flag(result);
                 self.set_negative_flag(result);
             }
@@ -708,10 +727,10 @@ impl<'a> Cpu<'a> {
             }
 
             ISC => {
-                let operand_value = self.read_memory_mode(mode, operand, false);
-                let inc_result = operand_value.wrapping_add(1);
-                self.write_memory_mode(mode, operand, inc_result);
-                self.adc(!inc_result);
+                let result = self.read_modify_write(mode, operand, &mut |operand_value, _cpu| {
+                    operand_value.wrapping_add(1)
+                });
+                self.adc(!result);
             }
 
             JMP => {
@@ -766,12 +785,12 @@ impl<'a> Cpu<'a> {
             }
 
             LSR => {
-                let operand_value = self.read_memory_mode(mode, operand, false);
-                let result = operand_value >> 1;
-                self.write_memory_mode(mode, operand, result);
+                let result = self.read_modify_write(mode, operand, &mut |operand_value, cpu| {
+                    cpu.set_flag(CARRY, operand_value & 0b1 > 0);
+                    operand_value >> 1
+                });
                 self.set_zero_flag(result);
                 self.set_negative_flag(result);
-                self.set_flag(CARRY, operand_value & 0b1 > 0);
             }
 
             NOP => {
@@ -814,49 +833,53 @@ impl<'a> Cpu<'a> {
             }
 
             RLA => {
-                let operand_value = self.read_memory_mode(mode, operand, false);
-                let new_carry = operand_value & 0x80 > 0;
-                let rol_result = (operand_value << 1) + if self.flag(CARRY) { 1 } else { 0 };
-                self.write_memory_mode(mode, operand, rol_result);
+                let rol_result = self.read_modify_write(mode, operand, &mut |operand_value, cpu| {
+                    let new_carry = operand_value & 0x80 > 0;
+                    let rol_result = (operand_value << 1) + if cpu.flag(CARRY) { 1 } else { 0 };
+                    cpu.set_flag(CARRY, new_carry);
+                    rol_result
+                });
                 let result = self.a & rol_result;
                 self.set_zero_flag(result);
                 self.set_negative_flag(result);
-                self.set_flag(CARRY, new_carry);
                 self.a = result;
             }
 
             ROL => {
-                let operand_value = self.read_memory_mode(mode, operand, false);
-                let new_carry = operand_value & 0x80 > 0;
-                let result = (operand_value << 1) + if self.flag(CARRY) { 1 } else { 0 };
-                self.write_memory_mode(mode, operand, result);
+                let result = self.read_modify_write(mode, operand, &mut |operand_value, cpu| {
+                    let new_carry = operand_value & 0x80 > 0;
+                    let result = (operand_value << 1) + if cpu.flag(CARRY) { 1 } else { 0 };
+                    cpu.set_flag(CARRY, new_carry);
+                    result
+                });
                 self.set_zero_flag(result);
                 self.set_negative_flag(result);
-                self.set_flag(CARRY, new_carry);
             }
 
             ROR => {
-                let operand_value = self.read_memory_mode(mode, operand, false);
-                let new_carry = operand_value & 0x1 > 0;
-                let result = (operand_value >> 1) + if self.flag(CARRY) { 0x80 } else { 0 };
-                self.write_memory_mode(mode, operand, result);
+                let result = self.read_modify_write(mode, operand, &mut |operand_value, cpu| {
+                    let new_carry = operand_value & 0x1 > 0;
+                    let result = (operand_value >> 1) + if cpu.flag(CARRY) { 0x80 } else { 0 };
+                    cpu.set_flag(CARRY, new_carry);
+                    result
+                });
                 self.set_zero_flag(result);
                 self.set_negative_flag(result);
-                self.set_flag(CARRY, new_carry);
             }
 
             RRA => {
-                let operand_value = self.read_memory_mode(mode, operand, false);
-                let ror_carry = (operand_value & 0x1) as u16;
-                let ror_result = (operand_value >> 1) + if self.flag(CARRY) { 0x80 } else { 0 };
-                self.write_memory_mode(mode, operand, ror_result);
-                let prev_a = self.a;
-                let result = u16::from(self.a) + u16::from(ror_result) + ror_carry;
-                self.a = (result & 0xff) as u8;
-                self.set_zero_flag(result as u8);
-                self.set_negative_flag(result as u8);
-                self.set_carry_flag(result);
-                self.set_overflow_flag(result, prev_a, ror_result, false);
+                self.read_modify_write(mode, operand, &mut |operand_value, cpu| {
+                    let ror_carry = (operand_value & 0x1) as u16;
+                    let ror_result = (operand_value >> 1) + if cpu.flag(CARRY) { 0x80 } else { 0 };
+                    let prev_a = cpu.a;
+                    let result = u16::from(cpu.a) + u16::from(ror_result) + ror_carry;
+                    cpu.a = (result & 0xff) as u8;
+                    cpu.set_zero_flag(result as u8);
+                    cpu.set_negative_flag(result as u8);
+                    cpu.set_carry_flag(result);
+                    cpu.set_overflow_flag(result, prev_a, ror_result, false);
+                    ror_result
+                });
             }
 
             RTI => {
@@ -914,21 +937,22 @@ impl<'a> Cpu<'a> {
             }
 
             SLO => {
-                let operand_value = self.read_memory_mode(mode, operand, false);
-                let asl_result = u16::from(operand_value) << 1;
-                self.write_memory_mode(mode, operand, asl_result as u8);
+                let asl_result = self.read_modify_write(mode, operand, &mut |operand_value, cpu| {
+                    let result = u16::from(operand_value) << 1;
+                    cpu.set_carry_flag(result);
+                    result as u8
+                });
                 let result = self.a | asl_result as u8;
                 self.set_zero_flag(result);
                 self.set_negative_flag(result);
-                self.set_carry_flag(asl_result);
                 self.a = result;
             }
 
             SRE => {
-                let operand_value = self.read_memory_mode(mode, operand, false);
-                let lsr_result = operand_value >> 1;
-                self.write_memory_mode(mode, operand, lsr_result);
-                self.set_flag(CARRY, operand_value & 0b1 > 0);
+                let lsr_result = self.read_modify_write(mode, operand, &mut |operand_value, cpu| {
+                    cpu.set_flag(CARRY, operand_value & 0b1 > 0);
+                    operand_value >> 1
+                });
                 let result = self.a ^ lsr_result;
                 self.a = result;
                 self.set_zero_flag(result);
@@ -1006,21 +1030,6 @@ impl<'a> Cpu<'a> {
             }
 
             XXX => { unimplemented!("{:02X}", opcode_hex) }
-        }
-
-        match *opcode {
-            ASL | LSR | ROL | ROR | INC | DEC | SLO | SRE | RLA | RRA | ISC | DCP => {
-                match *mode {
-                    Accumulator | ZeropageX | IndirectIndexed => (),
-                    AbsoluteIndexedX | AbsoluteIndexedY => {
-                        self.tick(None);
-                        self.tick(None);
-                    }
-                    IndexedIndirect => self.tick_adjust += 2,
-                    _ => self.tick(None),
-                };
-            }
-            _ => ()
         }
     }
 
