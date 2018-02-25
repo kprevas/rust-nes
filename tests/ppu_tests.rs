@@ -57,3 +57,14 @@ fn test_ppu_open_bus() {
                                   0x81,
                                   &[(0x6000, 0)]);
 }
+
+#[test]
+fn test_oam_read() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/oam_read/oam_read.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}

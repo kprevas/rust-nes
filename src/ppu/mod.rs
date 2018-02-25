@@ -162,7 +162,7 @@ impl<'a> Ppu<'a> {
             self.write_memory(addr, data);
             self.vram_addr += if bus.ctrl.address_increment_vertical { 32 } else { 1 };
         }
-        if let Some(data) = bus.oam_data.take() {
+        if let Some(data) = bus.oam_data_write.take() {
             let addr = bus.oam_addr;
             self.oam_ram[addr as usize] = data;
             bus.oam_addr = bus.oam_addr.wrapping_add(1);
@@ -227,6 +227,7 @@ impl<'a> Ppu<'a> {
                     bus.read_buffer = Some(self.read_memory(self.vram_addr, bus.mask.grayscale));
                 }
             }
+            bus.oam_data = self.oam_ram[bus.oam_addr as usize];
         }
         self.update_tmp_addr();
         self.process_data_write();

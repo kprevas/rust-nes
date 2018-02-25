@@ -119,7 +119,8 @@ pub struct PpuBus {
     pub mask: Mask,
     pub status: Status,
     pub oam_addr: u8,
-    pub oam_data: Option<u8>,
+    pub oam_data_write: Option<u8>,
+    pub oam_data: u8,
     pub scroll: Option<u8>,
     pub addr_write: Option<u8>,
     pub data_write: Option<u8>,
@@ -161,7 +162,8 @@ impl PpuBus {
                 just_read: false,
             },
             oam_addr: 0,
-            oam_data: None,
+            oam_data_write: None,
+            oam_data: 0,
             scroll: None,
             addr_write: None,
             data_write: None,
@@ -192,11 +194,8 @@ impl PpuBus {
                                          }
                                          value
                                      }
-                                     3 => self.oam_addr,
-                                     4 => match self.oam_data {
-                                         Some(value) => value,
-                                         None => 0,
-                                     },
+                                     3 => 0,
+                                     4 => self.oam_data,
                                      5 => 0,
                                      6 => 0,
                                      7 => {
@@ -230,7 +229,7 @@ impl PpuBus {
             2 => {}
             3 => self.oam_addr = value,
             4 => {
-                self.oam_data = Some(value);
+                self.oam_data_write = Some(value);
             }
             5 => {
                 self.scroll = Some(value);
