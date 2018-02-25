@@ -273,11 +273,11 @@ impl<'a> Cpu<'a> {
     fn apply_memory_mode(&mut self, mode: &AddressingMode, operand: u16, page_boundary_penalty: bool, dummy_read: bool) -> u16 {
         match *mode {
             ZeropageX => {
-                self.tick(None);
+                self.read_memory(operand);
                 u16::from((operand as u8).wrapping_add(self.x))
             }
             ZeropageY => {
-                self.tick(None);
+                self.read_memory(operand);
                 u16::from((operand as u8).wrapping_add(self.y))
             }
             Zeropage => operand & 0xff,
@@ -292,7 +292,7 @@ impl<'a> Cpu<'a> {
                 address
             }
             IndexedIndirect => {
-                self.tick(None);
+                self.read_memory(operand);
                 let target = u16::from((operand as u8).wrapping_add(self.x));
                 self.read_word_zeropage_wrapped(target)
             }
