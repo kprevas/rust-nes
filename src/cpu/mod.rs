@@ -40,6 +40,7 @@ pub struct Cpu<'a> {
     delayed_irq_flag: Option<bool>,
     irq: bool,
     prev_irq: bool,
+    dmc_delay: u8,
     cycle_count: u64,
 
     memory_watches: Box<HashSet<u16>>,
@@ -87,6 +88,7 @@ impl<'a> Cpu<'a> {
             delayed_irq_flag: None,
             irq: false,
             prev_irq: false,
+            dmc_delay: 0,
             cycle_count: 0,
         };
 
@@ -95,7 +97,10 @@ impl<'a> Cpu<'a> {
         cpu
     }
 
-    fn tick(&mut self) {
+    fn tick(&mut self, write_addr: Option<u16>) {
+        if self.dmc_delay > 0 {
+            self.dmc_delay -= 1;
+        }
         if self.tick_adjust > 0 {
             self.tick_adjust -= 1;
         } else {
@@ -106,8 +111,22 @@ impl<'a> Cpu<'a> {
             self.apu.tick(self.cartridge);
             self.ppu_bus.borrow_mut().tick();
         }
-        if self.oam_dma_write.is_none() {
-            let irq_interrupt = self.apu_bus.borrow().irq_interrupt() && !match self.delayed_irq_flag {
+        let mut apu_bus = self.apu_bus.borrow_mut();
+        if apu_bus.dmc_delay {
+            apu_bus.dmc_delay = false;
+            self.dmc_delay = match self.oam_dma_write {
+                Some((_, 255)) => 3,
+                Some((_, 254)) => 1,
+                Some(_) => 2,
+                None => match write_addr {
+                    Some(0x4014) => 2,
+                    Some(_) => 3,
+                    None => 4,
+                },
+            }
+        }
+        if self.oam_dma_write.is_none() && self.dmc_delay == 0 {
+            let irq_interrupt = apu_bus.irq_interrupt() && !match self.delayed_irq_flag {
                 Some(val) => val,
                 None => self.flag(INTERRUPT)
             };
@@ -116,7 +135,7 @@ impl<'a> Cpu<'a> {
             self.prev_irq = self.irq || nmi_interrupt;
             self.irq = irq_interrupt;
         }
-        self.cycle_count.wrapping_add(1);
+        self.cycle_count = self.cycle_count.wrapping_add(1);
     }
 
     fn flag(&self, flag: u8) -> bool {
@@ -154,7 +173,13 @@ impl<'a> Cpu<'a> {
     }
 
     pub fn read_memory(&mut self, address: u16) -> u8 {
-        self.tick();
+        self.tick(None);
+        while self.dmc_delay > 0 {
+            self.tick(None);
+            if (address != 0x4016 && address != 0x4017 && self.cycle_count & 1 > 0) || self.dmc_delay == 1 {
+                self.read_memory_no_tick(address);
+            }
+        }
         let value = self.read_memory_no_tick(address);
         self.open_bus = value;
         value
@@ -187,8 +212,14 @@ impl<'a> Cpu<'a> {
     }
 
     fn write_memory(&mut self, address: u16, value: u8) {
-        self.tick();
+        self.tick(Some(address));
+        while self.dmc_delay > 0 {
+            self.tick(Some(address));
+        }
         self.write_memory_no_tick(address, value);
+        while self.dmc_delay > 0 {
+            self.tick(Some(address));
+        }
     }
 
     fn write_memory_no_tick(&mut self, address: u16, value: u8) {
@@ -202,10 +233,10 @@ impl<'a> Cpu<'a> {
             0x4014 => {
                 self.oam_dma_write = Some((value, 0));
                 if self.cycle_count & 1 == 0 {
-                    self.tick();
+                    self.tick(Some(address));
                 }
-                self.tick();
-            },
+                self.tick(Some(address));
+            }
             0x4000 ... 0x4013 | 0x4015 | 0x4017 => self.apu_bus.borrow_mut().write(address, value),
             0x4016 => self.controller_strobe = value & 1 > 0,
             0x4018 ... 0x401F => (),
@@ -242,11 +273,11 @@ impl<'a> Cpu<'a> {
     fn apply_memory_mode(&mut self, mode: &AddressingMode, operand: u16, page_boundary_penalty: bool, dummy_read: bool) -> u16 {
         match *mode {
             ZeropageX => {
-                self.tick();
+                self.tick(None);
                 u16::from((operand as u8).wrapping_add(self.x))
             }
             ZeropageY => {
-                self.tick();
+                self.tick(None);
                 u16::from((operand as u8).wrapping_add(self.y))
             }
             Zeropage => operand & 0xff,
@@ -261,7 +292,7 @@ impl<'a> Cpu<'a> {
                 address
             }
             IndexedIndirect => {
-                self.tick();
+                self.tick(None);
                 let target = u16::from((operand as u8).wrapping_add(self.x));
                 self.read_word_zeropage_wrapped(target)
             }
@@ -335,11 +366,11 @@ impl<'a> Cpu<'a> {
             self.pc = self.pc.wrapping_sub((-(offset as i16)) as u16);
         }
         if prev_pc >> 8 != self.pc >> 8 {
-            self.tick();
+            self.tick(None);
         } else if self.irq && !self.prev_irq {
             self.irq = false;
         }
-        self.tick();
+        self.tick(None);
     }
 
     fn adc(&mut self, operand_value: u8) {
@@ -376,7 +407,7 @@ impl<'a> Cpu<'a> {
         if self.instrumented {
             let pc = self.pc - u16::from(mode.bytes()) - 1;
             if self.pc_breaks.contains(&pc) {
-                panic!("{:04X}\t{:02X} {}\t{:?} {}\t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} ppu:{} apu:{}",
+                panic!("{:04X}\t{:02X} {}\t{:?} {}\t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} ppu:{} apu:{} cyc:{}",
                        pc,
                        opcode_hex,
                        match mode.bytes() {
@@ -388,9 +419,10 @@ impl<'a> Cpu<'a> {
                        mode.format_operand(operand, self.pc),
                        self.a, self.x, self.y, self.p, self.sp,
                        self.ppu.instrumentation_short(),
-                       self.apu.instrumentation_short());
+                       self.apu.instrumentation_short(),
+                       self.cycle_count);
             } else if self.pc_watches.contains(&pc) {
-                warn!(target: "cpu", "{:04X}\t{:02X} {}\t{:?} {}\t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} ppu:{} apu:{}",
+                warn!(target: "cpu", "{:04X}\t{:02X} {}\t{:?} {}\t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} ppu:{} apu:{} cyc:{}",
                       pc,
                       opcode_hex,
                       match mode.bytes() {
@@ -402,7 +434,8 @@ impl<'a> Cpu<'a> {
                       mode.format_operand(operand, self.pc),
                       self.a, self.x, self.y, self.p, self.sp,
                       self.ppu.instrumentation_short(),
-                      self.apu.instrumentation_short());
+                      self.apu.instrumentation_short(),
+                      self.cycle_count);
             } else {
                 let mut ignore = false;
                 for ignore_range in self.pc_ignores.iter() {
@@ -412,7 +445,7 @@ impl<'a> Cpu<'a> {
                     }
                 }
                 if !ignore {
-                    debug!(target: "cpu", "{:04X}\t{:02X} {}\t{:?} {}\t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} ppu:{} apu:{}",
+                    debug!(target: "cpu", "{:04X}\t{:02X} {}\t{:?} {}\t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} ppu:{} apu:{} cyc:{}",
                            pc,
                            opcode_hex,
                            match mode.bytes() {
@@ -424,7 +457,8 @@ impl<'a> Cpu<'a> {
                            mode.format_operand(operand, self.pc),
                            self.a, self.x, self.y, self.p, self.sp,
                            self.ppu.instrumentation_short(),
-                           self.apu.instrumentation_short());
+                           self.apu.instrumentation_short(),
+                           self.cycle_count);
                 }
             }
         }
@@ -689,7 +723,7 @@ impl<'a> Cpu<'a> {
                 self.push_word(old_pc);
                 let new_pc = self.apply_memory_mode(mode, operand, false, false);
                 self.pc = new_pc;
-                self.tick();
+                self.tick(None);
             }
 
             LAS => {
@@ -769,14 +803,14 @@ impl<'a> Cpu<'a> {
                 self.a = value;
                 self.set_zero_flag(value);
                 self.set_negative_flag(value);
-                self.tick();
+                self.tick(None);
             }
 
             PLP => {
                 self.delayed_irq_flag = Some(self.flag(INTERRUPT));
                 let value = self.pop();
                 self.p = (value & 0b11101111) | 0b00100000;
-                self.tick();
+                self.tick(None);
             }
 
             RLA => {
@@ -830,14 +864,14 @@ impl<'a> Cpu<'a> {
                 self.p = p;
                 let pc = self.pop_word();
                 self.pc = pc;
-                self.tick();
+                self.tick(None);
             }
 
             RTS => {
-                self.tick();
+                self.tick(None);
                 let pc = self.pop_word();
                 self.pc = pc + 1;
-                self.tick();
+                self.tick(None);
             }
 
             SAX => {
@@ -979,11 +1013,11 @@ impl<'a> Cpu<'a> {
                 match *mode {
                     Accumulator | ZeropageX | IndirectIndexed => (),
                     AbsoluteIndexedX | AbsoluteIndexedY => {
-                        self.tick();
-                        self.tick();
+                        self.tick(None);
+                        self.tick(None);
                     }
                     IndexedIndirect => self.tick_adjust += 2,
-                    _ => self.tick(),
+                    _ => self.tick(None),
                 };
             }
             _ => ()
@@ -1008,24 +1042,6 @@ impl<'a> Cpu<'a> {
     pub fn next_operation(&mut self, inputs: ControllerState) {
         if self.controller_strobe {
             self.last_inputs = inputs.to_u8();
-        }
-        {
-            let dmc_delay;
-            {
-                let mut apu_bus = self.apu_bus.borrow_mut();
-                dmc_delay = apu_bus.dmc_delay;
-                if dmc_delay {
-                    apu_bus.dmc_delay = false;
-                }
-            }
-            if dmc_delay {
-                self.tick();
-                self.tick();
-                if self.oam_dma_write.is_some() {
-                    self.tick();
-                    self.tick();
-                };
-            }
         }
         if let Some((addr, i)) = self.oam_dma_write {
             let data = self.read_memory(u16::from(addr) * 0x100 + u16::from(i));

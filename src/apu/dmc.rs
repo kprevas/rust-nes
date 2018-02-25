@@ -63,45 +63,43 @@ impl Dmc {
                     }
                 }
             }
+        } else {
+            ctrl_bus.bytes_remaining = 0;
         }
 
-        if ctrl_bus.enabled || self.sample_buffer.is_some() {
-            if self.curr_timer == 0 {
-                if self.silence {
-                    self.output_level = 0;
+        if self.curr_timer == 0 && ctrl_bus.rate > 0 {
+            if self.silence {
+                self.output_level = 0;
+            } else {
+                if self.shift_register & 1 > 0 {
+                    if self.output_level <= 125 {
+                        self.output_level += 2;
+                    }
                 } else {
-                    if self.shift_register & 1 > 0 {
-                        if self.output_level <= 125 {
-                            self.output_level += 2;
-                        }
-                    } else {
-                        if self.output_level >= 2 {
-                            self.output_level -= 2;
-                        }
+                    if self.output_level >= 2 {
+                        self.output_level -= 2;
                     }
                 }
-                self.shift_register >>= 1;
-                self.bits_remaining -= 1;
-                if self.bits_remaining == 0 {
-                    self.bits_remaining = 8;
-                    match self.sample_buffer.take() {
-                        Some(value) => {
-                            self.silence = false;
-                            self.shift_register = value;
-                        }
-                        None => {
-                            self.silence = true;
-                        }
-                    }
-                }
-                self.curr_timer = ctrl_bus.rate;
             }
+            self.shift_register >>= 1;
+            self.bits_remaining -= 1;
+            if self.bits_remaining == 0 {
+                self.bits_remaining = 8;
+                match self.sample_buffer.take() {
+                    Some(value) => {
+                        self.silence = false;
+                        self.shift_register = value;
+                    }
+                    None => {
+                        self.silence = true;
+                        self.shift_register = 0;
+                    }
+                }
+            }
+            self.curr_timer = ctrl_bus.rate;
+        }
+        if self.curr_timer > 0 {
             self.curr_timer -= 2;
-        } else {
-            self.silence = true;
-            self.sample_buffer = None;
-            ctrl_bus.bytes_remaining = 0;
-            self.output_level = 0
         }
 
         if let Some(value) = ctrl_bus.direct_load.take() {
