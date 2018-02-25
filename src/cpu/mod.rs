@@ -435,6 +435,13 @@ impl<'a> Cpu<'a> {
                 self.adc(operand_value);
             }
 
+            AHX => {
+                let addr = self.apply_memory_mode(mode, operand, false, true);
+                let addr_high = (addr >> 8) as u8;
+                let result = self.a & self.x & addr_high;
+                self.write_memory(addr, result);
+            }
+
             ALR => {
                 let operand_value = self.read_memory_mode(mode, operand, true);
                 let and_result = self.a & operand_value;
@@ -685,6 +692,16 @@ impl<'a> Cpu<'a> {
                 self.tick();
             }
 
+            LAS => {
+                let operand_value = self.read_memory_mode(mode, operand, true);
+                let result = operand_value & self.sp;
+                self.a = result;
+                self.x = result;
+                self.sp = result;
+                self.set_zero_flag(result);
+                self.set_negative_flag(result);
+            }
+
             LAX => {
                 let operand_value = self.read_memory_mode(mode, operand, true);
                 self.a = operand_value;
@@ -847,7 +864,7 @@ impl<'a> Cpu<'a> {
             }
 
             SHX => {
-                let addr = self.apply_memory_mode(mode, operand, true, false);
+                let addr = self.apply_memory_mode(mode, operand, true, true);
                 let addr_high = addr >> 8;
                 let addr_low = addr & 0xFF;
                 let value = self.x & ((addr_high + 1) as u8);
@@ -855,7 +872,7 @@ impl<'a> Cpu<'a> {
             }
 
             SHY => {
-                let addr = self.apply_memory_mode(mode, operand, true, false);
+                let addr = self.apply_memory_mode(mode, operand, true, true);
                 let addr_high = addr >> 8;
                 let addr_low = addr & 0xFF;
                 let value = self.y & ((addr_high + 1) as u8);
@@ -899,6 +916,14 @@ impl<'a> Cpu<'a> {
                 self.write_memory_mode(mode, operand, value);
             }
 
+            TAS => {
+                let addr = self.apply_memory_mode(mode, operand, true, true);
+                let addr_high = (addr >> 8) as u8;
+                self.sp = self.a & self.x;
+                let result = self.sp & addr_high;
+                self.write_memory(addr, result);
+            }
+
             TAX => {
                 let value = self.a;
                 self.x = value;
@@ -935,6 +960,13 @@ impl<'a> Cpu<'a> {
             TYA => {
                 let value = self.y;
                 self.a = value;
+                self.set_zero_flag(value);
+                self.set_negative_flag(value);
+            }
+
+            XAA => {
+                let value = self.a;
+                self.x = value & self.read_memory_mode(mode, operand, true);
                 self.set_zero_flag(value);
                 self.set_negative_flag(value);
             }

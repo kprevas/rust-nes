@@ -308,3 +308,25 @@ fn test_reset_registers() {
                                   0x81,
                                   &[(0x6000, 0)]);
 }
+
+#[test]
+fn test_instr_timing() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/instr_timing/1-instr_timing.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_branch_timing() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/instr_timing/2-branch_timing.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}

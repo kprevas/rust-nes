@@ -56,6 +56,8 @@ impl AddressingMode {
 pub enum Opcode {
     ADC,
     // add with carry
+    AHX,
+    // store A & X & H
     ALR,
     // and then logical shift right
     ARR,
@@ -124,6 +126,8 @@ pub enum Opcode {
     // jump
     JSR,
     // jump subroutine
+    LAS,
+    // store memory & stack pointer into A, X, and stack pointer
     LAX,
     // load accumulator and X
     LDA,
@@ -182,6 +186,8 @@ pub enum Opcode {
     // store X
     STY,
     // store Y
+    TAS,
+    // store A & X in stack pointer and A & X & H in memory
     TAX,
     // transfer accumulator to X
     TAY,
@@ -194,6 +200,8 @@ pub enum Opcode {
     // transfer X to stack pointer
     TYA,
     // transfer Y to accumulator
+    XAA,
+    // transfer X to accumulator then and
     XXX, // unofficial, unimplemented
 }
 
@@ -354,7 +362,7 @@ pub const OPCODES: [(Opcode, AddressingMode); 256] = [
     (Opcode::DEY, AddressingMode::Implied),
     (Opcode::NOP, AddressingMode::Immediate),
     (Opcode::TXA, AddressingMode::Implied),
-    (Opcode::XXX, AddressingMode::Immediate),
+    (Opcode::XAA, AddressingMode::Immediate),
     (Opcode::STY, AddressingMode::Absolute),
     (Opcode::STA, AddressingMode::Absolute),
     (Opcode::STX, AddressingMode::Absolute),
@@ -364,7 +372,7 @@ pub const OPCODES: [(Opcode, AddressingMode); 256] = [
     (Opcode::BCC, AddressingMode::Relative),
     (Opcode::STA, AddressingMode::IndirectIndexed),
     (Opcode::XXX, AddressingMode::Implied),
-    (Opcode::XXX, AddressingMode::IndirectIndexed),
+    (Opcode::AHX, AddressingMode::IndirectIndexed),
     (Opcode::STY, AddressingMode::ZeropageX),
     (Opcode::STA, AddressingMode::ZeropageX),
     (Opcode::STX, AddressingMode::ZeropageY),
@@ -372,11 +380,11 @@ pub const OPCODES: [(Opcode, AddressingMode); 256] = [
     (Opcode::TYA, AddressingMode::Implied),
     (Opcode::STA, AddressingMode::AbsoluteIndexedY),
     (Opcode::TXS, AddressingMode::Implied),
-    (Opcode::XXX, AddressingMode::AbsoluteIndexedY),
+    (Opcode::TAS, AddressingMode::AbsoluteIndexedY),
     (Opcode::SHY, AddressingMode::AbsoluteIndexedX),
     (Opcode::STA, AddressingMode::AbsoluteIndexedX),
     (Opcode::SHX, AddressingMode::AbsoluteIndexedY),
-    (Opcode::XXX, AddressingMode::AbsoluteIndexedY),
+    (Opcode::AHX, AddressingMode::AbsoluteIndexedY),
 
     // Ax
     (Opcode::LDY, AddressingMode::Immediate),
@@ -408,7 +416,7 @@ pub const OPCODES: [(Opcode, AddressingMode); 256] = [
     (Opcode::CLV, AddressingMode::Implied),
     (Opcode::LDA, AddressingMode::AbsoluteIndexedY),
     (Opcode::TSX, AddressingMode::Implied),
-    (Opcode::XXX, AddressingMode::AbsoluteIndexedY),
+    (Opcode::LAS, AddressingMode::AbsoluteIndexedY),
     (Opcode::LDY, AddressingMode::AbsoluteIndexedX),
     (Opcode::LDA, AddressingMode::AbsoluteIndexedX),
     (Opcode::LDX, AddressingMode::AbsoluteIndexedY),
