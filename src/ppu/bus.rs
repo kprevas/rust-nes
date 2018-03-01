@@ -52,6 +52,7 @@ pub struct Status {
     pub sprite_overflow: bool,
     pub sprite_0_hit: bool,
     pub vertical_blank: bool,
+    pub vertical_blank_about_to_clear: bool,
     pub just_read: bool,
 }
 
@@ -159,6 +160,7 @@ impl PpuBus {
                 sprite_overflow: false,
                 sprite_0_hit: false,
                 vertical_blank: false,
+                vertical_blank_about_to_clear: false,
                 just_read: false,
             },
             oam_addr: 0,
@@ -221,7 +223,7 @@ impl PpuBus {
                 if !self.ctrl.gen_nmi && self.nmi_interrupt_age < 2 {
                     self.nmi_interrupt = false;
                 }
-                if self.ctrl.gen_nmi && !was_gen_nmi && self.status.vertical_blank {
+                if self.ctrl.gen_nmi && !was_gen_nmi && self.status.vertical_blank && !self.status.vertical_blank_about_to_clear {
                     self.nmi_interrupt = true;
                     self.nmi_interrupt_age = 0;
                 }

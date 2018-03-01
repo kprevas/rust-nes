@@ -535,6 +535,7 @@ impl<'a> Ppu<'a> {
     }
 
     fn tick_prerender(&mut self) {
+        self.bus.borrow_mut().status.vertical_blank_about_to_clear = self.dot == 0;
         if self.dot == 1 {
             self.bus.borrow_mut().status.vertical_blank = false;
         }
