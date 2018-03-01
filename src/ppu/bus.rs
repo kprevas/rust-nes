@@ -216,11 +216,12 @@ impl PpuBus {
         self.decay_register.write(value);
         match addr {
             0 => {
+                let was_gen_nmi = self.ctrl.gen_nmi;
                 self.ctrl = Ctrl::from_u8(value);
                 if !self.ctrl.gen_nmi && self.nmi_interrupt_age < 2 {
                     self.nmi_interrupt = false;
                 }
-                if self.ctrl.gen_nmi && self.status.vertical_blank {
+                if self.ctrl.gen_nmi && !was_gen_nmi && self.status.vertical_blank {
                     self.nmi_interrupt = true;
                     self.nmi_interrupt_age = 0;
                 }
