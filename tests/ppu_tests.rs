@@ -79,3 +79,113 @@ fn test_oam_stress() {
                                   0x81,
                                   &[(0x6000, 0)]);
 }
+
+#[test]
+fn test_01_vbl_basics() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/ppu_vbl_nmi/01-vbl_basics.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_02_vbl_set_time() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/ppu_vbl_nmi/02-vbl_set_time.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_03_vbl_clear_time() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/ppu_vbl_nmi/03-vbl_clear_time.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_04_nmi_control() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/ppu_vbl_nmi/04-nmi_control.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_05_nmi_timing() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/ppu_vbl_nmi/05-nmi_timing.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_06_suppression() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/ppu_vbl_nmi/06-suppression.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_07_nmi_on_timing() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/ppu_vbl_nmi/07-nmi_on_timing.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_08_nmi_off_timing() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/ppu_vbl_nmi/08-nmi_off_timing.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_09_even_odd_frames() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/ppu_vbl_nmi/09-even_odd_frames.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
+
+#[test]
+fn test_10_even_odd_timing() {
+    run_test_until_memory_matches(&mut include_bytes!("roms/ppu_vbl_nmi/10-even_odd_timing.nes").as_ref(),
+                                  0x6001,
+                                  &[0xde, 0xb0, 0x61],
+                                  0x6000,
+                                  0x80,
+                                  0x81,
+                                  &[(0x6000, 0)]);
+}
