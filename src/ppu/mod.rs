@@ -485,12 +485,12 @@ impl<'a> Ppu<'a> {
                 }
             }
             257 => {
-                self.eval_sprites();
+                if self.scanline != 261 {
+                    self.eval_sprites();
+                }
             }
             321 => {
-                if self.scanline != 261 {
-                    self.load_sprites();
-                }
+                self.load_sprites();
             }
             _ => (),
         }
