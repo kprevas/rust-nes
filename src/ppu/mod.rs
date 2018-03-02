@@ -55,6 +55,7 @@ pub struct Ppu<'a> {
     fine_x_scroll: u8,
 
     odd_frame: bool,
+    skip_tick: bool,
 
     nametable: u8,
     latch_attrtable: u8,
@@ -100,6 +101,7 @@ impl<'a> Ppu<'a> {
             tmp_vram_addr: 0,
             fine_x_scroll: 0,
             odd_frame: false,
+            skip_tick: false,
             nametable: 0,
             latch_attrtable: 0,
             latch_bgd_low: 0,
@@ -242,7 +244,7 @@ impl<'a> Ppu<'a> {
             _ => panic!("Bad scanline {}", self.scanline)
         }
         self.dot += 1;
-        if self.dot == 341 || (self.odd_frame && self.rendering() && self.dot == 340 && self.scanline == 261) {
+        if self.dot == 341 || (self.skip_tick && self.dot == 340) {
             self.dot = 0;
             self.scanline += 1;
             self.scanline %= 262;
@@ -250,6 +252,7 @@ impl<'a> Ppu<'a> {
                 self.odd_frame = !self.odd_frame;
             }
         }
+        self.skip_tick = self.scanline == 261 && self.dot == 339 && self.odd_frame && self.rendering();
         let mut bus = self.bus.borrow_mut();
         bus.status.just_read = false;
         bus.addr = self.vram_addr;
