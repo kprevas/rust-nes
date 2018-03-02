@@ -189,3 +189,69 @@ fn test_10_even_odd_timing() {
                                   0x81,
                                   &[(0x6000, 0)]);
 }
+
+#[test]
+fn test_sprite_hit_01_basics() {
+    run_test_to_pc(&mut include_bytes!("roms/sprite_hit_tests/01.basics.nes").as_ref(),
+                   None, 0xe635, &[(0xf8, 1)]);
+}
+
+#[test]
+fn test_sprite_hit_02_alignment() {
+    run_test_to_pc(&mut include_bytes!("roms/sprite_hit_tests/02.alignment.nes").as_ref(),
+                   None, 0xe635, &[(0xf8, 1)]);
+}
+
+#[test]
+fn test_sprite_hit_03_corners() {
+    run_test_to_pc(&mut include_bytes!("roms/sprite_hit_tests/03.corners.nes").as_ref(),
+                   None, 0xe635, &[(0xf8, 1)]);
+}
+
+#[test]
+fn test_sprite_hit_04_flip() {
+    run_test_to_pc(&mut include_bytes!("roms/sprite_hit_tests/04.flip.nes").as_ref(),
+                   None, 0xe5b6, &[(0xf8, 1)]);
+}
+
+#[test]
+fn test_sprite_hit_05_left_clip() {
+    run_test_to_pc(&mut include_bytes!("roms/sprite_hit_tests/05.left_clip.nes").as_ref(),
+                   None, 0xe635, &[(0xf8, 1)]);
+}
+
+#[test]
+fn test_sprite_hit_06_right_edge() {
+    run_test_to_pc(&mut include_bytes!("roms/sprite_hit_tests/06.right_edge.nes").as_ref(),
+                   None, 0xe635, &[(0xf8, 1)]);
+}
+
+#[test]
+fn test_sprite_hit_07_screen_bottom() {
+    run_test_to_pc(&mut include_bytes!("roms/sprite_hit_tests/07.screen_bottom.nes").as_ref(),
+                   None, 0xe635, &[(0xf8, 1)]);
+}
+
+#[test]
+fn test_sprite_hit_08_double_height() {
+    run_test_to_pc(&mut include_bytes!("roms/sprite_hit_tests/08.double_height.nes").as_ref(),
+                   None, 0xe635, &[(0xf8, 1)]);
+}
+
+#[test]
+fn test_sprite_hit_09_timing_basics() {
+    run_test_to_pc(&mut include_bytes!("roms/sprite_hit_tests/09.timing_basics.nes").as_ref(),
+                   None, 0xe64c, &[(0xf8, 1)]);
+}
+
+#[test]
+fn test_sprite_hit_10_timing_order() {
+    run_test_to_pc(&mut include_bytes!("roms/sprite_hit_tests/10.timing_order.nes").as_ref(),
+                   None, 0xe635, &[(0xf8, 1)]);
+}
+
+#[test]
+fn test_sprite_hit_11_edge_timing() {
+    run_test_to_pc(&mut include_bytes!("roms/sprite_hit_tests/10.timing_order.nes").as_ref(),
+                   None, 0xe635, &[(0xf8, 1)]);
+}
