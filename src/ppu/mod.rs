@@ -428,6 +428,7 @@ impl<'a> Ppu<'a> {
 
     fn eval_sprites(&mut self) {
         let mut sprite_index = 0;
+        let rendering = self.rendering();
         for i in 0..64 {
             let sprite_y = u16::from(self.oam_ram[(i * 4) as usize]);
             if sprite_y <= self.scanline {
@@ -442,7 +443,9 @@ impl<'a> Ppu<'a> {
 
                     sprite_index += 1;
                     if sprite_index >= 8 {
-                        self.bus.borrow_mut().status.sprite_overflow = true;
+                        if rendering {
+                            self.bus.borrow_mut().status.sprite_overflow = true;
+                        }
                         break;
                     }
                 }
