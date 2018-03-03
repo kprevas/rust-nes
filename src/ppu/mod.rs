@@ -74,6 +74,7 @@ pub struct Ppu<'a> {
 
     oam: [Sprite; 8],
     sec_oam: [Sprite; 8],
+    sprite_overflow_tick_delay: Option<u8>,
 
     internal_ram: Box<[u8]>,
     palette_ram: Box<[u8]>,
@@ -115,6 +116,7 @@ impl<'a> Ppu<'a> {
             addr: 0,
             oam: Default::default(),
             sec_oam: Default::default(),
+            sprite_overflow_tick_delay: None,
             internal_ram: vec![0; 0x800].into_boxed_slice(),
             palette_ram: vec![0; 0x20].into_boxed_slice(),
             oam_ram: vec![0; 0x100].into_boxed_slice(),
@@ -428,14 +430,12 @@ impl<'a> Ppu<'a> {
 
     fn eval_sprites(&mut self) {
         let mut sprite_index = 0;
-        let rendering = self.rendering();
         let mut overflow_bug_offset = 0;
+        let mut overflow_tick = 0;
         for i in 0..64 {
             let sprite_start = (i * 4) as usize + overflow_bug_offset;
-            if sprite_start + 4 >= self.oam_ram.len() {
-                break;
-            }
             let sprite_y = u16::from(self.oam_ram[sprite_start]);
+            overflow_tick += 2;
             let mut in_range = false;
             if sprite_y <= self.scanline {
                 let line = self.scanline - sprite_y;
@@ -445,24 +445,24 @@ impl<'a> Ppu<'a> {
             }
             if in_range {
                 if sprite_index == 8 {
-                    if rendering {
-                        self.bus.borrow_mut().status.sprite_overflow = true;
-                    }
+                    self.sprite_overflow_tick_delay = Some(overflow_tick);
                     break;
                 } else {
-                    {
-                        let sprite = &mut self.sec_oam[sprite_index];
-                        sprite.id = sprite_start as u8;
-                        sprite.y = self.oam_ram[sprite_start];
-                        sprite.tile = self.oam_ram[sprite_start + 1];
-                        sprite.attr = self.oam_ram[sprite_start + 2];
-                        sprite.x = self.oam_ram[sprite_start + 3];
-                    }
+                    let sprite = &mut self.sec_oam[sprite_index];
+                    sprite.id = i;
+                    sprite.y = self.oam_ram[sprite_start];
+                    sprite.tile = self.oam_ram[sprite_start + 1];
+                    sprite.attr = self.oam_ram[sprite_start + 2];
+                    sprite.x = self.oam_ram[sprite_start + 3];
 
+                    overflow_tick += 6;
                     sprite_index += 1;
                 }
             } else if sprite_index == 8 {
                 overflow_bug_offset += 1;
+                if overflow_bug_offset == 4 {
+                    overflow_bug_offset = 0;
+                }
             }
         }
     }
@@ -501,7 +501,7 @@ impl<'a> Ppu<'a> {
                     bus.status.sprite_overflow = false;
                 }
             }
-            257 => {
+            65 => {
                 if self.scanline != 261 {
                     self.eval_sprites();
                 }
@@ -510,6 +510,16 @@ impl<'a> Ppu<'a> {
                 self.load_sprites();
             }
             _ => (),
+        }
+        if let Some(val) = self.sprite_overflow_tick_delay {
+            if val == 0 {
+                if self.rendering() {
+                    self.bus.borrow_mut().status.sprite_overflow = true;
+                }
+                self.sprite_overflow_tick_delay = None;
+            } else {
+                self.sprite_overflow_tick_delay = Some(val - 1);
+            }
         }
         match self.dot {
             2 ... 256 => {
