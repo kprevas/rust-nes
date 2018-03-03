@@ -255,3 +255,33 @@ fn test_sprite_hit_11_edge_timing() {
     run_test_to_pc(&mut include_bytes!("roms/sprite_hit_tests/10.timing_order.nes").as_ref(),
                    None, 0xe635, &[(0xf8, 1)]);
 }
+
+#[test]
+fn test_sprite_overflow_1_basics() {
+    run_test_to_pc(&mut include_bytes!("roms/sprite_overflow_tests/1.Basics.nes").as_ref(),
+                   None, 0xe55a, &[(0xf8, 1)]);
+}
+
+#[test]
+fn test_sprite_overflow_2_details() {
+    run_test_to_pc(&mut include_bytes!("roms/sprite_overflow_tests/2.Details.nes").as_ref(),
+                   None, 0xe635, &[(0xf8, 1)]);
+}
+
+#[test]
+fn test_sprite_overflow_3_timing() {
+    run_test_to_pc(&mut include_bytes!("roms/sprite_overflow_tests/3.Timing.nes").as_ref(),
+                   None, 0xe5f0, &[(0xf8, 1)]);
+}
+
+#[test]
+fn test_sprite_overflow_4_obscure() {
+    run_test_to_pc(&mut include_bytes!("roms/sprite_overflow_tests/4.Obscure.nes").as_ref(),
+                   None, 0xe5f0, &[(0xf8, 1)]);
+}
+
+#[test]
+fn test_sprite_overflow_5_emulator() {
+    run_test_to_pc(&mut include_bytes!("roms/sprite_overflow_tests/5.Emulator.nes").as_ref(),
+                   None, 0xe5f0, &[(0xf8, 1)]);
+}
