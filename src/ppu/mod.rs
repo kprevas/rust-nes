@@ -205,7 +205,7 @@ impl<'a> Ppu<'a> {
                     palette_address &= !0x10;
                 }
                 self.palette_ram[(palette_address % 0x20) as usize] = value
-            },
+            }
             _ => panic!("Bad PPU memory write {:04X}", address),
         }
     }
@@ -429,26 +429,40 @@ impl<'a> Ppu<'a> {
     fn eval_sprites(&mut self) {
         let mut sprite_index = 0;
         let rendering = self.rendering();
+        let mut overflow_bug_offset = 0;
         for i in 0..64 {
-            let sprite_y = u16::from(self.oam_ram[(i * 4) as usize]);
+            let sprite_start = (i * 4) as usize + overflow_bug_offset;
+            if sprite_start + 4 >= self.oam_ram.len() {
+                break;
+            }
+            let sprite_y = u16::from(self.oam_ram[sprite_start]);
+            let mut in_range = false;
             if sprite_y <= self.scanline {
                 let line = self.scanline - sprite_y;
                 if line < u16::from(self.spr_height()) {
-                    let sprite = &mut self.sec_oam[sprite_index];
-                    sprite.id = i;
-                    sprite.y = self.oam_ram[(i * 4) as usize];
-                    sprite.tile = self.oam_ram[(i * 4 + 1) as usize];
-                    sprite.attr = self.oam_ram[(i * 4 + 2) as usize];
-                    sprite.x = self.oam_ram[(i * 4 + 3) as usize];
+                    in_range = true;
+                }
+            }
+            if in_range {
+                if sprite_index == 8 {
+                    if rendering {
+                        self.bus.borrow_mut().status.sprite_overflow = true;
+                    }
+                    break;
+                } else {
+                    {
+                        let sprite = &mut self.sec_oam[sprite_index];
+                        sprite.id = sprite_start as u8;
+                        sprite.y = self.oam_ram[sprite_start];
+                        sprite.tile = self.oam_ram[sprite_start + 1];
+                        sprite.attr = self.oam_ram[sprite_start + 2];
+                        sprite.x = self.oam_ram[sprite_start + 3];
+                    }
 
                     sprite_index += 1;
-                    if sprite_index >= 8 {
-                        if rendering {
-                            self.bus.borrow_mut().status.sprite_overflow = true;
-                        }
-                        break;
-                    }
                 }
+            } else if sprite_index == 8 {
+                overflow_bug_offset += 1;
             }
         }
     }
