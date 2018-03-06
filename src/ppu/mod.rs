@@ -532,6 +532,10 @@ impl<'a> Ppu<'a> {
             }
             321 ... 336 => {
                 self.read_into_latches();
+                if self.dot % 8 == 0 {
+                    self.shift_bgd_high <<= 8;
+                    self.shift_bgd_low <<= 8;
+                }
             }
             337 | 339 => {
                 self.nametable = self.read_memory(self.addr, self.bus.borrow().mask.grayscale);
