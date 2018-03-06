@@ -322,6 +322,10 @@ impl<'a> Ppu<'a> {
             let color = self.read_memory(0x3F00 + if self.rendering() { palette } else { 0 }, self.bus.borrow().mask.grayscale);
             self.image.put_pixel(u32::from(self.dot) - 2, u32::from(self.scanline), Rgba(NES_RGB[color as usize]))
         }
+        self.adjust_shifts();
+    }
+
+    fn adjust_shifts(&mut self) {
         self.shift_bgd_low <<= 1;
         self.shift_bgd_high <<= 1;
         self.shift_attrtable_low = (self.shift_attrtable_low << 1) | if self.attrtable_latch_low { 1 } else { 0 };
@@ -532,10 +536,7 @@ impl<'a> Ppu<'a> {
             }
             321 ... 336 => {
                 self.read_into_latches();
-                if self.dot % 8 == 0 {
-                    self.shift_bgd_high <<= 8;
-                    self.shift_bgd_low <<= 8;
-                }
+                self.adjust_shifts();
             }
             337 | 339 => {
                 self.nametable = self.read_memory(self.addr, self.bus.borrow().mask.grayscale);
