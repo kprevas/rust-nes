@@ -33,7 +33,7 @@ pub fn run(matches: clap::ArgMatches) {
             None => Box::new(std::io::stdout()) as Box<Write>,
         };
         let cartridge = if let Some(cartridge) = load_cartridge(matches) { cartridge } else { return };
-        cpu::disassembler::disassemble(cartridge.cpu_bus, 0xc000, &mut out).unwrap();
+        cpu::disassembler::disassemble(cartridge.cpu_bus, 0x8000, &mut out).unwrap();
     } else if let Some(matches) = matches.subcommand_matches("run") {
         let window: PistonWindow = WindowSettings::new(
             "nes",
@@ -59,6 +59,9 @@ pub fn run(matches: clap::ArgMatches) {
         let apu = apu::Apu::new(&apu_bus, Some(PortAudio::new().unwrap())).unwrap();
 
         let mut cpu = cpu::Cpu::boot(&mut cartridge.cpu_bus, ppu, &ppu_bus, apu, &apu_bus, instrument_cpu);
+
+        cpu.set_memory_watch(0x2006);
+        cpu.set_memory_watch(0x2007);
 
         let assets = find_folder::Search::ParentsThenKids(3, 3).for_folder("src").unwrap();
         let ref font = assets.join("VeraMono.ttf");
