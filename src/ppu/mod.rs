@@ -228,10 +228,12 @@ impl<'a> Ppu<'a> {
                 bus.palette_data = self.read_memory(self.vram_addr, bus.mask.grayscale);
                 if bus.read_buffer.is_none() {
                     bus.read_buffer = Some(self.read_memory_under_palette(self.vram_addr));
+                    self.vram_addr += if bus.ctrl.address_increment_vertical { 32 } else { 1 };
                 }
             } else {
                 if bus.read_buffer.is_none() {
                     bus.read_buffer = Some(self.read_memory(self.vram_addr, bus.mask.grayscale));
+                    self.vram_addr += if bus.ctrl.address_increment_vertical { 32 } else { 1 };
                 }
             }
             bus.oam_data = self.oam_ram[bus.oam_addr as usize];
