@@ -60,9 +60,6 @@ pub fn run(matches: clap::ArgMatches) {
 
         let mut cpu = cpu::Cpu::boot(&mut cartridge.cpu_bus, ppu, &ppu_bus, apu, &apu_bus, instrument_cpu);
 
-        cpu.set_memory_watch(0x2006);
-        cpu.set_memory_watch(0x2007);
-
         let assets = find_folder::Search::ParentsThenKids(3, 3).for_folder("src").unwrap();
         let ref font = assets.join("VeraMono.ttf");
         let factory = window.factory.clone();
