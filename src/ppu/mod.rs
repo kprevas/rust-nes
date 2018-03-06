@@ -376,9 +376,7 @@ impl<'a> Ppu<'a> {
         match self.dot % 8 {
             1 => {
                 self.addr = 0x2000 | (self.vram_addr & 0xFFF);
-                if self.dot != 1 && self.dot != 321 {
-                    self.reload_shift();
-                }
+                self.reload_shift();
             }
             2 => {
                 self.nametable = self.read_memory(self.addr, bus.mask.grayscale);
@@ -522,23 +520,21 @@ impl<'a> Ppu<'a> {
             }
         }
         match self.dot {
-            2 ... 256 => {
-                self.draw_pixel();
+            1 ... 256 => {
+                if self.dot >= 2 {
+                    self.draw_pixel();
+                }
                 self.read_into_latches();
             }
             257 => {
                 self.draw_pixel();
-                self.reload_shift();
                 self.update_horizontal();
             }
-            321 ... 337 => {
+            321 ... 336 => {
                 self.read_into_latches();
             }
-            338 | 340 => {
+            337 | 339 => {
                 self.nametable = self.read_memory(self.addr, self.bus.borrow().mask.grayscale);
-            }
-            1 | 339 => {
-                self.addr = 0x2000 | (self.vram_addr & 0xFFF);
             }
             _ => (),
         }
@@ -575,7 +571,7 @@ impl<'a> Ppu<'a> {
         }
     }
 
-    pub fn render(&mut self, c: Context, gl: &mut G2d) {
+    pub fn render(&mut self, c: Context, gl: &mut G2d, _glyphs: &mut Glyphs) {
         if let Some(ref mut texture) = self.texture {
             texture.update(gl.encoder, self.image_buffer.as_rgba8().unwrap()).unwrap();
             image(texture, c.transform.scale(8.0 / 7.0, 1.0), gl);

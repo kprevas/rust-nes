@@ -2,7 +2,7 @@ use apu::*;
 use apu::bus::*;
 use cartridge::CartridgeBus;
 use input::ControllerState;
-use piston_window::{Context, G2d};
+use piston_window::{Context, G2d, Glyphs};
 use ppu::*;
 use ppu::bus::*;
 use self::opcodes::AddressingMode;
@@ -1073,8 +1073,8 @@ impl<'a> Cpu<'a> {
         }
     }
 
-    pub fn render(&mut self, c: Context, gl: &mut G2d) {
-        self.ppu.render(c, gl);
+    pub fn render(&mut self, c: Context, gl: &mut G2d, glyphs: &mut Glyphs) {
+        self.ppu.render(c, gl, glyphs);
     }
 
     pub fn reset(&mut self, soft: bool) {

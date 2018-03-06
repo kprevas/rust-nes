@@ -1,13 +1,13 @@
-#[macro_use]
-extern crate log;
 extern crate clap;
-extern crate piston_window;
-extern crate image;
 extern crate find_folder;
 extern crate hex_slice;
+extern crate image;
+#[macro_use]
+extern crate log;
 extern crate nfd;
-extern crate simple_error;
+extern crate piston_window;
 extern crate portaudio;
+extern crate simple_error;
 
 use cartridge::Cartridge;
 use clap::ArgMatches;
@@ -60,6 +60,11 @@ pub fn run(matches: clap::ArgMatches) {
 
         let mut cpu = cpu::Cpu::boot(&mut cartridge.cpu_bus, ppu, &ppu_bus, apu, &apu_bus, instrument_cpu);
 
+        let assets = find_folder::Search::ParentsThenKids(3, 3).for_folder("src").unwrap();
+        let ref font = assets.join("VeraMono.ttf");
+        let factory = window.factory.clone();
+        let mut glyphs = Glyphs::new(font, factory, TextureSettings::new()).unwrap();
+
         while let Some(e) = window.next() {
             inputs.event(&e, &mut reset);
 
@@ -73,7 +78,7 @@ pub fn run(matches: clap::ArgMatches) {
 
             if let Some(_r) = e.render_args() {
                 window.draw_2d(&e, |c, gl| {
-                    cpu.render(c, gl);
+                    cpu.render(c, gl, &mut glyphs);
                 });
             }
 
