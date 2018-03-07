@@ -28,9 +28,7 @@ pub struct Mask {
     pub show_sprite_left8: bool,
     pub show_bgd: bool,
     pub show_sprite: bool,
-    pub red_emphasis: bool,
-    pub green_emphasis: bool,
-    pub blue_emphasis: bool,
+    pub color_emphasis: u8,
 }
 
 impl Mask {
@@ -41,9 +39,7 @@ impl Mask {
             show_sprite_left8: value & 0b100 > 0,
             show_bgd: value & 0b1000 > 0,
             show_sprite: value & 0b10000 > 0,
-            red_emphasis: value & 0b100000 > 0,
-            green_emphasis: value & 0b1000000 > 0,
-            blue_emphasis: value & 0b10000000 > 0,
+            color_emphasis: (value & 0b11100000) >> 5,
         }
     }
 }
@@ -152,9 +148,7 @@ impl PpuBus {
                 show_sprite_left8: false,
                 show_bgd: false,
                 show_sprite: false,
-                red_emphasis: false,
-                green_emphasis: false,
-                blue_emphasis: false,
+                color_emphasis: 0,
             },
             status: Status {
                 sprite_overflow: false,
