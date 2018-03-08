@@ -10,6 +10,8 @@ use self::opcodes::AddressingMode::*;
 use self::opcodes::Opcode;
 use std::cell::RefCell;
 use std::collections::HashSet;
+use std::io::prelude::*;
+use std::io::Result;
 use std::ops::Range;
 
 mod opcodes;
@@ -1101,6 +1103,16 @@ impl<'a> Cpu<'a> {
 
     pub fn close(&mut self) {
         self.apu.close();
+    }
+
+    pub fn save_to_battery(&self, out: &mut Write) -> Result<usize> {
+        let result = self.cartridge.save_to_battery(out);
+        if let Ok(bytes) = result {
+            info!(target: "cartridge", "{} bytes written", bytes);
+        } else {
+            info!(target: "cartridge", "no save data written");
+        }
+        result
     }
 
     pub fn setup_for_test(&mut self, p_start: u8, pc_start: u16) {

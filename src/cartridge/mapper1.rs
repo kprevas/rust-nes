@@ -5,6 +5,8 @@ use cartridge::NametableMirroring;
 use cartridge::NametableMirroring::*;
 use std::cell::RefCell;
 use std::cmp::max;
+use std::io::prelude::*;
+use std::io::Result;
 use std::rc::Rc;
 
 enum PrgBankMode {
@@ -138,6 +140,7 @@ struct Mapper1Cpu {
     prg_ram: Vec<u8>,
     prg_ram_enabled: bool,
     ctrl: Rc<RefCell<CtrlRegisters>>,
+    battery_save: bool,
 }
 
 struct Mapper1Ppu {
@@ -164,6 +167,7 @@ pub fn read(header: &Header, prg_rom: &[u8], chr_rom: &[u8]) -> Cartridge {
         prg_ram: vec![0; (u16::from(max(header.prg_ram_blocks, 1)) * 0x2000) as usize],
         prg_ram_enabled: true,
         ctrl: Rc::clone(&ctrl_register),
+        battery_save: header.battery_save,
     });
     Cartridge {
         cpu_bus,
@@ -201,6 +205,23 @@ impl CartridgeBus for Mapper1Cpu {
 
     fn mirror_nametable(&self, address: u16) -> u16 {
         address
+    }
+
+    fn save_to_battery(&self, out: &mut Write) -> Result<usize> {
+        if self.battery_save {
+            out.write(self.prg_ram.as_slice())
+        } else {
+            Ok(0)
+        }
+    }
+
+    fn load_from_battery(&mut self, inp: &mut Read) -> Result<usize> {
+        if self.battery_save {
+            self.prg_ram.clear();
+            inp.read_to_end(&mut self.prg_ram)
+        } else {
+            Ok(0)
+        }
     }
 }
 
@@ -248,5 +269,13 @@ impl CartridgeBus for Mapper1Ppu {
             },
             _ => panic!("Bad nametable mirror request {:04X}", address),
         }
+    }
+
+    fn save_to_battery(&self, _out: &mut Write) -> Result<usize> {
+        unimplemented!();
+    }
+
+    fn load_from_battery(&mut self, _inp: &mut Read) -> Result<usize> {
+        unimplemented!();
     }
 }

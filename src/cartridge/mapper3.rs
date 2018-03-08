@@ -4,6 +4,8 @@ use cartridge::Header;
 use cartridge::NametableMirroring;
 use cartridge::NametableMirroring::*;
 use std::cell::Cell;
+use std::io::prelude::*;
+use std::io::Result;
 use std::rc::Rc;
 
 struct Mapper3Cpu {
@@ -58,6 +60,14 @@ impl CartridgeBus for Mapper3Cpu {
     fn mirror_nametable(&self, address: u16) -> u16 {
         address
     }
+
+    fn save_to_battery(&self, _out: &mut Write) -> Result<usize> {
+        Ok(0)
+    }
+
+    fn load_from_battery(&mut self, _inp: &mut Read) -> Result<usize> {
+        unimplemented!();
+    }
 }
 
 impl CartridgeBus for Mapper3Ppu {
@@ -86,5 +96,13 @@ impl CartridgeBus for Mapper3Ppu {
             0x2C00 ... 0x2FFF => address - 0x2800,
             _ => panic!("Bad nametable mirror request {:04X}", address),
         }
+    }
+
+    fn save_to_battery(&self, _out: &mut Write) -> Result<usize> {
+        unimplemented!();
+    }
+
+    fn load_from_battery(&mut self, _inp: &mut Read) -> Result<usize> {
+        unimplemented!();
     }
 }

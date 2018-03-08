@@ -32,19 +32,25 @@ pub fn run(matches: clap::ArgMatches) {
             Some(ref path) => Box::new(File::create(&Path::new(path)).unwrap()) as Box<Write>,
             None => Box::new(std::io::stdout()) as Box<Write>,
         };
-        let cartridge = if let Some(cartridge) = load_cartridge(matches) { cartridge } else { return };
+        let cartridge = if let Some((cartridge, _)) = load_cartridge(matches) { cartridge } else { return };
         cpu::disassembler::disassemble(cartridge.cpu_bus, 0x8000, &mut out).unwrap();
     } else if let Some(matches) = matches.subcommand_matches("run") {
         let window: PistonWindow = WindowSettings::new(
             "nes",
             [293, 240],
         )
-            .exit_on_esc(true)
             .build()
             .unwrap();
         let mut window = window.ups(60).ups_reset(0);
 
-        let mut cartridge = if let Some(cartridge) = load_cartridge(matches) { cartridge } else { return };
+        let mut cartridge;
+        let save_path;
+        if let Some((c, s)) = load_cartridge(matches) {
+            cartridge = c;
+            save_path = s;
+        } else {
+            return
+        }
 
         let instrument_cpu = matches.is_present("instrument_cpu");
         let instrument_ppu = matches.is_present("instrument_ppu");
@@ -84,12 +90,18 @@ pub fn run(matches: clap::ArgMatches) {
 
             if let Some(_c) = e.close_args() {
                 cpu.close();
+                let mut save: Vec<u8> = Vec::new();
+                cpu.save_to_battery(&mut save).unwrap();
+                if save.len() > 0 {
+                    File::create(save_path.as_path()).unwrap().write(save.as_slice()).unwrap();
+                }
             }
         }
     }
 }
 
-fn load_cartridge(matches: &ArgMatches) -> Option<Cartridge> {
+fn load_cartridge(matches: &ArgMatches) -> Option<(Cartridge, PathBuf)> {
+    let mut save_path: PathBuf;
     let cartridge: cartridge::Cartridge = loop {
         let input_file = match matches.value_of("INPUT") {
             Some(i) => Some(PathBuf::from(i)),
@@ -102,7 +114,12 @@ fn load_cartridge(matches: &ArgMatches) -> Option<Cartridge> {
             }
         };
         if let Some(input_file) = input_file {
-            match cartridge::read(File::open(input_file).as_mut().unwrap()) {
+            save_path = PathBuf::from(".").join(input_file.file_name().unwrap()).with_extension("sav");
+            match cartridge::read(File::open(input_file).as_mut().unwrap(),
+                                  match File::open(save_path.as_path()) {
+                                      Ok(ref mut file) => Some(file),
+                                      Err(_) => None,
+                                  }) {
                 Ok(c) => break c,
                 Err(e) => if matches.is_present("INPUT") {
                     panic!(e);
@@ -112,5 +129,5 @@ fn load_cartridge(matches: &ArgMatches) -> Option<Cartridge> {
             return None;
         }
     };
-    Some(cartridge)
+    Some((cartridge, save_path))
 }

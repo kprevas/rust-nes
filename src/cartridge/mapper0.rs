@@ -4,6 +4,8 @@ use cartridge::Header;
 use cartridge::NametableMirroring;
 use cartridge::NametableMirroring::*;
 use std::cmp::max;
+use std::io::prelude::*;
+use std::io::Result;
 
 struct Mapper0Cpu {
     prg_rom: Vec<u8>,
@@ -25,7 +27,7 @@ pub fn read(header: &Header, prg_rom: &[u8], chr_rom: &[u8]) -> Cartridge {
         }),
         ppu_bus: Box::new(Mapper0Ppu {
             chr_rom: if uses_chr_ram { vec!(0; 0x2000) } else { chr_rom.to_vec() },
-            mirroring: if header.flags_6 & 0x1 == 1 { Vertical } else { Horizontal },
+            mirroring: header.mirroring,
             uses_chr_ram,
         }),
     }
@@ -55,6 +57,14 @@ impl CartridgeBus for Mapper0Cpu {
 
     fn mirror_nametable(&self, address: u16) -> u16 {
         address
+    }
+
+    fn save_to_battery(&self, _out: &mut Write) -> Result<usize> {
+        Ok(0)
+    }
+
+    fn load_from_battery(&mut self, _inp: &mut Read) -> Result<usize> {
+        unimplemented!();
     }
 }
 
@@ -91,5 +101,13 @@ impl CartridgeBus for Mapper0Ppu {
             0x2C00 ... 0x2FFF => address - 0x2800,
             _ => panic!("Bad nametable mirror request {:04X}", address),
         }
+    }
+
+    fn save_to_battery(&self, _out: &mut Write) -> Result<usize> {
+        unimplemented!();
+    }
+
+    fn load_from_battery(&mut self, _inp: &mut Read) -> Result<usize> {
+        unimplemented!();
     }
 }

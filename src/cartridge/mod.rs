@@ -1,10 +1,13 @@
 use simple_error::*;
+use std::error::Error;
 use std::io::prelude::*;
+use std::io::Result;
 
 mod mapper0;
 mod mapper1;
 mod mapper3;
 
+#[derive(Debug, Copy, Clone)]
 enum NametableMirroring {
     Vertical,
     Horizontal,
@@ -27,6 +30,8 @@ pub trait CartridgeBus {
     fn read_memory(&self, address: u16, open_bus: u8) -> u8;
     fn write_memory(&mut self, address: u16, value: u8);
     fn mirror_nametable(&self, address: u16) -> u16;
+    fn save_to_battery(&self, out: &mut Write) -> Result<usize>;
+    fn load_from_battery(&mut self, inp: &mut Read) -> Result<usize>;
 }
 
 #[derive(Debug)]
@@ -38,9 +43,12 @@ pub struct Header {
     flags_7: u8,
     _flags_9: u8,
     _flags_10: u8,
+
+    mirroring: NametableMirroring,
+    battery_save: bool,
 }
 
-pub fn read(src: &mut Read) -> SimpleResult<Cartridge> {
+pub fn read(src: &mut Read, save_data: Option<&mut Read>) -> SimpleResult<Cartridge> {
     let mut contents = Vec::new();
     src.read_to_end(&mut contents).expect("error reading source");
     if contents[0..4] != [0x4E, 0x45, 0x53, 0x1A] {
@@ -54,6 +62,8 @@ pub fn read(src: &mut Read) -> SimpleResult<Cartridge> {
         flags_7: contents[7],
         _flags_9: contents[9],
         _flags_10: contents[10],
+        mirroring: if contents[6] & 0b1 > 0 { NametableMirroring::Vertical } else { NametableMirroring::Horizontal },
+        battery_save: contents[6] & 0b10 > 0,
     };
     info!(target: "cartridge", "header: {:?}", header);
     assert_eq!([0, 0, 0, 0, 0], contents[11..16]);
@@ -66,10 +76,20 @@ pub fn read(src: &mut Read) -> SimpleResult<Cartridge> {
     let mapper = (header.flags_6 >> 4) + (header.flags_7 & 0b11110000);
     info!(target: "cartridge", "Using mapper {}", mapper);
 
-    match mapper {
+    let mut cartridge = match mapper {
         0 => Ok(mapper0::read(&header, prg_rom, chr_rom)),
         1 => Ok(mapper1::read(&header, prg_rom, chr_rom)),
         3 => Ok(mapper3::read(&header, prg_rom, chr_rom)),
         _ => unimplemented!()
+    };
+
+    if let Ok(ref mut cartridge) = cartridge {
+        if let Some(save_data) = save_data {
+            let bytes = cartridge.cpu_bus.load_from_battery(save_data)
+                .map_err(|io_error| SimpleError::new(io_error.description()))?;
+            info!(target: "cartridge", "{} bytes loaded", bytes);
+        }
     }
+
+    cartridge
 }
