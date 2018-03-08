@@ -28,13 +28,14 @@ struct CtrlRegisters {
     chr_bank_low: usize,
     chr_bank_hi: usize,
     prg_bank: usize,
+    prg_ram_enabled: bool,
     shift_reg: u8,
     shift_reg_written: u8,
 }
 
 impl CtrlRegisters {
     fn write(&mut self, address: u16, value: u8) {
-        if value & 0xF0 > 0 {
+        if value & 0x80 > 0 {
             let new_val = self.read_ctrl() | 0xC;
             self.write_ctrl(new_val);
             self.shift_reg_written = 0;
@@ -48,7 +49,10 @@ impl CtrlRegisters {
                     0x8000 ... 0x9FFF => self.write_ctrl(value),
                     0xA000 ... 0xBFFF => self.chr_bank_low = value as usize,
                     0xC000 ... 0xDFFF => self.chr_bank_hi = value as usize,
-                    0xE000 ... 0xFFFF => self.prg_bank = value as usize,
+                    0xE000 ... 0xFFFF => {
+                        self.prg_ram_enabled = value & 0b10000 == 0;
+                        self.prg_bank = (value & 0b1111) as usize;
+                    },
                     _ => unreachable!(),
                 }
                 self.shift_reg_written = 0;
@@ -138,9 +142,9 @@ impl CtrlRegisters {
 struct Mapper1Cpu {
     prg_rom: Vec<u8>,
     prg_ram: Vec<u8>,
-    prg_ram_enabled: bool,
     ctrl: Rc<RefCell<CtrlRegisters>>,
     battery_save: bool,
+    last_write_cycle: u64,
 }
 
 struct Mapper1Ppu {
@@ -159,15 +163,16 @@ pub fn read(header: &Header, prg_rom: &[u8], chr_rom: &[u8]) -> Cartridge {
         chr_bank_low: 0,
         chr_bank_hi: 0,
         prg_bank: 0,
+        prg_ram_enabled: true,
         shift_reg: 0,
         shift_reg_written: 0,
     }));
     let cpu_bus = Box::new(Mapper1Cpu {
         prg_rom: prg_rom.to_vec(),
         prg_ram: vec![0; (u16::from(max(header.prg_ram_blocks, 1)) * 0x2000) as usize],
-        prg_ram_enabled: true,
         ctrl: Rc::clone(&ctrl_register),
         battery_save: header.battery_save,
+        last_write_cycle: 0,
     });
     Cartridge {
         cpu_bus,
@@ -190,17 +195,22 @@ impl CartridgeBus for Mapper1Cpu {
         }
     }
 
-    fn write_memory(&mut self, address: u16, value: u8) {
+    fn write_memory(&mut self, address: u16, value: u8, cpu_cycle: u64) {
         let mut ctrl = self.ctrl.borrow_mut();
         match address {
             0x6000 ... 0x7FFF => {
-                if self.prg_ram_enabled {
+                if ctrl.prg_ram_enabled {
                     self.prg_ram[(address - 0x6000) as usize] = value;
                 }
             }
-            0x8000 ... 0xFFFF => ctrl.write(address, value),
+            0x8000 ... 0xFFFF => {
+                if cpu_cycle - self.last_write_cycle > 2 {
+                    ctrl.write(address, value);
+                }
+            },
             _ => (),
         }
+        self.last_write_cycle = cpu_cycle;
     }
 
     fn mirror_nametable(&self, address: u16) -> u16 {
@@ -235,7 +245,7 @@ impl CartridgeBus for Mapper1Ppu {
         }
     }
 
-    fn write_memory(&mut self, address: u16, value: u8) {
+    fn write_memory(&mut self, address: u16, value: u8, _cpu_cycle: u64) {
         let ctrl = self.ctrl.borrow();
         if self.uses_chr_ram {
             match address {

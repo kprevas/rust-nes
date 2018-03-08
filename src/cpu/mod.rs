@@ -236,7 +236,7 @@ impl<'a> Cpu<'a> {
             0x4000 ... 0x4013 | 0x4015 | 0x4017 => self.apu_bus.borrow_mut().write(address, value),
             0x4016 => self.controller_strobe = value & 1 > 0,
             0x4018 ... 0x401F => (),
-            _ => self.cartridge.write_memory(address, value),
+            _ => self.cartridge.write_memory(address, value, self.cycle_count),
         }
     }
 

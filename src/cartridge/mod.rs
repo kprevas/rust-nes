@@ -28,7 +28,7 @@ pub struct Cartridge {
 
 pub trait CartridgeBus {
     fn read_memory(&self, address: u16, open_bus: u8) -> u8;
-    fn write_memory(&mut self, address: u16, value: u8);
+    fn write_memory(&mut self, address: u16, value: u8, cpu_cycle: u64);
     fn mirror_nametable(&self, address: u16) -> u16;
     fn save_to_battery(&self, out: &mut Write) -> Result<usize>;
     fn load_from_battery(&mut self, inp: &mut Read) -> Result<usize>;

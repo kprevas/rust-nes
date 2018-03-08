@@ -48,7 +48,7 @@ impl CartridgeBus for Mapper3Cpu {
         }
     }
 
-    fn write_memory(&mut self, address: u16, value: u8) {
+    fn write_memory(&mut self, address: u16, value: u8, _cpu_cycle: u64) {
         match address {
             0x8000 ... 0xFFFF => {
                 self.chr_bank.replace((value & 0x3) as usize);
@@ -78,7 +78,7 @@ impl CartridgeBus for Mapper3Ppu {
         }
     }
 
-    fn write_memory(&mut self, _address: u16, _value: u8) {}
+    fn write_memory(&mut self, _address: u16, _value: u8, _cpu_cycle: u64) {}
 
     fn mirror_nametable(&self, address: u16) -> u16 {
         match address {

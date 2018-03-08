@@ -190,7 +190,7 @@ impl<'a> Ppu<'a> {
 
     fn write_memory(&mut self, address: u16, value: u8) {
         match address {
-            0x0000 ... 0x1FFF => self.cartridge.write_memory(address, value),
+            0x0000 ... 0x1FFF => self.cartridge.write_memory(address, value, 0),
             0x2000 ... 0x2FFF => self.internal_ram[self.cartridge.mirror_nametable(address) as usize] = value,
             0x3000 ... 0x3EFF => self.internal_ram[(self.cartridge.mirror_nametable(address - 0x1000)) as usize] = value,
             0x3F00 ... 0x3FFF => {

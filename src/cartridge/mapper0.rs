@@ -48,7 +48,7 @@ impl CartridgeBus for Mapper0Cpu {
         }
     }
 
-    fn write_memory(&mut self, address: u16, value: u8) {
+    fn write_memory(&mut self, address: u16, value: u8, _cpu_cycle: u64) {
         match address {
             0x6000 ... 0x7FFF => self.prg_ram[(address - 0x6000) as usize] = value,
             _ => (),
@@ -76,7 +76,7 @@ impl CartridgeBus for Mapper0Ppu {
         }
     }
 
-    fn write_memory(&mut self, address: u16, value: u8) {
+    fn write_memory(&mut self, address: u16, value: u8, _cpu_cycle: u64) {
         if self.uses_chr_ram {
             match address {
                 0x0000 ... 0x1FFF => self.chr_rom[address as usize] = value,
