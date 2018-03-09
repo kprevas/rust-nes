@@ -71,6 +71,10 @@ pub fn run(matches: clap::ArgMatches) {
         let factory = window.factory.clone();
         let mut glyphs = Glyphs::new(font, factory, TextureSettings::new()).unwrap();
 
+        let mut scale = 1.0;
+        let mut x_trans = 0.0;
+        let mut y_trans = 0.0;
+
         while let Some(e) = window.next() {
             inputs.event(&e, &mut reset);
 
@@ -84,8 +88,18 @@ pub fn run(matches: clap::ArgMatches) {
 
             if let Some(_r) = e.render_args() {
                 window.draw_2d(&e, |c, gl| {
-                    cpu.render(c, gl, &mut glyphs);
+                    cpu.render(c.trans(x_trans, y_trans).scale(scale, scale), gl, &mut glyphs);
                 });
+            }
+
+            if let Some(r) = e.resize_args() {
+                let width = r[0] as f64;
+                let height = r[1] as f64;
+                let x_scale = width / 293.0;
+                let y_scale = height / 240.0;
+                scale = x_scale.min(y_scale);
+                x_trans = (width - 293.0 * scale) / 2.0;
+                y_trans = (height - 240.0 * scale) / 2.0;
             }
 
             if let Some(_c) = e.close_args() {
