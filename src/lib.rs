@@ -55,7 +55,7 @@ pub fn run(matches: clap::ArgMatches) {
         let instrument_cpu = matches.is_present("instrument_cpu");
         let instrument_ppu = matches.is_present("instrument_ppu");
 
-        let mut inputs: input::ControllerState = Default::default();
+        let mut inputs = [input::ControllerState::player_1(), input::ControllerState::player_2()];
         let mut reset = false;
 
         let ppu_bus = RefCell::new(ppu::bus::PpuBus::new());
@@ -76,14 +76,18 @@ pub fn run(matches: clap::ArgMatches) {
         let mut y_trans = 0.0;
 
         while let Some(e) = window.next() {
-            inputs.event(&e, &mut reset);
+            inputs[0].event(&e);
+            inputs[1].event(&e);
+            if let Some(Button::Keyboard(Key::R)) = e.press_args() {
+                reset = true;
+            }
 
             if let Some(u) = e.update_args() {
                 if reset {
                     reset = false;
                     cpu.reset(true);
                 }
-                cpu.do_frame(u.dt, inputs);
+                cpu.do_frame(u.dt, &inputs);
             }
 
             if let Some(_r) = e.render_args() {

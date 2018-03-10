@@ -34,7 +34,7 @@ pub struct Cpu<'a> {
     apu: Apu<'a>,
     apu_bus: &'a RefCell<ApuBus>,
     controller_strobe: bool,
-    last_inputs: u8,
+    last_inputs: [u8;2],
     ticks: f64,
     open_bus: u8,
     instrumented: bool,
@@ -77,7 +77,7 @@ impl<'a> Cpu<'a> {
             apu,
             apu_bus,
             controller_strobe: false,
-            last_inputs: Default::default(),
+            last_inputs: [0, 0],
             ticks: 0.0,
             open_bus: 0,
             instrumented,
@@ -188,13 +188,13 @@ impl<'a> Cpu<'a> {
             0x4000 ... 0x4014 => self.open_bus,
             0x4015 => self.apu_bus.borrow_mut().read_status(),
             0x4016 => {
-                let value = self.last_inputs & 1;
-                self.last_inputs >>= 1;
+                let value = self.last_inputs[0] & 1;
+                self.last_inputs[0] >>= 1;
                 value | (self.open_bus & 0xF0)
             }
             0x4017 => {
-                // TODO joypad 2
-                let value = 0;
+                let value = self.last_inputs[1] & 1;
+                self.last_inputs[1] >>= 1;
                 value | (self.open_bus & 0xF0)
             }
             0x4018 ... 0x401F => self.open_bus,
@@ -1050,9 +1050,9 @@ impl<'a> Cpu<'a> {
         self.set_flag(INTERRUPT, true);
     }
 
-    pub fn next_operation(&mut self, inputs: ControllerState) {
+    pub fn next_operation(&mut self, inputs: &[ControllerState;2]) {
         if self.controller_strobe {
-            self.last_inputs = inputs.to_u8();
+            self.last_inputs = [inputs[0].to_u8(), inputs[1].to_u8()];
         }
         if let Some((addr, i)) = self.oam_dma_write {
             let data = self.read_memory(u16::from(addr) * 0x100 + u16::from(i));
@@ -1067,7 +1067,7 @@ impl<'a> Cpu<'a> {
         }
     }
 
-    pub fn do_frame(&mut self, time_secs: f64, inputs: ControllerState) {
+    pub fn do_frame(&mut self, time_secs: f64, inputs: &[ControllerState;2]) {
         self.ticks += time_secs * CPU_TICKS_PER_SECOND;
 
         while self.ticks > 0.0 {

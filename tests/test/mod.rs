@@ -94,7 +94,7 @@ fn run_test(rom: &mut Read,
     let ppu = Ppu::new(&mut cartridge.ppu_bus, &ppu_bus, None, true);
     let apu = Apu::new(&apu_bus, None).unwrap();
     let mut cpu = Cpu::boot(&mut cartridge.cpu_bus, ppu, &ppu_bus, apu, &apu_bus, true);
-    let inputs = ControllerState::default();
+    let inputs = [ControllerState::player_1(), ControllerState::player_2()];
 
     if let Some(pc_start) = pc_start {
         cpu.setup_for_test(0x24, pc_start);
@@ -103,7 +103,7 @@ fn run_test(rom: &mut Read,
     let mut reset_delay = 0;
     let mut did_reset = false;
     while !terminate_condition(&mut cpu) {
-        cpu.next_operation(inputs);
+        cpu.next_operation(&inputs);
         if let Some((addr, running, reset)) = status {
             if reset_delay > 0 {
                 reset_delay -= 1;
