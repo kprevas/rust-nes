@@ -4,12 +4,15 @@ use piston_window::*;
 use self::bus::*;
 use std::borrow::BorrowMut;
 use std::cell::RefCell;
+use std::io::Cursor;
+use bincode::{serialize, deserialize_from};
+use bytes::*;
 
 pub mod bus;
 
 const NES_RGB: [u8; 0x600] = *include_bytes!("ntscpalette.pal");
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct Sprite {
     id: u8,
     x: u8,
@@ -578,6 +581,62 @@ impl<'a> Ppu<'a> {
             texture.update(gl.encoder, self.image_buffer.as_rgba8().unwrap()).unwrap();
             image(texture, c.transform.scale(8.0 / 7.0, 1.0), gl);
         }
+    }
+
+    pub fn save_state(&self, out: &mut Vec<u8>) {
+        out.put_u16::<BigEndian>(self.scanline);
+        out.put_u16::<BigEndian>(self.dot);
+        out.put_u16::<BigEndian>(self.vram_addr);
+        out.put_u16::<BigEndian>(self.tmp_vram_addr);
+        out.put_u8(self.fine_x_scroll);
+        out.put_u8(if self.odd_frame { 1 } else { 0 });
+        out.put_u8(if self.skip_tick { 1 } else { 0 });
+        out.put_u8(self.nametable);
+        out.put_u8(self.latch_attrtable);
+        out.put_u8(self.latch_bgd_low);
+        out.put_u8(self.latch_bgd_high);
+        out.put_u8(self.shift_attrtable_low);
+        out.put_u8(self.shift_attrtable_high);
+        out.put_u16::<BigEndian>(self.shift_bgd_low);
+        out.put_u16::<BigEndian>(self.shift_bgd_high);
+        out.put_u8(if self.attrtable_latch_low { 1 } else { 0 });
+        out.put_u8(if self.attrtable_latch_high { 1 } else { 0 });
+        out.put_u16::<BigEndian>(self.addr);
+        out.put_slice(&serialize(&self.oam).unwrap());
+        out.put_slice(&serialize(&self.sec_oam).unwrap());
+        out.put_slice(&serialize(&self.sprite_overflow_tick_delay).unwrap());
+        out.put_slice(&self.internal_ram);
+        out.put_slice(&self.palette_ram);
+        out.put_slice(&self.oam_ram);
+        self.cartridge.save_state(out);
+    }
+
+    pub fn load_state(&mut self, state: &mut Cursor<Vec<u8>>) {
+        self.scanline = state.get_u16::<BigEndian>();
+        self.dot = state.get_u16::<BigEndian>();
+        self.vram_addr = state.get_u16::<BigEndian>();
+        self.tmp_vram_addr = state.get_u16::<BigEndian>();
+        self.fine_x_scroll = state.get_u8();
+        self.odd_frame = state.get_u8() == 1;
+        self.skip_tick = state.get_u8() == 1;
+        self.nametable = state.get_u8();
+        self.latch_attrtable = state.get_u8();
+        self.latch_bgd_low = state.get_u8();
+        self.latch_bgd_high = state.get_u8();
+        self.shift_attrtable_low = state.get_u8();
+        self.shift_attrtable_high = state.get_u8();
+        self.shift_bgd_low = state.get_u16::<BigEndian>();
+        self.shift_bgd_high = state.get_u16::<BigEndian>();
+        self.attrtable_latch_low = state.get_u8() == 1;
+        self.attrtable_latch_high = state.get_u8() == 1;
+        self.addr = state.get_u16::<BigEndian>();
+        self.oam = deserialize_from(state.reader()).unwrap();
+        self.sec_oam = deserialize_from(state.reader()).unwrap();
+        self.sprite_overflow_tick_delay = deserialize_from(state.reader()).unwrap();
+        state.copy_to_slice(&mut self.internal_ram);
+        state.copy_to_slice(&mut self.palette_ram);
+        state.copy_to_slice(&mut self.oam_ram);
+        self.cartridge.load_state(state);
     }
 
     pub fn instrumentation_short(&self) -> String {

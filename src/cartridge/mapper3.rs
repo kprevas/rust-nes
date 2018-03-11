@@ -5,8 +5,9 @@ use cartridge::NametableMirroring;
 use cartridge::NametableMirroring::*;
 use std::cell::Cell;
 use std::io::prelude::*;
-use std::io::Result;
+use std::io::{Cursor, Result};
 use std::rc::Rc;
+use bytes::*;
 
 struct Mapper3Cpu {
     prg_rom: Vec<u8>,
@@ -68,6 +69,14 @@ impl CartridgeBus for Mapper3Cpu {
     fn load_from_battery(&mut self, _inp: &mut Read) -> Result<usize> {
         unimplemented!();
     }
+
+    fn save_state(&self, out: &mut Vec<u8>) {
+        out.put_u8(self.chr_bank.get() as u8);
+    }
+
+    fn load_state(&mut self, state: &mut Cursor<Vec<u8>>) {
+        self.chr_bank.replace(state.get_u8() as usize);
+    }
 }
 
 impl CartridgeBus for Mapper3Ppu {
@@ -105,4 +114,8 @@ impl CartridgeBus for Mapper3Ppu {
     fn load_from_battery(&mut self, _inp: &mut Read) -> Result<usize> {
         unimplemented!();
     }
+
+    fn save_state(&self, _out: &mut Vec<u8>) {}
+
+    fn load_state(&mut self, _state: &mut Cursor<Vec<u8>>) {}
 }

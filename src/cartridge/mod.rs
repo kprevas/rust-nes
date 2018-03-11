@@ -1,13 +1,13 @@
 use simple_error::*;
 use std::error::Error;
 use std::io::prelude::*;
-use std::io::Result;
+use std::io::{Cursor, Result};
 
 mod mapper0;
 mod mapper1;
 mod mapper3;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 enum NametableMirroring {
     Vertical,
     Horizontal,
@@ -32,6 +32,8 @@ pub trait CartridgeBus {
     fn mirror_nametable(&self, address: u16) -> u16;
     fn save_to_battery(&self, out: &mut Write) -> Result<usize>;
     fn load_from_battery(&mut self, inp: &mut Read) -> Result<usize>;
+    fn save_state(&self, out: &mut Vec<u8>);
+    fn load_state(&mut self, state: &mut Cursor<Vec<u8>>);
 }
 
 #[derive(Debug)]

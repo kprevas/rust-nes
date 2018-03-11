@@ -5,7 +5,8 @@ use cartridge::NametableMirroring;
 use cartridge::NametableMirroring::*;
 use std::cmp::max;
 use std::io::prelude::*;
-use std::io::Result;
+use std::io::{Result, Cursor};
+use bytes::*;
 
 struct Mapper0Cpu {
     prg_rom: Vec<u8>,
@@ -66,6 +67,14 @@ impl CartridgeBus for Mapper0Cpu {
     fn load_from_battery(&mut self, _inp: &mut Read) -> Result<usize> {
         unimplemented!();
     }
+
+    fn save_state(&self, out: &mut Vec<u8>) {
+        out.put_slice(&self.prg_ram);
+    }
+
+    fn load_state(&mut self, state: &mut Cursor<Vec<u8>>) {
+        state.copy_to_slice(&mut self.prg_ram);
+    }
 }
 
 impl CartridgeBus for Mapper0Ppu {
@@ -109,5 +118,17 @@ impl CartridgeBus for Mapper0Ppu {
 
     fn load_from_battery(&mut self, _inp: &mut Read) -> Result<usize> {
         unimplemented!();
+    }
+
+    fn save_state(&self, out: &mut Vec<u8>) {
+        if self.uses_chr_ram {
+            out.put_slice(&self.chr_rom);
+        }
+    }
+
+    fn load_state(&mut self, state: &mut Cursor<Vec<u8>>) {
+        if self.uses_chr_ram {
+            state.copy_to_slice(&mut self.chr_rom);
+        }
     }
 }

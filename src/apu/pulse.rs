@@ -7,6 +7,7 @@ const DUTY_CYCLES: [[bool; 8]; 4] = [
     [true, false, false, true, true, true, true, true],
 ];
 
+#[derive(Serialize, Deserialize)]
 pub struct Pulse {
     curr_timer: u16,
     curr_cycle: usize,

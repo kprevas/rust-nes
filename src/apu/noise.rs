@@ -2,6 +2,7 @@ use apu::*;
 
 pub const TIMER_VALUES: [u16; 16] = [4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068];
 
+#[derive(Serialize, Deserialize)]
 pub struct Noise {
     curr_timer: u16,
     shift_register: u16,

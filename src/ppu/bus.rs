@@ -1,3 +1,8 @@
+use std::io::Cursor;
+use bincode::{serialize, deserialize_from};
+use bytes::*;
+
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]
 pub struct Ctrl {
     pub nametable_select: Option<u8>,
     pub address_increment_vertical: bool,
@@ -22,6 +27,7 @@ impl Ctrl {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]
 pub struct Mask {
     pub grayscale: bool,
     pub show_bgd_left8: bool,
@@ -44,6 +50,7 @@ impl Mask {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]
 pub struct Status {
     pub sprite_overflow: bool,
     pub sprite_0_hit: bool,
@@ -62,6 +69,7 @@ impl Status {
 
 const DECAY_REGISTER_TTL: u32 = 1073863;
 
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]
 struct DecayRegister {
     pub masks: [u8; 8],
     pub value: u8,
@@ -111,6 +119,7 @@ impl DecayRegister {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]
 pub struct PpuBus {
     pub ctrl: Ctrl,
     pub mask: Mask,
@@ -253,5 +262,13 @@ impl PpuBus {
         self.scroll = None;
         self.addr_write = None;
         self.data_write = None;
+    }
+
+    pub fn save_state(&self, out: &mut Vec<u8>) {
+        out.put_slice(&serialize(self).unwrap());
+    }
+
+    pub fn load_state(&mut self, saved: &mut Cursor<Vec<u8>>) {
+        *self = deserialize_from(saved.reader()).unwrap();
     }
 }

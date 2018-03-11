@@ -1,3 +1,7 @@
+use bincode::{serialize, deserialize_from};
+use bytes::*;
+
+#[derive(Serialize, Deserialize)]
 pub struct SweepCtrl {
     pub enabled: bool,
     pub period: u8,
@@ -17,6 +21,7 @@ impl SweepCtrl {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct SquareCtrl {
     pub enabled: bool,
 
@@ -60,6 +65,7 @@ impl SquareCtrl {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct TriangleCtrl {
     pub enabled: bool,
 
@@ -97,6 +103,7 @@ impl TriangleCtrl {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct NoiseCtrl {
     pub enabled: bool,
 
@@ -134,6 +141,7 @@ impl NoiseCtrl {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct DmcCtrl {
     pub enabled: bool,
     pub enabled_set: bool,
@@ -166,6 +174,7 @@ impl DmcCtrl {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct ApuBus {
     pub pulse_1: SquareCtrl,
     pub pulse_2: SquareCtrl,
@@ -337,5 +346,13 @@ impl ApuBus {
 
     pub fn irq_interrupt(&self) -> bool {
         self.frame_interrupt || self.dmc_interrupt
+    }
+
+    pub fn save_state<B: BufMut>(&self, out: &mut B) {
+        out.put_slice(&serialize(self).unwrap());
+    }
+
+    pub fn load_state<B: Buf>(&mut self, saved: &mut B) {
+        *self = deserialize_from(saved.reader()).unwrap();
     }
 }

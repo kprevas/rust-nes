@@ -6,20 +6,26 @@ use cartridge::NametableMirroring::*;
 use std::cell::RefCell;
 use std::cmp::max;
 use std::io::prelude::*;
-use std::io::Result;
+use std::io::{Cursor, Result};
 use std::rc::Rc;
+use std::ops::Deref;
+use bincode::{serialize, deserialize_from};
+use bytes::*;
 
+#[derive(Serialize, Deserialize)]
 enum PrgBankMode {
     Switch32K,
     FixLowBank,
     FixHiBank,
 }
 
+#[derive(Serialize, Deserialize)]
 enum ChrBankMode {
     Switch8K,
     Switch4K,
 }
 
+#[derive(Serialize, Deserialize)]
 struct CtrlRegisters {
     mirroring: NametableMirroring,
     one_screen_mirroring_hi: bool,
@@ -233,6 +239,20 @@ impl CartridgeBus for Mapper1Cpu {
             Ok(0)
         }
     }
+
+    fn save_state(&self, out: &mut Vec<u8>) {
+        out.put_slice(&self.prg_ram);
+        out.put_slice(&serialize(&self.ctrl.borrow().deref()).unwrap());
+        out.put_u8(if self.battery_save { 1 } else { 0 });
+        out.put_u64::<BigEndian>(self.last_write_cycle);
+    }
+
+    fn load_state(&mut self, state: &mut Cursor<Vec<u8>>) {
+        state.copy_to_slice(&mut self.prg_ram);
+        self.ctrl.replace(deserialize_from(state.reader()).unwrap());
+        self.battery_save = state.get_u8() == 1;
+        self.last_write_cycle = state.get_u64::<BigEndian>();
+    }
 }
 
 impl CartridgeBus for Mapper1Ppu {
@@ -287,5 +307,17 @@ impl CartridgeBus for Mapper1Ppu {
 
     fn load_from_battery(&mut self, _inp: &mut Read) -> Result<usize> {
         unimplemented!();
+    }
+
+    fn save_state(&self, out: &mut Vec<u8>) {
+        if self.uses_chr_ram {
+            out.put_slice(&self.chr_rom);
+        }
+    }
+
+    fn load_state(&mut self, state: &mut Cursor<Vec<u8>>) {
+        if self.uses_chr_ram {
+            state.copy_to_slice(&mut self.chr_rom);
+        }
     }
 }

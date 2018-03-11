@@ -8,6 +8,11 @@ extern crate nfd;
 extern crate piston_window;
 extern crate portaudio;
 extern crate simple_error;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+extern crate bincode;
+extern crate bytes;
 
 use cartridge::Cartridge;
 use clap::ArgMatches;
@@ -24,6 +29,7 @@ pub mod cpu;
 pub mod cartridge;
 pub mod input;
 pub mod ppu;
+pub mod savestate;
 
 pub fn run(matches: clap::ArgMatches) {
     if let Some(matches) = matches.subcommand_matches("disassemble") {
@@ -75,12 +81,12 @@ pub fn run(matches: clap::ArgMatches) {
         let mut x_trans = 0.0;
         let mut y_trans = 0.0;
 
+        let mut save_states = savestate::SaveStates::new();
+
         while let Some(e) = window.next() {
             inputs[0].event(&e);
             inputs[1].event(&e);
-            if let Some(Button::Keyboard(Key::R)) = e.press_args() {
-                reset = true;
-            }
+            save_states.event(&e, &mut cpu);
 
             if let Some(u) = e.update_args() {
                 if reset {

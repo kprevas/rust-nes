@@ -1,5 +1,6 @@
 use apu::*;
 
+#[derive(Serialize, Deserialize)]
 pub struct Triangle {
     linear_counter: u8,
     timer_tick: u16,

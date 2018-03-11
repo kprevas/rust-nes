@@ -11,8 +11,10 @@ use self::opcodes::Opcode;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::io::prelude::*;
-use std::io::Result;
+use std::io::{Cursor, Result};
 use std::ops::Range;
+use bincode::{serialize, deserialize_from};
+use bytes::*;
 
 mod opcodes;
 pub mod disassembler;
@@ -1113,6 +1115,58 @@ impl<'a> Cpu<'a> {
             info!(target: "cartridge", "no save data written");
         }
         result
+    }
+
+    pub fn save_state(&self, out: &mut Vec<u8>) {
+        out.put_u8(self.a);
+        out.put_u8(self.x);
+        out.put_u8(self.y);
+        out.put_u8(self.p);
+        out.put_u8(self.sp);
+        out.put_u16::<BigEndian>(self.pc);
+        out.put_slice(&serialize(&self.oam_dma_write).unwrap());
+        out.put_slice(&self.internal_ram);
+        out.put_u8(if self.controller_strobe { 1 } else { 0 });
+        out.put_u8(self.last_inputs[0]);
+        out.put_u8(self.last_inputs[1]);
+        out.put_f64::<BigEndian>(self.ticks);
+        out.put_u8(self.open_bus);
+        out.put_slice(&serialize(&self.delayed_irq_flag).unwrap());
+        out.put_u8(if self.irq { 1 } else { 0 });
+        out.put_u8(if self.prev_irq { 1 } else { 0 });
+        out.put_u8(self.dmc_delay);
+        out.put_u64::<BigEndian>(self.cycle_count);
+        self.cartridge.save_state(out);
+        self.ppu.save_state(out);
+        self.ppu_bus.borrow().save_state(out);
+        self.apu.save_state(out);
+        self.apu_bus.borrow().save_state(out);
+    }
+
+    pub fn load_state(&mut self, state: &mut Cursor<Vec<u8>>) {
+        self.a = state.get_u8();
+        self.x = state.get_u8();
+        self.y = state.get_u8();
+        self.p = state.get_u8();
+        self.sp = state.get_u8();
+        self.pc = state.get_u16::<BigEndian>();
+        self.oam_dma_write = deserialize_from(state.reader()).unwrap();
+        state.copy_to_slice(&mut self.internal_ram);
+        self.controller_strobe = state.get_u8() == 1;
+        self.last_inputs[0] = state.get_u8();
+        self.last_inputs[1] = state.get_u8();
+        self.ticks = state.get_f64::<BigEndian>();
+        self.open_bus = state.get_u8();
+        self.delayed_irq_flag = deserialize_from(state.reader()).unwrap();
+        self.irq = state.get_u8() == 1;
+        self.prev_irq = state.get_u8() == 1;
+        self.dmc_delay = state.get_u8();
+        self.cycle_count = state.get_u64::<BigEndian>();
+        self.cartridge.load_state(state);
+        self.ppu.load_state(state);
+        self.ppu_bus.borrow_mut().load_state(state);
+        self.apu.load_state(state);
+        self.apu_bus.borrow_mut().load_state(state);
     }
 
     pub fn setup_for_test(&mut self, p_start: u8, pc_start: u16) {

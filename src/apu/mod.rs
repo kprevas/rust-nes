@@ -12,6 +12,9 @@ use self::pulse::*;
 use self::rb::{Producer, RB, RbConsumer, RbInspector, RbProducer, SpscRb};
 use self::triangle::*;
 use std::cell::RefCell;
+use std::io::Cursor;
+use bincode::{serialize, deserialize_from};
+use bytes::*;
 
 pub mod bus;
 mod pulse;
@@ -188,6 +191,26 @@ impl<'a> Apu<'a> {
         if let Some(ref mut stream) = self.stream {
             stream.abort().unwrap();
         }
+    }
+
+    pub fn save_state(&self, out: &mut Vec<u8>) {
+        out.put_slice(&serialize(&self.pulse_1).unwrap());
+        out.put_slice(&serialize(&self.pulse_2).unwrap());
+        out.put_slice(&serialize(&self.triangle).unwrap());
+        out.put_slice(&serialize(&self.noise).unwrap());
+        out.put_slice(&serialize(&self.dmc).unwrap());
+        out.put_i32::<BigEndian>(self.frame_counter);
+        out.put_u8(if self.apu_tick { 1 } else { 0 });
+    }
+
+    pub fn load_state(&mut self, state: &mut Cursor<Vec<u8>>) {
+        self.pulse_1 = deserialize_from(state.reader()).unwrap();
+        self.pulse_2 = deserialize_from(state.reader()).unwrap();
+        self.triangle = deserialize_from(state.reader()).unwrap();
+        self.noise = deserialize_from(state.reader()).unwrap();
+        self.dmc = deserialize_from(state.reader()).unwrap();
+        self.frame_counter = state.get_i32::<BigEndian>();
+        self.apu_tick = state.get_u8() == 1;
     }
 
     pub fn instrumentation_short(&self) -> String {
