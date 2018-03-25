@@ -22,7 +22,8 @@ impl ControllerState {
         ControllerState::new([Key::G, Key::F, Key::CapsLock, Key::Tab, Key::W, Key::S, Key::A, Key::D])
     }
 
-    pub fn event(&mut self, event: &Event) {
+    pub fn event(&mut self, event: &Event) -> bool {
+        let prev_state = self.state;
         if let Some(Button::Keyboard(key_pressed)) = event.press_args() {
             for (i, key) in self.keys.iter().enumerate() {
                 if *key == key_pressed {
@@ -38,9 +39,14 @@ impl ControllerState {
                 }
             }
         }
+        self.state != prev_state
     }
 
     pub fn to_u8(&self) -> u8 {
         self.state
+    }
+
+    pub fn set_from_u8(&mut self, value: u8) {
+        self.state = value;
     }
 }

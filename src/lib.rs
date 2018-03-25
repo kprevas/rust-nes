@@ -29,7 +29,8 @@ pub mod cpu;
 pub mod cartridge;
 pub mod input;
 pub mod ppu;
-pub mod savestate;
+pub mod control;
+pub mod record;
 
 pub fn run(matches: clap::ArgMatches) {
     if let Some(matches) = matches.subcommand_matches("disassemble") {
@@ -64,6 +65,10 @@ pub fn run(matches: clap::ArgMatches) {
         let mut inputs = [input::ControllerState::player_1(), input::ControllerState::player_2()];
         let mut reset = false;
 
+        let mut frame_count = 0u32;
+        let record_path = save_path.with_extension("rcd");
+        let mut recorder = record::Recorder::new(&record_path);
+
         let ppu_bus = RefCell::new(ppu::bus::PpuBus::new());
         let apu_bus = RefCell::new(apu::bus::ApuBus::new());
 
@@ -81,24 +86,33 @@ pub fn run(matches: clap::ArgMatches) {
         let mut x_trans = 0.0;
         let mut y_trans = 0.0;
 
-        let mut save_states = savestate::SaveStates::new();
+        let mut control = control::Control::new();
+
+        let mut input_changed = false;
 
         while let Some(e) = window.next() {
-            inputs[0].event(&e);
-            inputs[1].event(&e);
-            save_states.event(&e, &mut cpu);
+            input_changed |= inputs[0].event(&e);
+            input_changed |= inputs[1].event(&e);
+            control.event(&e, &mut cpu, &mut reset, &mut recorder, frame_count);
 
             if let Some(u) = e.update_args() {
                 if reset {
                     reset = false;
                     cpu.reset(true);
                 }
+                if input_changed {
+                    recorder.input_changed(&inputs, frame_count);
+                    input_changed = false;
+                }
+                recorder.set_frame_inputs(&mut inputs, frame_count);
                 cpu.do_frame(u.dt, &inputs);
+                frame_count += 1;
             }
 
             if let Some(_r) = e.render_args() {
                 window.draw_2d(&e, |c, gl| {
                     cpu.render(c.trans(x_trans, y_trans).scale(scale, scale), gl, &mut glyphs);
+                    recorder.render_overlay(c, gl);
                 });
             }
 
@@ -111,16 +125,15 @@ pub fn run(matches: clap::ArgMatches) {
                 x_trans = (width - 293.0 * scale) / 2.0;
                 y_trans = (height - 240.0 * scale) / 2.0;
             }
-
-            if let Some(_c) = e.close_args() {
-                cpu.close();
-                let mut save: Vec<u8> = Vec::new();
-                cpu.save_to_battery(&mut save).unwrap();
-                if save.len() > 0 {
-                    File::create(save_path.as_path()).unwrap().write(save.as_slice()).unwrap();
-                }
-            }
         }
+
+        cpu.close();
+        let mut save: Vec<u8> = Vec::new();
+        cpu.save_to_battery(&mut save).unwrap();
+        if save.len() > 0 {
+            File::create(save_path.as_path()).unwrap().write(save.as_slice()).unwrap();
+        }
+        recorder.stop();
     }
 }
 
