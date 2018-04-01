@@ -26,7 +26,13 @@ impl Control {
         }
     }
 
-    pub fn event(&mut self, event: &Event, cpu: &mut super::cpu::Cpu, reset: &mut bool, recorder: &mut Recorder, frame_count: u32) {
+    pub fn event(&mut self,
+                 event: &Event,
+                 cpu: &mut super::cpu::Cpu,
+                 reset: &mut bool,
+                 input_overlay: &mut bool,
+                 recorder: &mut Recorder,
+                 frame_count: u32) {
         if let Some(Button::Keyboard(key_pressed)) = event.press_args() {
             self.process_modifier_keys(key_pressed, true);
             for (i, key) in SAVE_KEYS.iter().enumerate() {
@@ -51,6 +57,9 @@ impl Control {
             }
             if key_pressed == Key::P && (self.left_ctrl_state || self.right_ctrl_state) {
                 recorder.toggle_playback(frame_count);
+            }
+            if key_pressed == Key::I && (self.left_ctrl_state || self.right_ctrl_state) {
+                *input_overlay = !*input_overlay;
             }
         }
 

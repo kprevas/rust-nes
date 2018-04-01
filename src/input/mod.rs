@@ -99,4 +99,11 @@ impl ControllerState {
             self.inputs[i] = buttons[i];
         }
     }
+
+    pub fn render_overlay(&self, c: Context, gl: &mut G2d, glyphs: &mut Glyphs) {
+        const INPUT_STRS: [&str;8] = ["A ", "B ", "s ", "S ", "^ ", "v ", "< ", "> "];
+        let value = (0..8).map(|i| { if self.state & (1 << i) > 0 { INPUT_STRS[i] } else { "  " } }).collect::<String>();
+        text([0.0, 0.0, 0.0, 1.0], 8, &value, glyphs, c.trans(1.0, 1.0).transform, gl).unwrap();
+        text([1.0, 1.0, 0.5, 1.0], 8, &value, glyphs, c.transform, gl).unwrap();
+    }
 }

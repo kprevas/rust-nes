@@ -66,6 +66,7 @@ pub fn run(matches: clap::ArgMatches) {
 
         let mut inputs = [input::ControllerState::player_1(), input::ControllerState::player_2()];
         let mut reset = false;
+        let mut input_overlay = false;
 
         let mut frame_count = 0u32;
         let record_path = save_path.with_extension("rcd");
@@ -93,13 +94,19 @@ pub fn run(matches: clap::ArgMatches) {
         let mut input_changed = false;
 
         let mut menu = menu::Menu::new(&inputs);
+        menu.update_controls(&mut inputs);
 
         while let Some(e) = window.next() {
             let menu_handled = menu.event(&e);
             if !menu_handled {
                 input_changed |= inputs[0].event(&e);
                 input_changed |= inputs[1].event(&e);
-                control.event(&e, &mut cpu, &mut reset, &mut recorder, frame_count);
+                control.event(&e,
+                              &mut cpu,
+                              &mut reset,
+                              &mut input_overlay,
+                              &mut recorder,
+                              frame_count);
             } else {
                 menu.update_controls(&mut inputs);
             }
@@ -123,6 +130,10 @@ pub fn run(matches: clap::ArgMatches) {
                     let trans = c.trans(x_trans, y_trans).scale(scale, scale);
                     cpu.render(trans, gl, &mut glyphs);
                     recorder.render_overlay(c, gl);
+                    if input_overlay {
+                        inputs[0].render_overlay(trans.trans(10.0, 230.0), gl, &mut glyphs);
+                        inputs[1].render_overlay(trans.trans(170.0, 230.0), gl, &mut glyphs);
+                    }
                     menu.render(trans, gl, &mut glyphs);
                 });
             }
