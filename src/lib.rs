@@ -32,6 +32,7 @@ pub mod input;
 pub mod ppu;
 pub mod control;
 pub mod record;
+pub mod menu;
 
 pub fn run(matches: clap::ArgMatches) {
     if let Some(matches) = matches.subcommand_matches("disassemble") {
@@ -91,10 +92,17 @@ pub fn run(matches: clap::ArgMatches) {
 
         let mut input_changed = false;
 
+        let mut menu = menu::Menu::new(&inputs);
+
         while let Some(e) = window.next() {
-            input_changed |= inputs[0].event(&e);
-            input_changed |= inputs[1].event(&e);
-            control.event(&e, &mut cpu, &mut reset, &mut recorder, frame_count);
+            let menu_handled = menu.event(&e);
+            if !menu_handled {
+                input_changed |= inputs[0].event(&e);
+                input_changed |= inputs[1].event(&e);
+                control.event(&e, &mut cpu, &mut reset, &mut recorder, frame_count);
+            } else {
+                menu.update_controls(&mut inputs);
+            }
 
             if let Some(u) = e.update_args() {
                 if reset {
@@ -112,8 +120,10 @@ pub fn run(matches: clap::ArgMatches) {
 
             if let Some(_r) = e.render_args() {
                 window.draw_2d(&e, |c, gl| {
-                    cpu.render(c.trans(x_trans, y_trans).scale(scale, scale), gl, &mut glyphs);
+                    let trans = c.trans(x_trans, y_trans).scale(scale, scale);
+                    cpu.render(trans, gl, &mut glyphs);
                     recorder.render_overlay(c, gl);
+                    menu.render(trans, gl, &mut glyphs);
                 });
             }
 
@@ -135,6 +145,7 @@ pub fn run(matches: clap::ArgMatches) {
             File::create(save_path.as_path()).unwrap().write(save.as_slice()).unwrap();
         }
         recorder.stop();
+        menu.save_settings();
     }
 }
 

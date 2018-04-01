@@ -67,4 +67,14 @@ impl ControllerState {
     pub fn set_from_u8(&mut self, value: u8) {
         self.state = value;
     }
+
+    pub fn buttons(&self) -> [Button; 8] {
+        self.buttons.clone()
+    }
+
+    pub fn set_buttons(&mut self, buttons: &[Button]) {
+        for i in 0..8 {
+            self.buttons[i] = buttons[i];
+        }
+    }
 }
