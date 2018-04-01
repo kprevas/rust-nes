@@ -1,4 +1,5 @@
 extern crate env_logger;
+extern crate piston_window;
 
 use nes::apu::*;
 use nes::apu::bus::*;
@@ -7,6 +8,7 @@ use nes::cpu::*;
 use nes::input::ControllerState;
 use nes::ppu::*;
 use nes::ppu::bus::*;
+use self::piston_window::*;
 use std::cell::RefCell;
 use std::io::Read;
 
@@ -91,7 +93,7 @@ fn run_test(rom: &mut Read,
     let ppu_bus = RefCell::new(PpuBus::new());
     let apu_bus = RefCell::new(ApuBus::new());
     let mut cartridge = cartridge::read(rom, None).unwrap();
-    let ppu = Ppu::new(&mut cartridge.ppu_bus, &ppu_bus, None, true);
+    let ppu = Ppu::new::<NoWindow>(&mut cartridge.ppu_bus, &ppu_bus, None, true);
     let apu = Apu::new(&apu_bus, None).unwrap();
     let mut cpu = Cpu::boot(&mut cartridge.cpu_bus, ppu, &ppu_bus, apu, &apu_bus, true);
     let inputs = [ControllerState::player_1(), ControllerState::player_2()];
