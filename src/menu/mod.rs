@@ -1,6 +1,7 @@
 extern crate bincode;
 
-use input::ControllerState;
+use input::{ControllerState, Input};
+use input::Input::*;
 use piston_window::*;
 use piston_window::Button::*;
 use std::fs::File;
@@ -19,7 +20,7 @@ const CONTROLS: [(&str, usize); 8] = [
 
 pub struct Menu {
     showing: bool,
-    buttons: [[Button; 8]; 2],
+    buttons: [[Input; 8]; 2],
     current_index: usize,
     awaiting_input: bool,
 }
@@ -50,7 +51,7 @@ impl Menu {
     pub fn event(&mut self, event: &Event) -> bool {
         if self.awaiting_input {
             if let Some(button) = event.release_args() {
-                self.buttons[self.current_index / 8][CONTROLS[self.current_index % 8].1] = button;
+                self.buttons[self.current_index / 8][CONTROLS[self.current_index % 8].1] = Button(button);
                 self.awaiting_input = false;
             }
         } else {
@@ -74,11 +75,11 @@ impl Menu {
     }
 
     fn render_controls_menu(&self, header_text: &str, start_index: usize,
-                            buttons: [Button; 8],
+                            buttons: [Input; 8],
                             c: Context, gl: &mut G2d, glyphs: &mut Glyphs) {
         self.render_header(header_text, c, gl, glyphs);
         for (menu_index, &(name, array_index)) in CONTROLS.iter().enumerate() {
-            self.render_item(name, &button_to_string(buttons[array_index]),
+            self.render_item(name, &input_to_string(buttons[array_index]),
                              self.current_index == start_index + menu_index,
                              c.trans(0.0, 12.0 * (1.0 + menu_index as f64)),
                              gl, glyphs,
@@ -104,10 +105,11 @@ impl Menu {
     }
 }
 
-fn button_to_string(button: Button) -> String {
-    match button {
-        Button::Keyboard(key) => format!("{:?}", key),
-        Button::Mouse(button) => format!("Mouse {:?}", button),
-        Button::Controller(button) => format!("Joy {} button {}", button.id, button.button),
+fn input_to_string(input: Input) -> String {
+    match input {
+        Button(Keyboard(key)) => format!("{:?}", key),
+        Button(Mouse(button)) => format!("Mouse {:?}", button),
+        Button(Controller(button)) => format!("Joy {} button {}", button.id, button.button),
+        Axis(axis_args) => format!("Joy {} axis {} {}", axis_args.id, axis_args.axis, if axis_args.position < 0.0 { "-" } else { "+" }),
     }
 }
