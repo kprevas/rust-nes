@@ -1,40 +1,58 @@
 use piston_window::*;
+use piston_window::Button::*;
 
 pub struct ControllerState {
-    keys: [Key;8],
+    buttons: [Button; 8],
     state: u8,
 }
 
 impl ControllerState {
-
-    fn new(keys: [Key;8]) -> ControllerState {
+    fn new(buttons: [Button; 8]) -> ControllerState {
         ControllerState {
-            keys,
+            buttons,
             state: 0,
         }
     }
 
     pub fn player_1() -> ControllerState {
-        ControllerState::new([Key::J, Key::H, Key::Backslash, Key::Return, Key::Up, Key::Down, Key::Left, Key::Right])
+        ControllerState::new([
+            Keyboard(Key::J),
+            Keyboard(Key::H),
+            Keyboard(Key::Backslash),
+            Keyboard(Key::Return),
+            Keyboard(Key::Up),
+            Keyboard(Key::Down),
+            Keyboard(Key::Left),
+            Keyboard(Key::Right),
+        ])
     }
 
     pub fn player_2() -> ControllerState {
-        ControllerState::new([Key::G, Key::F, Key::CapsLock, Key::Tab, Key::W, Key::S, Key::A, Key::D])
+        ControllerState::new([
+            Keyboard(Key::G),
+            Keyboard(Key::F),
+            Keyboard(Key::CapsLock),
+            Keyboard(Key::Tab),
+            Keyboard(Key::W),
+            Keyboard(Key::S),
+            Keyboard(Key::A),
+            Keyboard(Key::D),
+        ])
     }
 
     pub fn event(&mut self, event: &Event) -> bool {
         let prev_state = self.state;
-        if let Some(Button::Keyboard(key_pressed)) = event.press_args() {
-            for (i, key) in self.keys.iter().enumerate() {
-                if *key == key_pressed {
+        if let Some(button_pressed) = event.press_args() {
+            for (i, button) in self.buttons.iter().enumerate() {
+                if *button == button_pressed {
                     self.state |= 1 << i;
                 }
             }
         }
 
-        if let Some(Button::Keyboard(key_released)) = event.release_args() {
-            for (i, key) in self.keys.iter().enumerate() {
-                if *key == key_released {
+        if let Some(button_released) = event.release_args() {
+            for (i, button) in self.buttons.iter().enumerate() {
+                if *button == button_released {
                     self.state &= !(1 << i);
                 }
             }

@@ -1,3 +1,5 @@
+use bincode::{deserialize_from, serialize};
+use bytes::*;
 use cartridge::CartridgeBus;
 use image::{DynamicImage, GenericImage, Rgba};
 use piston_window::*;
@@ -5,8 +7,6 @@ use self::bus::*;
 use std::borrow::BorrowMut;
 use std::cell::RefCell;
 use std::io::Cursor;
-use bincode::{serialize, deserialize_from};
-use bytes::*;
 
 pub mod bus;
 
@@ -82,7 +82,7 @@ pub struct Ppu<'a> {
 }
 
 impl<'a> Ppu<'a> {
-    pub fn new<'b>(cartridge: &'b mut Box<CartridgeBus>, bus: &'b RefCell<PpuBus>, window: Option<&mut PistonWindow>, instrumented: bool) -> Ppu<'b> {
+    pub fn new<'b, W: Window>(cartridge: &'b mut Box<CartridgeBus>, bus: &'b RefCell<PpuBus>, window: Option<&mut PistonWindow<W>>, instrumented: bool) -> Ppu<'b> {
         let image = DynamicImage::new_rgba8(256, 240);
         let texture = window.map(|window| {
             G2dTexture::from_image(window.factory.borrow_mut(), image.as_rgba8().unwrap(), &TextureSettings::new()).unwrap()

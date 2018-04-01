@@ -1,3 +1,5 @@
+extern crate bincode;
+extern crate bytes;
 extern crate clap;
 extern crate find_folder;
 extern crate hex_slice;
@@ -7,12 +9,11 @@ extern crate log;
 extern crate nfd;
 extern crate piston_window;
 extern crate portaudio;
-extern crate simple_error;
+extern crate sdl2_window;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate bincode;
-extern crate bytes;
+extern crate simple_error;
 
 use cartridge::Cartridge;
 use clap::ArgMatches;
@@ -42,7 +43,7 @@ pub fn run(matches: clap::ArgMatches) {
         let cartridge = if let Some((cartridge, _)) = load_cartridge(matches) { cartridge } else { return };
         cpu::disassembler::disassemble(cartridge.cpu_bus, 0x8000, &mut out).unwrap();
     } else if let Some(matches) = matches.subcommand_matches("run") {
-        let window: PistonWindow = WindowSettings::new(
+        let window: PistonWindow<sdl2_window::Sdl2Window> = WindowSettings::new(
             "nes",
             [293, 240],
         )
