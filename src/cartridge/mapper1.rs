@@ -1,3 +1,5 @@
+use bincode::{deserialize_from, serialize};
+use bytes::*;
 use cartridge::Cartridge;
 use cartridge::CartridgeBus;
 use cartridge::Header;
@@ -5,12 +7,10 @@ use cartridge::NametableMirroring;
 use cartridge::NametableMirroring::*;
 use std::cell::RefCell;
 use std::cmp::max;
-use std::io::prelude::*;
 use std::io::{Cursor, Result};
-use std::rc::Rc;
+use std::io::prelude::*;
 use std::ops::Deref;
-use bincode::{serialize, deserialize_from};
-use bytes::*;
+use std::rc::Rc;
 
 #[derive(Serialize, Deserialize)]
 enum PrgBankMode {
@@ -114,34 +114,34 @@ impl CtrlRegisters {
         val
     }
 
-    fn chr_low_bank(&self, addr: u16) -> usize {
-        (addr as usize) + match self.chr_bank_mode {
+    fn chr_low_bank(&self, addr: u16, max_addr: usize) -> usize {
+        ((addr as usize) + match self.chr_bank_mode {
             ChrBankMode::Switch8K => (self.chr_bank_low & (!1)) << 12,
             ChrBankMode::Switch4K => self.chr_bank_low << 12,
-        }
+        }) % max_addr
     }
 
-    fn chr_hi_bank(&self, addr: u16) -> usize {
-        (addr as usize) + match self.chr_bank_mode {
+    fn chr_hi_bank(&self, addr: u16, max_addr: usize) -> usize {
+        ((addr as usize) + match self.chr_bank_mode {
             ChrBankMode::Switch8K => (self.chr_bank_low | 1) << 12,
             ChrBankMode::Switch4K => self.chr_bank_hi << 12,
-        }
+        }) % max_addr
     }
 
-    fn prg_low_bank(&self, addr: u16) -> usize {
-        (addr as usize) + match self.prg_bank_mode {
+    fn prg_low_bank(&self, addr: u16, max_addr: usize) -> usize {
+        ((addr as usize) + match self.prg_bank_mode {
             PrgBankMode::Switch32K => (self.prg_bank & (!1)) << 14,
             PrgBankMode::FixLowBank => 0,
             PrgBankMode::FixHiBank => self.prg_bank << 14,
-        }
+        }) % max_addr
     }
 
     fn prg_hi_bank(&self, addr: u16, max_addr: usize) -> usize {
-        (addr as usize) + match self.prg_bank_mode {
+        ((addr as usize) + match self.prg_bank_mode {
             PrgBankMode::Switch32K => (self.prg_bank | 1) << 14,
             PrgBankMode::FixLowBank => self.prg_bank << 14,
             PrgBankMode::FixHiBank => max_addr - 0x4000,
-        }
+        }) % max_addr
     }
 }
 
@@ -164,7 +164,7 @@ pub fn read(header: &Header, prg_rom: &[u8], chr_rom: &[u8]) -> Cartridge {
     let ctrl_register = Rc::new(RefCell::new(CtrlRegisters {
         mirroring: SingleScreen,
         one_screen_mirroring_hi: false,
-        prg_bank_mode: self::PrgBankMode::Switch32K,
+        prg_bank_mode: self::PrgBankMode::FixHiBank,
         chr_bank_mode: self::ChrBankMode::Switch8K,
         chr_bank_low: 0,
         chr_bank_hi: 0,
@@ -195,7 +195,7 @@ impl CartridgeBus for Mapper1Cpu {
         let ctrl = self.ctrl.borrow();
         match address {
             0x6000 ... 0x7FFF => self.prg_ram[(address - 0x6000) as usize],
-            0x8000 ... 0xBFFF => self.prg_rom[ctrl.prg_low_bank(address - 0x8000)],
+            0x8000...0xBFFF => self.prg_rom[ctrl.prg_low_bank(address - 0x8000, self.prg_rom.len())],
             0xC000 ... 0xFFFF => self.prg_rom[ctrl.prg_hi_bank(address - 0xC000, self.prg_rom.len())],
             _ => open_bus,
         }
@@ -258,9 +258,10 @@ impl CartridgeBus for Mapper1Cpu {
 impl CartridgeBus for Mapper1Ppu {
     fn read_memory(&self, address: u16, open_bus: u8) -> u8 {
         let ctrl = self.ctrl.borrow();
+        let max_addr = self.chr_rom.len();
         match address {
-            0x0000 ... 0x0FFF => self.chr_rom[ctrl.chr_low_bank(address)],
-            0x1000 ... 0x1FFF => self.chr_rom[ctrl.chr_hi_bank(address - 0x1000)],
+            0x0000...0x0FFF => self.chr_rom[ctrl.chr_low_bank(address, max_addr)],
+            0x1000...0x1FFF => self.chr_rom[ctrl.chr_hi_bank(address - 0x1000, max_addr)],
             _ => open_bus,
         }
     }
@@ -268,9 +269,10 @@ impl CartridgeBus for Mapper1Ppu {
     fn write_memory(&mut self, address: u16, value: u8, _cpu_cycle: u64) {
         let ctrl = self.ctrl.borrow();
         if self.uses_chr_ram {
+            let max_addr = self.chr_rom.len();
             match address {
-                0x0000 ... 0x0FFF => self.chr_rom[ctrl.chr_low_bank(address)] = value,
-                0x1000 ... 0x1FFF => self.chr_rom[ctrl.chr_hi_bank(address - 0x1000)] = value,
+                0x0000...0x0FFF => self.chr_rom[ctrl.chr_low_bank(address, max_addr)] = value,
+                0x1000...0x1FFF => self.chr_rom[ctrl.chr_hi_bank(address - 0x1000, max_addr)] = value,
                 _ => (),
             }
         }
