@@ -57,9 +57,9 @@ impl Menu {
         } else {
             match event.release_args() {
                 Some(Keyboard(Key::Escape)) => self.showing = !self.showing,
-                Some(Keyboard(Key::Up)) => if self.current_index > 0 { self.current_index -= 1 },
-                Some(Keyboard(Key::Down)) => if self.current_index < 15 { self.current_index += 1 },
-                Some(Keyboard(Key::Return)) => self.awaiting_input = true,
+                Some(Keyboard(Key::Up)) => if self.showing && self.current_index > 0 { self.current_index -= 1 },
+                Some(Keyboard(Key::Down)) => if self.showing && self.current_index < 15 { self.current_index += 1 },
+                Some(Keyboard(Key::Return)) => if self.showing { self.awaiting_input = true },
                 _ => (),
             }
         }
