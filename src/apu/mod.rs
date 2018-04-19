@@ -3,6 +3,8 @@ extern crate rb;
 extern crate sample;
 extern crate time;
 
+use bincode::{deserialize_from, serialize};
+use bytes::*;
 use cartridge::CartridgeBus;
 use self::bus::*;
 use self::dmc::*;
@@ -13,8 +15,6 @@ use self::rb::{Producer, RB, RbConsumer, RbInspector, RbProducer, SpscRb};
 use self::triangle::*;
 use std::cell::RefCell;
 use std::io::Cursor;
-use bincode::{serialize, deserialize_from};
-use bytes::*;
 
 pub mod bus;
 mod pulse;
@@ -23,9 +23,10 @@ mod noise;
 mod dmc;
 
 const CHANNELS: i32 = 1;
-const FRAMES: u32 = 735;
 const TARGET_HZ: f64 = 44_100.0;
-const TICKS_PER_SAMPLE: usize = 20;
+const TICKS_PER_SAMPLE: f64 = 20.2922108844;
+const APPROX_TICKS_PER_FRAME: usize = 14915;
+const MAX_BUFFER_FRAMES: usize = 3;
 
 const LENGTH_TABLE: [u8; 0x20] = [
     0x0A, 0xFE, 0x14, 0x02, 0x28, 0x04, 0x50, 0x06,
@@ -58,9 +59,15 @@ impl<'a> Apu<'a> {
         let inspector = buffer;
 
         let callback = move |OutputStreamCallbackArgs { buffer, frames, .. }| {
-            let ticks_to_read = inspector.count().min(TICKS_PER_SAMPLE * frames);
-            while inspector.count() > ticks_to_read * 2 {
-                buffer_consumer.read_blocking(&mut resample_data[0..ticks_to_read]);
+            let ticks = TICKS_PER_SAMPLE * frames as f64;
+            let ticks_to_read;
+            if inspector.count() > APPROX_TICKS_PER_FRAME {
+                ticks_to_read = inspector.count().min(ticks.floor() as usize);
+            } else {
+                ticks_to_read = inspector.count().min(ticks.ceil() as usize);
+            }
+            while inspector.count() > APPROX_TICKS_PER_FRAME * MAX_BUFFER_FRAMES {
+                buffer_consumer.skip(APPROX_TICKS_PER_FRAME).unwrap();
             }
             buffer_consumer.read_blocking(&mut resample_data[0..ticks_to_read]);
             let ticks_per_sample = ((ticks_to_read as f32) / (frames as f32)).floor() as i16;
@@ -83,7 +90,10 @@ impl<'a> Apu<'a> {
             Continue
         };
         let stream = pa.map(|pa| {
-            let settings = pa.default_output_stream_settings::<f32>(CHANNELS, TARGET_HZ, FRAMES).unwrap();
+            let settings = pa.default_output_stream_settings::<f32>(
+                CHANNELS,
+                TARGET_HZ,
+                portaudio::FRAMES_PER_BUFFER_UNSPECIFIED).unwrap();
             let mut stream = pa.open_non_blocking_stream(settings, callback).unwrap();
             stream.start().unwrap();
             stream
@@ -179,7 +189,12 @@ impl<'a> Apu<'a> {
             let dmc = self.dmc.tick(&mut bus, cartridge);
             if self.stream.is_some() {
                 self.output_buffer.write_blocking(
-                    &[(pulse_1 + pulse_2) * 0.00752 + triangle * 0.00851 + noise * 0.00494 + dmc * 0.00335]);
+                    &[
+                        (pulse_1 + pulse_2) * 0.00752
+                            + triangle * 0.00851
+                            + noise * 0.00494
+                            + dmc * 0.00335
+                    ]);
             }
         }
 
