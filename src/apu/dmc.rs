@@ -103,8 +103,10 @@ impl Dmc {
             self.curr_timer -= 2;
         }
 
-        if let Some(value) = ctrl_bus.direct_load.take() {
-            self.output_level = value;
+        if ctrl_bus.enabled {
+            if let Some(value) = ctrl_bus.direct_load.take() {
+                self.output_level = value;
+            }
         }
         f32::from(self.output_level)
     }
