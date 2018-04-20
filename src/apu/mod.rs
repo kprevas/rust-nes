@@ -87,6 +87,10 @@ impl<'a> Apu<'a> {
                     ticks = 0;
                 }
             }
+            while buffer_ptr < frames {
+                buffer[buffer_ptr] = 0.0;
+                buffer_ptr += 1;
+            }
             Continue
         };
         let stream = pa.map(|pa| {
