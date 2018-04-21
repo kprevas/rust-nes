@@ -50,7 +50,10 @@ pub fn run(matches: clap::ArgMatches) {
         )
             .build()
             .unwrap();
-        let mut window = window.ups(60).ups_reset(0);
+        let mut window = window
+            .ups(60)
+            .ups_reset(0)
+            .bench_mode(matches.is_present("bench_mode"));
 
         let mut cartridge;
         let save_path;

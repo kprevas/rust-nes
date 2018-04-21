@@ -1,6 +1,6 @@
-extern crate env_logger;
 #[macro_use]
 extern crate clap;
+extern crate env_logger;
 extern crate nes;
 
 fn main() {
@@ -17,6 +17,7 @@ fn main() {
             (@arg INPUT: "the input file to use")
             (@arg instrument_cpu: -c "instruments CPU")
             (@arg instrument_ppu: -p "instruments PPU")
+            (@arg bench_mode: -b "runs in benchmark mode")
         )
     ).get_matches();
     nes::run(matches);
