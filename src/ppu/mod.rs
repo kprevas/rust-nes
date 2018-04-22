@@ -1,12 +1,18 @@
+extern crate triple_buffer;
+
 use bincode::{deserialize_from, serialize};
 use bytes::*;
 use cartridge::CartridgeBus;
 use image::{DynamicImage, GenericImage, Rgba};
 use piston_window::*;
 use self::bus::*;
+use self::triple_buffer::TripleBuffer;
 use std::borrow::BorrowMut;
 use std::cell::RefCell;
 use std::io::Cursor;
+use std::sync::*;
+use std::sync::atomic::*;
+use std::thread;
 
 pub mod bus;
 
@@ -38,9 +44,11 @@ impl Default for Sprite {
 }
 
 pub struct Ppu<'a> {
-    image: DynamicImage,
-    image_buffer: DynamicImage,
+    image_buffer: triple_buffer::Input<Box<[usize; 61440]>>,
+    image: Arc<Mutex<DynamicImage>>,
     texture: Option<G2dTexture>,
+    join_handle: Option<thread::JoinHandle<()>>,
+    closed: Arc<AtomicBool>,
 
     scanline: u16,
     dot: u16,
@@ -83,14 +91,46 @@ pub struct Ppu<'a> {
 
 impl<'a> Ppu<'a> {
     pub fn new<'b, W: Window>(cartridge: &'b mut Box<CartridgeBus>, bus: &'b RefCell<PpuBus>, window: Option<&mut PistonWindow<W>>, instrumented: bool) -> Ppu<'b> {
-        let image = DynamicImage::new_rgba8(256, 240);
+        let image = Arc::new(Mutex::new(DynamicImage::new_rgba8(256, 240)));
+        let image_clone = image.clone();
         let texture = window.map(|window| {
-            G2dTexture::from_image(window.factory.borrow_mut(), image.as_rgba8().unwrap(), &TextureSettings::new()).unwrap()
+            G2dTexture::from_image(window.factory.borrow_mut(), image.lock().unwrap().as_rgba8().unwrap(), &TextureSettings::new()).unwrap()
         });
+
+        let (image_buffer, mut image_buffer_out) = TripleBuffer::new(Box::new([0usize; 61440])).split();
+        let closed = Arc::new(AtomicBool::new(false));
+        let closed_clone = closed.clone();
+
+        let join_handle = thread::spawn(move || {
+            let mut image = DynamicImage::new_rgba8(256, 240);
+            loop {
+                image_buffer_out.raw_update();
+                if closed_clone.load(Ordering::Relaxed) {
+                    break;
+                }
+                let pixels = image_buffer_out.raw_output_buffer();
+                let mut dot = 0;
+                let mut scanline = 0;
+                for color_index in pixels.iter() {
+                    image.put_pixel(dot, scanline,
+                                    Rgba([NES_RGB[*color_index], NES_RGB[*color_index + 1], NES_RGB[*color_index + 2], 0xff]));
+                    dot += 1;
+                    if dot == 256 {
+                        dot = 0;
+                        scanline += 1;
+                    }
+                }
+                image_clone.lock().unwrap().copy_from(&image, 0, 0);
+            }
+        });
+
+
         Ppu {
             image,
-            image_buffer: DynamicImage::new_rgba8(256, 240),
+            image_buffer,
             texture,
+            join_handle: Some(join_handle),
+            closed,
             scanline: 0,
             dot: 0,
             vram_addr: 0,
@@ -173,10 +213,10 @@ impl<'a> Ppu<'a> {
 
     fn read_memory(&self, address: u16, grayscale: bool) -> u8 {
         match address {
-            0x0000 ... 0x1FFF => self.cartridge.read_memory(address, 0),
-            0x2000 ... 0x2FFF => self.internal_ram[self.cartridge.mirror_nametable(address) as usize],
-            0x3000 ... 0x3EFF => self.internal_ram[(self.cartridge.mirror_nametable(address - 0x1000)) as usize],
-            0x3F00 ... 0x3FFF => {
+            0x0000...0x1FFF => self.cartridge.read_memory(address, 0),
+            0x2000...0x2FFF => self.internal_ram[self.cartridge.mirror_nametable(address) as usize],
+            0x3000...0x3EFF => self.internal_ram[(self.cartridge.mirror_nametable(address - 0x1000)) as usize],
+            0x3F00...0x3FFF => {
                 let mut palette_address = address;
                 if palette_address & 0x13 == 0x10 {
                     palette_address &= !0x10;
@@ -193,10 +233,10 @@ impl<'a> Ppu<'a> {
 
     fn write_memory(&mut self, address: u16, value: u8) {
         match address {
-            0x0000 ... 0x1FFF => self.cartridge.write_memory(address, value, 0),
-            0x2000 ... 0x2FFF => self.internal_ram[self.cartridge.mirror_nametable(address) as usize] = value,
-            0x3000 ... 0x3EFF => self.internal_ram[(self.cartridge.mirror_nametable(address - 0x1000)) as usize] = value,
-            0x3F00 ... 0x3FFF => {
+            0x0000...0x1FFF => self.cartridge.write_memory(address, value, 0),
+            0x2000...0x2FFF => self.internal_ram[self.cartridge.mirror_nametable(address) as usize] = value,
+            0x3000...0x3EFF => self.internal_ram[(self.cartridge.mirror_nametable(address - 0x1000)) as usize] = value,
+            0x3F00...0x3FFF => {
                 let mut palette_address = address;
                 if palette_address & 0x13 == 0x10 {
                     palette_address &= !0x10;
@@ -236,9 +276,9 @@ impl<'a> Ppu<'a> {
         self.update_tmp_addr();
         self.process_data_write();
         match self.scanline {
-            0 ... 239 => self.tick_render(),
+            0...239 => self.tick_render(),
             240 => self.tick_post_render(),
-            241 ... 260 => self.tick_vblank(),
+            241...260 => self.tick_vblank(),
             261 => self.tick_prerender(),
             _ => panic!("Bad scanline {}", self.scanline)
         }
@@ -318,8 +358,7 @@ impl<'a> Ppu<'a> {
             let bus = self.bus.borrow();
             let color = self.read_memory(0x3F00 + if self.rendering() { palette } else { 0 }, bus.mask.grayscale);
             let color_index = (0xc0 * bus.mask.color_emphasis + color * 3) as usize;
-            self.image.put_pixel(u32::from(self.dot) - 2, u32::from(self.scanline),
-                                 Rgba([NES_RGB[color_index], NES_RGB[color_index + 1], NES_RGB[color_index + 2], 0xff]));
+            self.image_buffer.raw_input_buffer()[(self.dot - 2 + self.scanline * 256) as usize] = color_index;
         }
         self.adjust_shifts();
     }
@@ -523,7 +562,7 @@ impl<'a> Ppu<'a> {
             }
         }
         match self.dot {
-            1 ... 256 => {
+            1...256 => {
                 if self.dot >= 2 {
                     self.draw_pixel();
                 }
@@ -533,7 +572,7 @@ impl<'a> Ppu<'a> {
                 self.draw_pixel();
                 self.update_horizontal();
             }
-            321 ... 336 => {
+            321...336 => {
                 self.read_into_latches();
                 self.adjust_shifts();
             }
@@ -547,7 +586,7 @@ impl<'a> Ppu<'a> {
 
     fn tick_post_render(&mut self) {
         if self.dot == 0 {
-            self.image_buffer.copy_from(&self.image, 0, 0);
+            self.image_buffer.raw_publish();
         }
     }
 
@@ -577,9 +616,15 @@ impl<'a> Ppu<'a> {
 
     pub fn render(&mut self, c: Context, gl: &mut G2d, _glyphs: &mut Glyphs) {
         if let Some(ref mut texture) = self.texture {
-            texture.update(gl.encoder, self.image_buffer.as_rgba8().unwrap()).unwrap();
+            texture.update(gl.encoder, self.image.lock().unwrap().as_rgba8().unwrap()).unwrap();
             image(texture, c.transform.scale(8.0 / 7.0, 1.0), gl);
         }
+    }
+
+    pub fn close(&mut self) {
+        self.closed.store(true, Ordering::Relaxed);
+        self.image_buffer.raw_publish();
+        self.join_handle.take().unwrap().join().unwrap();
     }
 
     pub fn save_state(&self, out: &mut Vec<u8>) {

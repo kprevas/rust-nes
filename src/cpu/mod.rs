@@ -1,5 +1,7 @@
 use apu::*;
 use apu::bus::*;
+use bincode::{deserialize_from, serialize};
+use bytes::*;
 use cartridge::CartridgeBus;
 use input::ControllerState;
 use piston_window::{Context, G2d, Glyphs};
@@ -10,11 +12,9 @@ use self::opcodes::AddressingMode::*;
 use self::opcodes::Opcode;
 use std::cell::RefCell;
 use std::collections::HashSet;
-use std::io::prelude::*;
 use std::io::{Cursor, Result};
+use std::io::prelude::*;
 use std::ops::Range;
-use bincode::{serialize, deserialize_from};
-use bytes::*;
 
 mod opcodes;
 pub mod disassembler;
@@ -1105,6 +1105,7 @@ impl<'a> Cpu<'a> {
 
     pub fn close(&mut self) {
         self.apu.close();
+        self.ppu.close();
     }
 
     pub fn save_to_battery(&self, out: &mut Write) -> Result<usize> {
