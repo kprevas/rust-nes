@@ -61,6 +61,18 @@ impl Control {
             if key_pressed == Key::I && (self.left_ctrl_state || self.right_ctrl_state) {
                 *input_overlay = !*input_overlay;
             }
+            if key_pressed == Key::Equals {
+                if cpu.speed_adj < 2.5 {
+                    cpu.speed_adj += 0.25;
+                }
+                debug!(target: "ctrl", "speed adj {}", cpu.speed_adj);
+            }
+            if key_pressed == Key::Minus {
+                if cpu.speed_adj > 0.25 {
+                    cpu.speed_adj -= 0.25;
+                }
+                debug!(target: "ctrl", "speed adj {}", cpu.speed_adj);
+            }
         }
 
         if let Some(Button::Keyboard(key_released)) = event.release_args() {

@@ -46,6 +46,8 @@ pub struct Cpu<'a> {
     dmc_delay: u8,
     cycle_count: u64,
 
+    pub speed_adj: f64,
+
     memory_watches: Box<HashSet<u16>>,
     pc_watches: Box<HashSet<u16>>,
     pc_breaks: Box<HashSet<u16>>,
@@ -92,6 +94,7 @@ impl<'a> Cpu<'a> {
             prev_irq: false,
             dmc_delay: 0,
             cycle_count: 0,
+            speed_adj: 1.0,
         };
 
         cpu.reset(false);
@@ -1070,7 +1073,7 @@ impl<'a> Cpu<'a> {
     }
 
     pub fn do_frame(&mut self, time_secs: f64, inputs: &[ControllerState;2]) {
-        self.ticks += time_secs * CPU_TICKS_PER_SECOND;
+        self.ticks += time_secs * CPU_TICKS_PER_SECOND * self.speed_adj;
 
         while self.ticks > 0.0 {
             self.next_operation(inputs);
