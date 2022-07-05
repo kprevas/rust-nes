@@ -1,18 +1,21 @@
 extern crate triple_buffer;
 
-use bincode::{deserialize_from, serialize};
-use bytes::*;
-use cartridge::CartridgeBus;
-use image::{DynamicImage, GenericImage, Rgba};
-use piston_window::*;
-use self::bus::*;
-use self::triple_buffer::TripleBuffer;
 use std::borrow::BorrowMut;
 use std::cell::RefCell;
 use std::io::Cursor;
 use std::sync::*;
 use std::sync::atomic::*;
 use std::thread;
+
+use bincode::{deserialize_from, serialize};
+use bytes::*;
+use image::{DynamicImage, GenericImage, Rgba};
+use piston_window::*;
+
+use cartridge::CartridgeBus;
+
+use self::bus::*;
+use self::triple_buffer::TripleBuffer;
 
 pub mod bus;
 
@@ -82,7 +85,7 @@ pub struct Ppu<'a> {
     internal_ram: Box<[u8]>,
     palette_ram: Box<[u8]>,
     oam_ram: Box<[u8]>,
-    cartridge: &'a mut Box<CartridgeBus>,
+    cartridge: &'a mut Box<dyn CartridgeBus>,
 
     bus: &'a RefCell<PpuBus>,
 
@@ -90,7 +93,7 @@ pub struct Ppu<'a> {
 }
 
 impl<'a> Ppu<'a> {
-    pub fn new<'b, W: Window>(cartridge: &'b mut Box<CartridgeBus>, bus: &'b RefCell<PpuBus>, window: Option<&mut PistonWindow<W>>, instrumented: bool) -> Ppu<'b> {
+    pub fn new<'b, W: Window>(cartridge: &'b mut Box<dyn CartridgeBus>, bus: &'b RefCell<PpuBus>, window: Option<&mut PistonWindow<W>>, instrumented: bool) -> Ppu<'b> {
         let image = Arc::new(Mutex::new(DynamicImage::new_rgba8(256, 240)));
         let image_clone = image.clone();
         let texture = window.map(|window| {
@@ -213,10 +216,10 @@ impl<'a> Ppu<'a> {
 
     fn read_memory(&self, address: u16, grayscale: bool) -> u8 {
         match address {
-            0x0000...0x1FFF => self.cartridge.read_memory(address, 0),
-            0x2000...0x2FFF => self.internal_ram[self.cartridge.mirror_nametable(address) as usize],
-            0x3000...0x3EFF => self.internal_ram[(self.cartridge.mirror_nametable(address - 0x1000)) as usize],
-            0x3F00...0x3FFF => {
+            0x0000..=0x1FFF => self.cartridge.read_memory(address, 0),
+            0x2000..=0x2FFF => self.internal_ram[self.cartridge.mirror_nametable(address) as usize],
+            0x3000..=0x3EFF => self.internal_ram[(self.cartridge.mirror_nametable(address - 0x1000)) as usize],
+            0x3F00..=0x3FFF => {
                 let mut palette_address = address;
                 if palette_address & 0x13 == 0x10 {
                     palette_address &= !0x10;
@@ -233,10 +236,10 @@ impl<'a> Ppu<'a> {
 
     fn write_memory(&mut self, address: u16, value: u8) {
         match address {
-            0x0000...0x1FFF => self.cartridge.write_memory(address, value, 0),
-            0x2000...0x2FFF => self.internal_ram[self.cartridge.mirror_nametable(address) as usize] = value,
-            0x3000...0x3EFF => self.internal_ram[(self.cartridge.mirror_nametable(address - 0x1000)) as usize] = value,
-            0x3F00...0x3FFF => {
+            0x0000..=0x1FFF => self.cartridge.write_memory(address, value, 0),
+            0x2000..=0x2FFF => self.internal_ram[self.cartridge.mirror_nametable(address) as usize] = value,
+            0x3000..=0x3EFF => self.internal_ram[(self.cartridge.mirror_nametable(address - 0x1000)) as usize] = value,
+            0x3F00..=0x3FFF => {
                 let mut palette_address = address;
                 if palette_address & 0x13 == 0x10 {
                     palette_address &= !0x10;
@@ -276,9 +279,9 @@ impl<'a> Ppu<'a> {
         self.update_tmp_addr();
         self.process_data_write();
         match self.scanline {
-            0...239 => self.tick_render(),
+            0..=239 => self.tick_render(),
             240 => self.tick_post_render(),
-            241...260 => self.tick_vblank(),
+            241..=260 => self.tick_vblank(),
             261 => self.tick_prerender(),
             _ => panic!("Bad scanline {}", self.scanline)
         }
@@ -562,7 +565,7 @@ impl<'a> Ppu<'a> {
             }
         }
         match self.dot {
-            1...256 => {
+            1..=256 => {
                 if self.dot >= 2 {
                     self.draw_pixel();
                 }
@@ -572,7 +575,7 @@ impl<'a> Ppu<'a> {
                 self.draw_pixel();
                 self.update_horizontal();
             }
-            321...336 => {
+            321..=336 => {
                 self.read_into_latches();
                 self.adjust_shifts();
             }

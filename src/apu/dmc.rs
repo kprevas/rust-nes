@@ -27,7 +27,7 @@ impl Dmc {
         }
     }
 
-    pub fn tick(&mut self, cpu_bus: &mut ApuBus, cartridge: &Box<CartridgeBus>) -> f32 {
+    pub fn tick(&mut self, cpu_bus: &mut ApuBus, cartridge: &Box<dyn CartridgeBus>) -> f32 {
         let ctrl_bus = &mut cpu_bus.dmc;
         if ctrl_bus.enabled_set {
             ctrl_bus.enabled_set = false;

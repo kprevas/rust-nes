@@ -3,9 +3,14 @@ extern crate rb;
 extern crate sample;
 extern crate time;
 
+use std::cell::RefCell;
+use std::io::Cursor;
+
 use bincode::{deserialize_from, serialize};
 use bytes::*;
+
 use cartridge::CartridgeBus;
+
 use self::bus::*;
 use self::dmc::*;
 use self::noise::*;
@@ -13,8 +18,6 @@ use self::portaudio::*;
 use self::pulse::*;
 use self::rb::{Producer, RB, RbConsumer, RbInspector, RbProducer, SpscRb};
 use self::triangle::*;
-use std::cell::RefCell;
-use std::io::Cursor;
 
 pub mod bus;
 mod pulse;
@@ -131,7 +134,7 @@ impl<'a> Apu<'a> {
         self.noise.clock_length(&mut bus.noise);
     }
 
-    pub fn tick(&mut self, cartridge: &Box<CartridgeBus>) {
+    pub fn tick(&mut self, cartridge: &Box<dyn CartridgeBus>) {
         let mut bus = self.bus.borrow_mut();
         self.frame_counter += 1;
         if bus.frame_mode_written {

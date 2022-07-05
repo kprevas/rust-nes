@@ -1,8 +1,9 @@
-use cartridge::CartridgeBus;
 use std::error::Error;
 use std::io::prelude::*;
 
-pub fn disassemble(cartridge: Box<CartridgeBus>, start: u16, out: &mut Write) -> Result<(), Box<Error>> {
+use cartridge::CartridgeBus;
+
+pub fn disassemble(cartridge: Box<dyn CartridgeBus>, start: u16, out: &mut dyn Write) -> Result<(), Box<dyn Error>> {
     use super::opcodes::OPCODES;
 
     let mut pc = start;

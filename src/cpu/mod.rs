@@ -1,20 +1,23 @@
-use apu::*;
-use apu::bus::*;
-use bincode::{deserialize_from, serialize};
-use bytes::*;
-use cartridge::CartridgeBus;
-use input::ControllerState;
-use piston_window::{Context, G2d, Glyphs};
-use ppu::*;
-use ppu::bus::*;
-use self::opcodes::AddressingMode;
-use self::opcodes::AddressingMode::*;
-use self::opcodes::Opcode;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::io::{Cursor, Result};
 use std::io::prelude::*;
 use std::ops::Range;
+
+use bincode::{deserialize_from, serialize};
+use bytes::*;
+use piston_window::{Context, G2d, Glyphs};
+
+use apu::*;
+use apu::bus::*;
+use cartridge::CartridgeBus;
+use input::ControllerState;
+use ppu::*;
+use ppu::bus::*;
+
+use self::opcodes::AddressingMode;
+use self::opcodes::AddressingMode::*;
+use self::opcodes::Opcode;
 
 mod opcodes;
 pub mod disassembler;
@@ -30,13 +33,13 @@ pub struct Cpu<'a> {
     pc: u16,
     oam_dma_write: Option<(u8, u8)>,
     internal_ram: Box<[u8]>,
-    cartridge: &'a mut Box<CartridgeBus>,
+    cartridge: &'a mut Box<dyn CartridgeBus>,
     ppu: Ppu<'a>,
     ppu_bus: &'a RefCell<PpuBus>,
     apu: Apu<'a>,
     apu_bus: &'a RefCell<ApuBus>,
     controller_strobe: bool,
-    last_inputs: [u8;2],
+    last_inputs: [u8; 2],
     ticks: f64,
     open_bus: u8,
     instrumented: bool,
@@ -62,7 +65,7 @@ const OVERFLOW: u8 = 0b1000000;
 const NEGATIVE: u8 = 0b10000000;
 
 impl<'a> Cpu<'a> {
-    pub fn boot<'b>(cartridge: &'b mut Box<CartridgeBus>,
+    pub fn boot<'b>(cartridge: &'b mut Box<dyn CartridgeBus>,
                     ppu: Ppu<'b>, ppu_bus: &'b RefCell<PpuBus>,
                     apu: Apu<'b>, apu_bus: &'b RefCell<ApuBus>,
                     instrumented: bool) -> Cpu<'b> {
@@ -188,9 +191,9 @@ impl<'a> Cpu<'a> {
 
     pub fn read_memory_no_tick(&mut self, address: u16) -> u8 {
         let value = match address {
-            0x0000 ... 0x1FFF => self.internal_ram[(address % 0x800) as usize],
-            0x2000 ... 0x3FFF => self.ppu_bus.borrow_mut().read(address),
-            0x4000 ... 0x4014 => self.open_bus,
+            0x0000..=0x1FFF => self.internal_ram[(address % 0x800) as usize],
+            0x2000..=0x3FFF => self.ppu_bus.borrow_mut().read(address),
+            0x4000..=0x4014 => self.open_bus,
             0x4015 => self.apu_bus.borrow_mut().read_status(),
             0x4016 => {
                 let value = self.last_inputs[0] & 1;
@@ -202,7 +205,7 @@ impl<'a> Cpu<'a> {
                 self.last_inputs[1] >>= 1;
                 value | (self.open_bus & 0xF0)
             }
-            0x4018 ... 0x401F => self.open_bus,
+            0x4018..=0x401F => self.open_bus,
             _ => self.cartridge.read_memory(address, self.open_bus),
         };
         if self.instrumented && self.memory_watches.contains(&address) {
@@ -229,8 +232,8 @@ impl<'a> Cpu<'a> {
                   self.ppu.instrumentation_short(), self.apu.instrumentation_short());
         }
         match address {
-            0x0000 ... 0x1FFF => self.internal_ram[(address % 0x800) as usize] = value,
-            0x2000 ... 0x3FFF => self.ppu_bus.borrow_mut().write(address, value),
+            0x0000..=0x1FFF => self.internal_ram[(address % 0x800) as usize] = value,
+            0x2000..=0x3FFF => self.ppu_bus.borrow_mut().write(address, value),
             0x4014 => {
                 self.oam_dma_write = Some((value, 0));
                 if self.cycle_count & 1 == 0 {
@@ -238,9 +241,9 @@ impl<'a> Cpu<'a> {
                 }
                 self.tick(Some(address));
             }
-            0x4000 ... 0x4013 | 0x4015 | 0x4017 => self.apu_bus.borrow_mut().write(address, value),
+            0x4000..=0x4013 | 0x4015 | 0x4017 => self.apu_bus.borrow_mut().write(address, value),
             0x4016 => self.controller_strobe = value & 1 > 0,
-            0x4018 ... 0x401F => (),
+            0x4018..=0x401F => (),
             _ => self.cartridge.write_memory(address, value, self.cycle_count),
         }
     }
@@ -322,7 +325,7 @@ impl<'a> Cpu<'a> {
         }
     }
 
-    fn read_modify_write(&mut self, mode: &AddressingMode, operand: u16, modify: &mut FnMut(u8, &mut Cpu) -> u8) -> u8 {
+    fn read_modify_write(&mut self, mode: &AddressingMode, operand: u16, modify: &mut dyn FnMut(u8, &mut Cpu) -> u8) -> u8 {
         let (addr, operand_value) = match *mode {
             Accumulator => (0, self.a),
             _ => {
@@ -1111,7 +1114,7 @@ impl<'a> Cpu<'a> {
         self.ppu.close();
     }
 
-    pub fn save_to_battery(&self, out: &mut Write) -> Result<usize> {
+    pub fn save_to_battery(&self, out: &mut dyn Write) -> Result<usize> {
         let result = self.cartridge.save_to_battery(out);
         if let Ok(bytes) = result {
             info!(target: "cartridge", "{} bytes written", bytes);

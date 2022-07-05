@@ -15,15 +15,17 @@ extern crate serde;
 extern crate serde_derive;
 extern crate simple_error;
 
-use cartridge::Cartridge;
-use clap::ArgMatches;
-use nfd::Response;
-use piston_window::*;
-use portaudio::PortAudio;
 use std::cell::RefCell;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
+
+use clap::ArgMatches;
+use nfd::Response;
+use piston_window::*;
+use portaudio::PortAudio;
+
+use cartridge::Cartridge;
 
 pub mod apu;
 pub mod cpu;
@@ -38,8 +40,8 @@ pub fn run(matches: clap::ArgMatches) {
     if let Some(matches) = matches.subcommand_matches("disassemble") {
         let output_path = matches.value_of("OUTPUT");
         let mut out = match output_path {
-            Some(ref path) => Box::new(File::create(&Path::new(path)).unwrap()) as Box<Write>,
-            None => Box::new(std::io::stdout()) as Box<Write>,
+            Some(ref path) => Box::new(File::create(&Path::new(path)).unwrap()) as Box<dyn Write>,
+            None => Box::new(std::io::stdout()) as Box<dyn Write>,
         };
         let cartridge = if let Some((cartridge, _)) = load_cartridge(matches) { cartridge } else { return };
         cpu::disassembler::disassemble(cartridge.cpu_bus, 0x8000, &mut out).unwrap();

@@ -1,4 +1,4 @@
-use bincode::{serialize, deserialize_from};
+use bincode::{deserialize_from, serialize};
 use bytes::*;
 
 #[derive(Serialize, Deserialize)]
@@ -271,11 +271,11 @@ impl ApuBus {
 
     pub fn write(&mut self, address: u16, value: u8) {
         match address {
-            0x4000 ... 0x4003 => self.pulse_1.write(address - 0x4000, value),
-            0x4004 ... 0x4007 => self.pulse_2.write(address - 0x4004, value),
-            0x4008 ... 0x400B => self.triangle.write(address - 0x4008, value),
-            0x400C ... 0x400F => self.noise.write(address - 0x400C, value),
-            0x4010 ... 0x4013 => {
+            0x4000..=0x4003 => self.pulse_1.write(address - 0x4000, value),
+            0x4004..=0x4007 => self.pulse_2.write(address - 0x4004, value),
+            0x4008..=0x400B => self.triangle.write(address - 0x4008, value),
+            0x400C..=0x400F => self.noise.write(address - 0x400C, value),
+            0x4010..=0x4013 => {
                 self.dmc.write(address - 0x4010, value);
                 if !self.dmc.irq_enabled {
                     self.dmc_interrupt = false;

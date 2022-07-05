@@ -1,7 +1,7 @@
-use simple_error::*;
-use std::error::Error;
-use std::io::prelude::*;
 use std::io::{Cursor, Result};
+use std::io::prelude::*;
+
+use simple_error::*;
 
 mod mapper0;
 mod mapper1;
@@ -22,16 +22,16 @@ enum NametableMirroring {
 }
 
 pub struct Cartridge {
-    pub cpu_bus: Box<CartridgeBus>,
-    pub ppu_bus: Box<CartridgeBus>,
+    pub cpu_bus: Box<dyn CartridgeBus>,
+    pub ppu_bus: Box<dyn CartridgeBus>,
 }
 
 pub trait CartridgeBus {
     fn read_memory(&self, address: u16, open_bus: u8) -> u8;
     fn write_memory(&mut self, address: u16, value: u8, cpu_cycle: u64);
     fn mirror_nametable(&self, address: u16) -> u16;
-    fn save_to_battery(&self, out: &mut Write) -> Result<usize>;
-    fn load_from_battery(&mut self, inp: &mut Read) -> Result<usize>;
+    fn save_to_battery(&self, out: &mut dyn Write) -> Result<usize>;
+    fn load_from_battery(&mut self, inp: &mut dyn Read) -> Result<usize>;
     fn save_state(&self, out: &mut Vec<u8>);
     fn load_state(&mut self, state: &mut Cursor<Vec<u8>>);
 }
@@ -50,7 +50,7 @@ pub struct Header {
     battery_save: bool,
 }
 
-pub fn read(src: &mut Read, save_data: Option<&mut Read>) -> SimpleResult<Cartridge> {
+pub fn read(src: &mut dyn Read, save_data: Option<&mut dyn Read>) -> SimpleResult<Cartridge> {
     let mut contents = Vec::new();
     src.read_to_end(&mut contents).expect("error reading source");
     if contents[0..4] != [0x4E, 0x45, 0x53, 0x1A] {
@@ -88,7 +88,7 @@ pub fn read(src: &mut Read, save_data: Option<&mut Read>) -> SimpleResult<Cartri
     if let Ok(ref mut cartridge) = cartridge {
         if let Some(save_data) = save_data {
             let bytes = cartridge.cpu_bus.load_from_battery(save_data)
-                .map_err(|io_error| SimpleError::new(io_error.description()))?;
+                .map_err(|io_error| SimpleError::new(io_error.to_string()))?;
             info!(target: "cartridge", "{} bytes loaded", bytes);
         }
     }

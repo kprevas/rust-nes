@@ -1,16 +1,18 @@
-use bincode::{deserialize_from, serialize};
-use bytes::*;
-use cartridge::Cartridge;
-use cartridge::CartridgeBus;
-use cartridge::Header;
-use cartridge::NametableMirroring;
-use cartridge::NametableMirroring::*;
 use std::cell::RefCell;
 use std::cmp::max;
 use std::io::{Cursor, Result};
 use std::io::prelude::*;
 use std::ops::Deref;
 use std::rc::Rc;
+
+use bincode::{deserialize_from, serialize};
+use bytes::*;
+
+use cartridge::Cartridge;
+use cartridge::CartridgeBus;
+use cartridge::Header;
+use cartridge::NametableMirroring;
+use cartridge::NametableMirroring::*;
 
 #[derive(Serialize, Deserialize)]
 enum PrgBankMode {
@@ -52,10 +54,10 @@ impl CtrlRegisters {
             if self.shift_reg_written == 5 {
                 let value = self.shift_reg;
                 match address {
-                    0x8000 ... 0x9FFF => self.write_ctrl(value),
-                    0xA000 ... 0xBFFF => self.chr_bank_low = value as usize,
-                    0xC000 ... 0xDFFF => self.chr_bank_hi = value as usize,
-                    0xE000 ... 0xFFFF => {
+                    0x8000..=0x9FFF => self.write_ctrl(value),
+                    0xA000..=0xBFFF => self.chr_bank_low = value as usize,
+                    0xC000..=0xDFFF => self.chr_bank_hi = value as usize,
+                    0xE000..=0xFFFF => {
                         self.prg_ram_enabled = value & 0b10000 == 0;
                         self.prg_bank = (value & 0b1111) as usize;
                     },
@@ -194,9 +196,9 @@ impl CartridgeBus for Mapper1Cpu {
     fn read_memory(&self, address: u16, open_bus: u8) -> u8 {
         let ctrl = self.ctrl.borrow();
         match address {
-            0x6000 ... 0x7FFF => self.prg_ram[(address - 0x6000) as usize],
-            0x8000...0xBFFF => self.prg_rom[ctrl.prg_low_bank(address - 0x8000, self.prg_rom.len())],
-            0xC000 ... 0xFFFF => self.prg_rom[ctrl.prg_hi_bank(address - 0xC000, self.prg_rom.len())],
+            0x6000..=0x7FFF => self.prg_ram[(address - 0x6000) as usize],
+            0x8000..=0xBFFF => self.prg_rom[ctrl.prg_low_bank(address - 0x8000, self.prg_rom.len())],
+            0xC000..=0xFFFF => self.prg_rom[ctrl.prg_hi_bank(address - 0xC000, self.prg_rom.len())],
             _ => open_bus,
         }
     }
@@ -204,12 +206,12 @@ impl CartridgeBus for Mapper1Cpu {
     fn write_memory(&mut self, address: u16, value: u8, cpu_cycle: u64) {
         let mut ctrl = self.ctrl.borrow_mut();
         match address {
-            0x6000 ... 0x7FFF => {
+            0x6000..=0x7FFF => {
                 if ctrl.prg_ram_enabled {
                     self.prg_ram[(address - 0x6000) as usize] = value;
                 }
             }
-            0x8000 ... 0xFFFF => {
+            0x8000..=0xFFFF => {
                 if cpu_cycle - self.last_write_cycle > 2 {
                     ctrl.write(address, value);
                 }
@@ -223,7 +225,7 @@ impl CartridgeBus for Mapper1Cpu {
         address
     }
 
-    fn save_to_battery(&self, out: &mut Write) -> Result<usize> {
+    fn save_to_battery(&self, out: &mut dyn Write) -> Result<usize> {
         if self.battery_save {
             out.write(self.prg_ram.as_slice())
         } else {
@@ -231,7 +233,7 @@ impl CartridgeBus for Mapper1Cpu {
         }
     }
 
-    fn load_from_battery(&mut self, inp: &mut Read) -> Result<usize> {
+    fn load_from_battery(&mut self, inp: &mut dyn Read) -> Result<usize> {
         if self.battery_save {
             self.prg_ram.clear();
             inp.read_to_end(&mut self.prg_ram)
@@ -260,8 +262,8 @@ impl CartridgeBus for Mapper1Ppu {
         let ctrl = self.ctrl.borrow();
         let max_addr = self.chr_rom.len();
         match address {
-            0x0000...0x0FFF => self.chr_rom[ctrl.chr_low_bank(address, max_addr)],
-            0x1000...0x1FFF => self.chr_rom[ctrl.chr_hi_bank(address - 0x1000, max_addr)],
+            0x0000..=0x0FFF => self.chr_rom[ctrl.chr_low_bank(address, max_addr)],
+            0x1000..=0x1FFF => self.chr_rom[ctrl.chr_hi_bank(address - 0x1000, max_addr)],
             _ => open_bus,
         }
     }
@@ -271,8 +273,8 @@ impl CartridgeBus for Mapper1Ppu {
         if self.uses_chr_ram {
             let max_addr = self.chr_rom.len();
             match address {
-                0x0000...0x0FFF => self.chr_rom[ctrl.chr_low_bank(address, max_addr)] = value,
-                0x1000...0x1FFF => self.chr_rom[ctrl.chr_hi_bank(address - 0x1000, max_addr)] = value,
+                0x0000..=0x0FFF => self.chr_rom[ctrl.chr_low_bank(address, max_addr)] = value,
+                0x1000..=0x1FFF => self.chr_rom[ctrl.chr_hi_bank(address - 0x1000, max_addr)] = value,
                 _ => (),
             }
         }
@@ -281,20 +283,20 @@ impl CartridgeBus for Mapper1Ppu {
     fn mirror_nametable(&self, address: u16) -> u16 {
         let ctrl = self.ctrl.borrow();
         match address {
-            0x2000 ... 0x23FF => address - 0x2000,
-            0x2400 ... 0x27FF => match ctrl.mirroring {
+            0x2000..=0x23FF => address - 0x2000,
+            0x2400..=0x27FF => match ctrl.mirroring {
                 Vertical => address - 0x2000,
                 Horizontal => address - 0x2400,
                 SingleScreen => if ctrl.one_screen_mirroring_hi { address - 0x2000 } else { address - 0x2400 },
                 _ => unimplemented!(),
             },
-            0x2800 ... 0x2BFF => match ctrl.mirroring {
+            0x2800..=0x2BFF => match ctrl.mirroring {
                 Vertical => address - 0x2800,
                 Horizontal => address - 0x2400,
                 SingleScreen => if ctrl.one_screen_mirroring_hi { address - 0x2400 } else { address - 0x2800 },
                 _ => unimplemented!(),
             },
-            0x2C00 ... 0x2FFF => match ctrl.mirroring {
+            0x2C00..=0x2FFF => match ctrl.mirroring {
                 Vertical | Horizontal => address - 0x2800,
                 SingleScreen => if ctrl.one_screen_mirroring_hi { address - 0x2800 } else { address - 0x2C00 },
                 _ => unimplemented!(),
@@ -303,11 +305,11 @@ impl CartridgeBus for Mapper1Ppu {
         }
     }
 
-    fn save_to_battery(&self, _out: &mut Write) -> Result<usize> {
+    fn save_to_battery(&self, _out: &mut dyn Write) -> Result<usize> {
         unimplemented!();
     }
 
-    fn load_from_battery(&mut self, _inp: &mut Read) -> Result<usize> {
+    fn load_from_battery(&mut self, _inp: &mut dyn Read) -> Result<usize> {
         unimplemented!();
     }
 

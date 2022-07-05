@@ -1,15 +1,18 @@
 extern crate byteorder;
 
-use std::sync::mpsc::Sender;
-use std::sync::mpsc;
-use std::thread;
+use std::collections::VecDeque;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
-use std::collections::VecDeque;
+use std::sync::mpsc;
+use std::sync::mpsc::Sender;
+use std::thread;
+
 use piston_window::*;
-use self::byteorder::{ByteOrder, BigEndian};
+
 use super::input::ControllerState;
+
+use self::byteorder::{BigEndian, ByteOrder};
 
 pub struct Recorder {
     start_frame: u32,
@@ -108,7 +111,7 @@ struct Playback {
 }
 
 impl Playback {
-    fn new(src: &mut Read, start_frame: u32) -> Playback {
+    fn new(src: &mut dyn Read, start_frame: u32) -> Playback {
         let mut input_vec = Vec::new();
         src.read_to_end(&mut input_vec).unwrap();
         let mut input_data = VecDeque::from(input_vec);
