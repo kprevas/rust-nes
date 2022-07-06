@@ -5,7 +5,7 @@ authors = ["Gus Prevas <kprevas@gmail.com>"]
 
 [dependencies]
 log = "0.4.1"
-env_logger = "0.4.3"
+env_logger = "0.6.2"
 clap = "2.29.0"
 piston = "0.36.0"
 piston2d-graphics = "0.26.0"
