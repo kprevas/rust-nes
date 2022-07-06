@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::cmp::max;
-use std::io::{Cursor, Result};
 use std::io::prelude::*;
+use std::io::Result;
 use std::ops::Deref;
 use std::rc::Rc;
 
@@ -246,14 +246,14 @@ impl CartridgeBus for Mapper1Cpu {
         out.put_slice(&self.prg_ram);
         out.put_slice(&serialize(&self.ctrl.borrow().deref()).unwrap());
         out.put_u8(if self.battery_save { 1 } else { 0 });
-        out.put_u64::<BigEndian>(self.last_write_cycle);
+        out.put_u64(self.last_write_cycle);
     }
 
-    fn load_state(&mut self, state: &mut Cursor<Vec<u8>>) {
+    fn load_state(&mut self, state: &mut dyn Buf) {
         state.copy_to_slice(&mut self.prg_ram);
         self.ctrl.replace(deserialize_from(state.reader()).unwrap());
         self.battery_save = state.get_u8() == 1;
-        self.last_write_cycle = state.get_u64::<BigEndian>();
+        self.last_write_cycle = state.get_u64();
     }
 }
 
@@ -319,7 +319,7 @@ impl CartridgeBus for Mapper1Ppu {
         }
     }
 
-    fn load_state(&mut self, state: &mut Cursor<Vec<u8>>) {
+    fn load_state(&mut self, state: &mut dyn Buf) {
         if self.uses_chr_ram {
             state.copy_to_slice(&mut self.chr_rom);
         }

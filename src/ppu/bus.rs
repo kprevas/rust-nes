@@ -1,5 +1,4 @@
-use std::io::Cursor;
-use bincode::{serialize, deserialize_from};
+use bincode::{deserialize_from, serialize};
 use bytes::*;
 
 #[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]
@@ -268,7 +267,7 @@ impl PpuBus {
         out.put_slice(&serialize(self).unwrap());
     }
 
-    pub fn load_state(&mut self, saved: &mut Cursor<Vec<u8>>) {
+    pub fn load_state(&mut self, saved: &mut dyn Buf) {
         *self = deserialize_from(saved.reader()).unwrap();
     }
 }

@@ -1,5 +1,6 @@
 use piston_window::*;
 use piston_window::Button::*;
+
 use self::Input::*;
 
 #[derive(PartialEq, Copy, Clone, Serialize, Deserialize)]
@@ -8,43 +9,17 @@ pub enum Input {
     Axis(ControllerAxisArgs),
 }
 
-pub struct ControllerState {
-    inputs: [Input; 8],
+pub struct ControllerState<const N: usize> {
+    inputs: [Input; N],
     state: u8,
 }
 
-impl ControllerState {
-    fn new(inputs: [Input; 8]) -> ControllerState {
+impl<const N: usize> ControllerState<N> {
+    fn new(inputs: [Input; N]) -> ControllerState<N> {
         ControllerState {
             inputs,
             state: 0,
         }
-    }
-
-    pub fn player_1() -> ControllerState {
-        ControllerState::new([
-            Button(Keyboard(Key::J)),
-            Button(Keyboard(Key::H)),
-            Button(Keyboard(Key::Backslash)),
-            Button(Keyboard(Key::Return)),
-            Button(Keyboard(Key::Up)),
-            Button(Keyboard(Key::Down)),
-            Button(Keyboard(Key::Left)),
-            Button(Keyboard(Key::Right)),
-        ])
-    }
-
-    pub fn player_2() -> ControllerState {
-        ControllerState::new([
-            Button(Keyboard(Key::G)),
-            Button(Keyboard(Key::F)),
-            Button(Keyboard(Key::CapsLock)),
-            Button(Keyboard(Key::Tab)),
-            Button(Keyboard(Key::W)),
-            Button(Keyboard(Key::S)),
-            Button(Keyboard(Key::A)),
-            Button(Keyboard(Key::D)),
-        ])
     }
 
     pub fn event(&mut self, event: &Event) -> bool {
@@ -90,7 +65,7 @@ impl ControllerState {
         self.state = value;
     }
 
-    pub fn buttons(&self) -> [Input; 8] {
+    pub fn buttons(&self) -> [Input; N] {
         self.inputs.clone()
     }
 
@@ -101,9 +76,36 @@ impl ControllerState {
     }
 
     pub fn render_overlay(&self, c: Context, gl: &mut G2d, glyphs: &mut Glyphs) {
-        const INPUT_STRS: [&str;8] = ["A ", "B ", "s ", "S ", "^ ", "v ", "< ", "> "];
+        const INPUT_STRS: [&str; 8] = ["A ", "B ", "s ", "S ", "^ ", "v ", "< ", "> "];
         let value = (0..8).map(|i| { if self.state & (1 << i) > 0 { INPUT_STRS[i] } else { "  " } }).collect::<String>();
         text([0.0, 0.0, 0.0, 1.0], 8, &value, glyphs, c.trans(1.0, 1.0).transform, gl).unwrap();
         text([1.0, 1.0, 0.5, 1.0], 8, &value, glyphs, c.transform, gl).unwrap();
     }
+}
+
+
+pub fn player_1_nes() -> ControllerState<8> {
+    ControllerState::new([
+        Button(Keyboard(Key::J)),
+        Button(Keyboard(Key::H)),
+        Button(Keyboard(Key::Backslash)),
+        Button(Keyboard(Key::Return)),
+        Button(Keyboard(Key::Up)),
+        Button(Keyboard(Key::Down)),
+        Button(Keyboard(Key::Left)),
+        Button(Keyboard(Key::Right)),
+    ])
+}
+
+pub fn player_2_nes() -> ControllerState<8> {
+    ControllerState::new([
+        Button(Keyboard(Key::G)),
+        Button(Keyboard(Key::F)),
+        Button(Keyboard(Key::CapsLock)),
+        Button(Keyboard(Key::Tab)),
+        Button(Keyboard(Key::W)),
+        Button(Keyboard(Key::S)),
+        Button(Keyboard(Key::A)),
+        Button(Keyboard(Key::D)),
+    ])
 }

@@ -348,11 +348,11 @@ impl ApuBus {
         self.frame_interrupt || self.dmc_interrupt
     }
 
-    pub fn save_state<B: BufMut>(&self, out: &mut B) {
+    pub fn save_state<B: BufMut + ?Sized>(&self, out: &mut B) {
         out.put_slice(&serialize(self).unwrap());
     }
 
-    pub fn load_state<B: Buf>(&mut self, saved: &mut B) {
+    pub fn load_state<B: Buf + ?Sized>(&mut self, saved: &mut B) {
         *self = deserialize_from(saved.reader()).unwrap();
     }
 }

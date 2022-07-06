@@ -1,6 +1,7 @@
-use std::io::{Cursor, Result};
 use std::io::prelude::*;
+use std::io::Result;
 
+use bytes::Buf;
 use simple_error::*;
 
 mod mapper0;
@@ -33,7 +34,7 @@ pub trait CartridgeBus {
     fn save_to_battery(&self, out: &mut dyn Write) -> Result<usize>;
     fn load_from_battery(&mut self, inp: &mut dyn Read) -> Result<usize>;
     fn save_state(&self, out: &mut Vec<u8>);
-    fn load_state(&mut self, state: &mut Cursor<Vec<u8>>);
+    fn load_state(&mut self, state: &mut dyn Buf);
 }
 
 #[derive(Debug)]

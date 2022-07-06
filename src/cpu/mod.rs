@@ -1,12 +1,12 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
-use std::io::{Cursor, Result};
 use std::io::prelude::*;
+use std::io::Result;
 use std::ops::Range;
 
 use bincode::{deserialize_from, serialize};
 use bytes::*;
-use piston_window::{Context, G2d, Glyphs};
+use piston_window::{Context, G2d, G2dTextureContext, Glyphs};
 
 use apu::*;
 use apu::bus::*;
@@ -1058,7 +1058,7 @@ impl<'a> Cpu<'a> {
         self.set_flag(INTERRUPT, true);
     }
 
-    pub fn next_operation(&mut self, inputs: &[ControllerState;2]) {
+    pub fn next_operation(&mut self, inputs: &[ControllerState<8>; 2]) {
         if self.controller_strobe {
             self.last_inputs = [inputs[0].to_u8(), inputs[1].to_u8()];
         }
@@ -1075,7 +1075,7 @@ impl<'a> Cpu<'a> {
         }
     }
 
-    pub fn do_frame(&mut self, time_secs: f64, inputs: &[ControllerState;2]) {
+    pub fn do_frame(&mut self, time_secs: f64, inputs: &[ControllerState<8>; 2]) {
         self.ticks += time_secs * CPU_TICKS_PER_SECOND * self.speed_adj;
 
         while self.ticks > 0.0 {
@@ -1083,8 +1083,8 @@ impl<'a> Cpu<'a> {
         }
     }
 
-    pub fn render(&mut self, c: Context, gl: &mut G2d, glyphs: &mut Glyphs) {
-        self.ppu.render(c, gl, glyphs);
+    pub fn render(&mut self, c: Context, texture_ctx: &mut G2dTextureContext, gl: &mut G2d, glyphs: &mut Glyphs) {
+        self.ppu.render(c, texture_ctx, gl, glyphs);
     }
 
     pub fn reset(&mut self, soft: bool) {
@@ -1130,19 +1130,19 @@ impl<'a> Cpu<'a> {
         out.put_u8(self.y);
         out.put_u8(self.p);
         out.put_u8(self.sp);
-        out.put_u16::<BigEndian>(self.pc);
+        out.put_u16(self.pc);
         out.put_slice(&serialize(&self.oam_dma_write).unwrap());
         out.put_slice(&self.internal_ram);
         out.put_u8(if self.controller_strobe { 1 } else { 0 });
         out.put_u8(self.last_inputs[0]);
         out.put_u8(self.last_inputs[1]);
-        out.put_f64::<BigEndian>(self.ticks);
+        out.put_f64(self.ticks);
         out.put_u8(self.open_bus);
         out.put_slice(&serialize(&self.delayed_irq_flag).unwrap());
         out.put_u8(if self.irq { 1 } else { 0 });
         out.put_u8(if self.prev_irq { 1 } else { 0 });
         out.put_u8(self.dmc_delay);
-        out.put_u64::<BigEndian>(self.cycle_count);
+        out.put_u64(self.cycle_count);
         self.cartridge.save_state(out);
         self.ppu.save_state(out);
         self.ppu_bus.borrow().save_state(out);
@@ -1150,25 +1150,25 @@ impl<'a> Cpu<'a> {
         self.apu_bus.borrow().save_state(out);
     }
 
-    pub fn load_state(&mut self, state: &mut Cursor<Vec<u8>>) {
+    pub fn load_state(&mut self, state: &mut dyn Buf) {
         self.a = state.get_u8();
         self.x = state.get_u8();
         self.y = state.get_u8();
         self.p = state.get_u8();
         self.sp = state.get_u8();
-        self.pc = state.get_u16::<BigEndian>();
+        self.pc = state.get_u16();
         self.oam_dma_write = deserialize_from(state.reader()).unwrap();
         state.copy_to_slice(&mut self.internal_ram);
         self.controller_strobe = state.get_u8() == 1;
         self.last_inputs[0] = state.get_u8();
         self.last_inputs[1] = state.get_u8();
-        self.ticks = state.get_f64::<BigEndian>();
+        self.ticks = state.get_f64();
         self.open_bus = state.get_u8();
         self.delayed_irq_flag = deserialize_from(state.reader()).unwrap();
         self.irq = state.get_u8() == 1;
         self.prev_irq = state.get_u8() == 1;
         self.dmc_delay = state.get_u8();
-        self.cycle_count = state.get_u64::<BigEndian>();
+        self.cycle_count = state.get_u64();
         self.cartridge.load_state(state);
         self.ppu.load_state(state);
         self.ppu_bus.borrow_mut().load_state(state);

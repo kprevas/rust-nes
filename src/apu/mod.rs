@@ -1,10 +1,9 @@
+extern crate dasp;
 extern crate portaudio;
 extern crate rb;
-extern crate sample;
 extern crate time;
 
 use std::cell::RefCell;
-use std::io::Cursor;
 
 use bincode::{deserialize_from, serialize};
 use bytes::*;
@@ -100,7 +99,7 @@ impl<'a> Apu<'a> {
             let settings = pa.default_output_stream_settings::<f32>(
                 CHANNELS,
                 TARGET_HZ,
-                portaudio::FRAMES_PER_BUFFER_UNSPECIFIED).unwrap();
+                FRAMES_PER_BUFFER_UNSPECIFIED).unwrap();
             let mut stream = pa.open_non_blocking_stream(settings, callback).unwrap();
             stream.start().unwrap();
             stream
@@ -221,17 +220,17 @@ impl<'a> Apu<'a> {
         out.put_slice(&serialize(&self.triangle).unwrap());
         out.put_slice(&serialize(&self.noise).unwrap());
         out.put_slice(&serialize(&self.dmc).unwrap());
-        out.put_i32::<BigEndian>(self.frame_counter);
+        out.put_i32(self.frame_counter);
         out.put_u8(if self.apu_tick { 1 } else { 0 });
     }
 
-    pub fn load_state(&mut self, state: &mut Cursor<Vec<u8>>) {
+    pub fn load_state(&mut self, state: &mut dyn Buf) {
         self.pulse_1 = deserialize_from(state.reader()).unwrap();
         self.pulse_2 = deserialize_from(state.reader()).unwrap();
         self.triangle = deserialize_from(state.reader()).unwrap();
         self.noise = deserialize_from(state.reader()).unwrap();
         self.dmc = deserialize_from(state.reader()).unwrap();
-        self.frame_counter = state.get_i32::<BigEndian>();
+        self.frame_counter = state.get_i32();
         self.apu_tick = state.get_u8() == 1;
     }
 

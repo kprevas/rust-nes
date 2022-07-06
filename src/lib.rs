@@ -26,6 +26,7 @@ use piston_window::*;
 use portaudio::PortAudio;
 
 use cartridge::Cartridge;
+use menu::NES_CONTROLS;
 
 pub mod apu;
 pub mod cpu;
@@ -43,7 +44,7 @@ pub fn run(matches: clap::ArgMatches) {
             Some(ref path) => Box::new(File::create(&Path::new(path)).unwrap()) as Box<dyn Write>,
             None => Box::new(std::io::stdout()) as Box<dyn Write>,
         };
-        let cartridge = if let Some((cartridge, _)) = load_cartridge(matches) { cartridge } else { return };
+        let cartridge = if let Some((cartridge, _)) = load_cartridge(matches) { cartridge } else { return; };
         cpu::disassembler::disassemble(cartridge.cpu_bus, 0x8000, &mut out).unwrap();
     } else if let Some(matches) = matches.subcommand_matches("run") {
         let window: PistonWindow<sdl2_window::Sdl2Window> = WindowSettings::new(
@@ -63,13 +64,13 @@ pub fn run(matches: clap::ArgMatches) {
             cartridge = c;
             save_path = s;
         } else {
-            return
+            return;
         }
 
         let instrument_cpu = matches.is_present("instrument_cpu");
         let instrument_ppu = matches.is_present("instrument_ppu");
 
-        let mut inputs = [input::ControllerState::player_1(), input::ControllerState::player_2()];
+        let mut inputs = [input::player_1_nes(), input::player_2_nes()];
         let mut reset = false;
         let mut input_overlay = false;
 
@@ -87,8 +88,10 @@ pub fn run(matches: clap::ArgMatches) {
 
         let assets = find_folder::Search::ParentsThenKids(3, 3).for_folder("src").unwrap();
         let ref font = assets.join("VeraMono.ttf");
-        let factory = window.factory.clone();
-        let mut glyphs = Glyphs::new(font, factory, TextureSettings::new()).unwrap();
+        let mut glyphs = Glyphs::new(font,
+                                     window.create_texture_context(),
+                                     TextureSettings::new()).unwrap();
+        let mut texture_ctx = window.create_texture_context();
 
         let mut scale = 1.0;
         let mut x_trans = 0.0;
@@ -98,7 +101,7 @@ pub fn run(matches: clap::ArgMatches) {
 
         let mut input_changed = false;
 
-        let mut menu = menu::Menu::new(&inputs);
+        let mut menu = menu::Menu::new(NES_CONTROLS, &inputs);
         menu.update_controls(&mut inputs);
 
         while let Some(e) = window.next() {
@@ -131,9 +134,9 @@ pub fn run(matches: clap::ArgMatches) {
             }
 
             if let Some(_r) = e.render_args() {
-                window.draw_2d(&e, |c, gl| {
+                window.draw_2d(&e, |c, gl, _| {
                     let trans = c.trans(x_trans, y_trans).scale(scale, scale);
-                    cpu.render(trans, gl, &mut glyphs);
+                    cpu.render(trans, &mut texture_ctx, gl, &mut glyphs);
                     recorder.render_overlay(c, gl);
                     if input_overlay {
                         inputs[0].render_overlay(trans.trans(10.0, 230.0), gl, &mut glyphs);
@@ -144,8 +147,8 @@ pub fn run(matches: clap::ArgMatches) {
             }
 
             if let Some(r) = e.resize_args() {
-                let width = r[0] as f64;
-                let height = r[1] as f64;
+                let width = r.draw_size[0] as f64;
+                let height = r.draw_size[1] as f64;
                 let x_scale = width / 293.0;
                 let y_scale = height / 240.0;
                 scale = x_scale.min(y_scale);
@@ -187,7 +190,7 @@ fn load_cartridge(matches: &ArgMatches) -> Option<(Cartridge, PathBuf)> {
                                   }) {
                 Ok(c) => break c,
                 Err(e) => if matches.is_present("INPUT") {
-                    panic!(e);
+                    panic!("{}", e);
                 },
             };
         } else {

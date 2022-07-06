@@ -4,7 +4,7 @@ extern crate env_logger;
 extern crate nes;
 
 fn main() {
-    env_logger::init().unwrap();
+    env_logger::try_init().unwrap();
 
     let matches = clap_app!(myapp =>
         (@subcommand disassemble =>

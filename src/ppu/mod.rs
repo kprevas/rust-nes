@@ -1,8 +1,6 @@
 extern crate triple_buffer;
 
-use std::borrow::BorrowMut;
 use std::cell::RefCell;
-use std::io::Cursor;
 use std::sync::*;
 use std::sync::atomic::*;
 use std::thread;
@@ -97,21 +95,21 @@ impl<'a> Ppu<'a> {
         let image = Arc::new(Mutex::new(DynamicImage::new_rgba8(256, 240)));
         let image_clone = image.clone();
         let texture = window.map(|window| {
-            G2dTexture::from_image(window.factory.borrow_mut(), image.lock().unwrap().as_rgba8().unwrap(), &TextureSettings::new()).unwrap()
+            G2dTexture::from_image(&mut window.create_texture_context(), image.lock().unwrap().as_rgba8().unwrap(), &TextureSettings::new()).unwrap()
         });
 
-        let (image_buffer, mut image_buffer_out) = TripleBuffer::new(Box::new([0usize; 61440])).split();
+        let (image_buffer, mut image_buffer_out) = TripleBuffer::new(&Box::new([0usize; 61440])).split();
         let closed = Arc::new(AtomicBool::new(false));
         let closed_clone = closed.clone();
 
         let join_handle = thread::spawn(move || {
             let mut image = DynamicImage::new_rgba8(256, 240);
             loop {
-                image_buffer_out.raw_update();
+                image_buffer_out.update();
                 if closed_clone.load(Ordering::Relaxed) {
                     break;
                 }
-                let pixels = image_buffer_out.raw_output_buffer();
+                let pixels = image_buffer_out.output_buffer();
                 let mut dot = 0;
                 let mut scanline = 0;
                 for color_index in pixels.iter() {
@@ -123,7 +121,7 @@ impl<'a> Ppu<'a> {
                         scanline += 1;
                     }
                 }
-                image_clone.lock().unwrap().copy_from(&image, 0, 0);
+                image_clone.lock().unwrap().copy_from(&image, 0, 0).unwrap();
             }
         });
 
@@ -361,7 +359,7 @@ impl<'a> Ppu<'a> {
             let bus = self.bus.borrow();
             let color = self.read_memory(0x3F00 + if self.rendering() { palette } else { 0 }, bus.mask.grayscale);
             let color_index = (0xc0 * bus.mask.color_emphasis + color * 3) as usize;
-            self.image_buffer.raw_input_buffer()[(self.dot - 2 + self.scanline * 256) as usize] = color_index;
+            self.image_buffer.input_buffer()[(self.dot - 2 + self.scanline * 256) as usize] = color_index;
         }
         self.adjust_shifts();
     }
@@ -589,7 +587,7 @@ impl<'a> Ppu<'a> {
 
     fn tick_post_render(&mut self) {
         if self.dot == 0 {
-            self.image_buffer.raw_publish();
+            self.image_buffer.publish();
         }
     }
 
@@ -617,24 +615,24 @@ impl<'a> Ppu<'a> {
         }
     }
 
-    pub fn render(&mut self, c: Context, gl: &mut G2d, _glyphs: &mut Glyphs) {
+    pub fn render(&mut self, c: Context, mut texture_ctx: &mut G2dTextureContext, gl: &mut G2d, _glyphs: &mut Glyphs) {
         if let Some(ref mut texture) = self.texture {
-            texture.update(gl.encoder, self.image.lock().unwrap().as_rgba8().unwrap()).unwrap();
+            texture.update(&mut texture_ctx, self.image.lock().unwrap().as_rgba8().unwrap()).unwrap();
             image(texture, c.transform.scale(8.0 / 7.0, 1.0), gl);
         }
     }
 
     pub fn close(&mut self) {
         self.closed.store(true, Ordering::Relaxed);
-        self.image_buffer.raw_publish();
+        self.image_buffer.publish();
         self.join_handle.take().unwrap().join().unwrap();
     }
 
     pub fn save_state(&self, out: &mut Vec<u8>) {
-        out.put_u16::<BigEndian>(self.scanline);
-        out.put_u16::<BigEndian>(self.dot);
-        out.put_u16::<BigEndian>(self.vram_addr);
-        out.put_u16::<BigEndian>(self.tmp_vram_addr);
+        out.put_u16(self.scanline);
+        out.put_u16(self.dot);
+        out.put_u16(self.vram_addr);
+        out.put_u16(self.tmp_vram_addr);
         out.put_u8(self.fine_x_scroll);
         out.put_u8(if self.odd_frame { 1 } else { 0 });
         out.put_u8(if self.skip_tick { 1 } else { 0 });
@@ -644,11 +642,11 @@ impl<'a> Ppu<'a> {
         out.put_u8(self.latch_bgd_high);
         out.put_u8(self.shift_attrtable_low);
         out.put_u8(self.shift_attrtable_high);
-        out.put_u16::<BigEndian>(self.shift_bgd_low);
-        out.put_u16::<BigEndian>(self.shift_bgd_high);
+        out.put_u16(self.shift_bgd_low);
+        out.put_u16(self.shift_bgd_high);
         out.put_u8(if self.attrtable_latch_low { 1 } else { 0 });
         out.put_u8(if self.attrtable_latch_high { 1 } else { 0 });
-        out.put_u16::<BigEndian>(self.addr);
+        out.put_u16(self.addr);
         out.put_slice(&serialize(&self.oam).unwrap());
         out.put_slice(&serialize(&self.sec_oam).unwrap());
         out.put_slice(&serialize(&self.sprite_overflow_tick_delay).unwrap());
@@ -658,11 +656,11 @@ impl<'a> Ppu<'a> {
         self.cartridge.save_state(out);
     }
 
-    pub fn load_state(&mut self, state: &mut Cursor<Vec<u8>>) {
-        self.scanline = state.get_u16::<BigEndian>();
-        self.dot = state.get_u16::<BigEndian>();
-        self.vram_addr = state.get_u16::<BigEndian>();
-        self.tmp_vram_addr = state.get_u16::<BigEndian>();
+    pub fn load_state(&mut self, state: &mut dyn Buf) {
+        self.scanline = state.get_u16();
+        self.dot = state.get_u16();
+        self.vram_addr = state.get_u16();
+        self.tmp_vram_addr = state.get_u16();
         self.fine_x_scroll = state.get_u8();
         self.odd_frame = state.get_u8() == 1;
         self.skip_tick = state.get_u8() == 1;
@@ -672,11 +670,11 @@ impl<'a> Ppu<'a> {
         self.latch_bgd_high = state.get_u8();
         self.shift_attrtable_low = state.get_u8();
         self.shift_attrtable_high = state.get_u8();
-        self.shift_bgd_low = state.get_u16::<BigEndian>();
-        self.shift_bgd_high = state.get_u16::<BigEndian>();
+        self.shift_bgd_low = state.get_u16();
+        self.shift_bgd_high = state.get_u16();
         self.attrtable_latch_low = state.get_u8() == 1;
         self.attrtable_latch_high = state.get_u8() == 1;
-        self.addr = state.get_u16::<BigEndian>();
+        self.addr = state.get_u16();
         self.oam = deserialize_from(state.reader()).unwrap();
         self.sec_oam = deserialize_from(state.reader()).unwrap();
         self.sprite_overflow_tick_delay = deserialize_from(state.reader()).unwrap();

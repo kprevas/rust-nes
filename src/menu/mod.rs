@@ -1,13 +1,16 @@
 extern crate bincode;
 
-use input::{ControllerState, Input};
-use input::Input::*;
-use piston_window::*;
-use piston_window::Button::*;
 use std::fs::File;
 use std::path::Path;
 
-const CONTROLS: [(&str, usize); 8] = [
+use piston_window::*;
+use piston_window::Button::*;
+use serde::{Deserialize, Serialize};
+
+use input::{ControllerState, Input};
+use input::Input::*;
+
+pub const NES_CONTROLS: [(&str, usize); 8] = [
     ("Up", 4),
     ("Down", 5),
     ("Left", 6),
@@ -18,40 +21,49 @@ const CONTROLS: [(&str, usize); 8] = [
     ("Start", 3),
 ];
 
-pub struct Menu {
+#[derive(Serialize, Deserialize)]
+struct Buttons<const B: usize>(
+    #[serde(with = "serde_arrays")]
+    [Input; B],
+);
+
+pub struct Menu<'a, const B: usize> {
     showing: bool,
-    buttons: [[Input; 8]; 2],
+    control_labels: [(&'a str, usize); B],
+    buttons: [Buttons<B>; 2],
     current_index: usize,
     awaiting_input: bool,
 }
 
-impl Menu {
-    pub fn new(default_controls: &[ControllerState; 2]) -> Menu {
+impl<'a, const B: usize> Menu<'a, B> {
+    pub fn new(control_labels: [(&'a str, usize); B],
+               default_controls: &[ControllerState<B>; 2]) -> Menu<'a, B> {
         let settings_file = File::open(Path::new("settings.dat"));
         let buttons = match settings_file {
             Ok(file) => match bincode::deserialize_from(file) {
                 Ok(buttons) => buttons,
-                Err(_) => [default_controls[0].buttons(), default_controls[1].buttons()],
+                Err(_) => [Buttons(default_controls[0].buttons()), Buttons(default_controls[1].buttons())],
             },
-            Err(_) => [default_controls[0].buttons(), default_controls[1].buttons()],
+            Err(_) => [Buttons(default_controls[0].buttons()), Buttons(default_controls[1].buttons())],
         };
         Menu {
             showing: false,
+            control_labels,
             buttons,
             current_index: 0,
             awaiting_input: false,
         }
     }
 
-    pub fn update_controls(&self, controls: &mut [ControllerState; 2]) {
-        controls[0].set_buttons(&self.buttons[0]);
-        controls[1].set_buttons(&self.buttons[1]);
+    pub fn update_controls(&self, controls: &mut [ControllerState<B>; 2]) {
+        controls[0].set_buttons(&self.buttons[0].0);
+        controls[1].set_buttons(&self.buttons[1].0);
     }
 
     pub fn event(&mut self, event: &Event) -> bool {
         if self.awaiting_input {
             if let Some(button) = event.release_args() {
-                self.buttons[self.current_index / 8][CONTROLS[self.current_index % 8].1] = Button(button);
+                self.buttons[self.current_index / 8].0[self.control_labels[self.current_index % 8].1] = Button(button);
                 self.awaiting_input = false;
             }
         } else {
@@ -69,16 +81,16 @@ impl Menu {
     pub fn render(&self, c: Context, gl: &mut G2d, glyphs: &mut Glyphs) {
         if self.showing {
             rectangle([0.0, 0.0, 0.0, 0.7], [0.0, 0.0, 293.0, 240.0], c.transform, gl);
-            self.render_controls_menu("Player 1", 0, self.buttons[0], c.trans(10.0, 20.0), gl, glyphs);
-            self.render_controls_menu("Player 2", 8, self.buttons[1], c.trans(10.0, 135.0), gl, glyphs);
+            self.render_controls_menu("Player 1", 0, self.buttons[0].0, c.trans(10.0, 20.0), gl, glyphs);
+            self.render_controls_menu("Player 2", 8, self.buttons[1].0, c.trans(10.0, 135.0), gl, glyphs);
         }
     }
 
     fn render_controls_menu(&self, header_text: &str, start_index: usize,
-                            buttons: [Input; 8],
+                            buttons: [Input; B],
                             c: Context, gl: &mut G2d, glyphs: &mut Glyphs) {
         self.render_header(header_text, c, gl, glyphs);
-        for (menu_index, &(name, array_index)) in CONTROLS.iter().enumerate() {
+        for (menu_index, &(name, array_index)) in self.control_labels.iter().enumerate() {
             self.render_item(name, &input_to_string(buttons[array_index]),
                              self.current_index == start_index + menu_index,
                              c.trans(0.0, 12.0 * (1.0 + menu_index as f64)),
@@ -111,5 +123,6 @@ fn input_to_string(input: Input) -> String {
         Button(Mouse(button)) => format!("Mouse {:?}", button),
         Button(Controller(button)) => format!("Joy {} button {}", button.id, button.button),
         Axis(axis_args) => format!("Joy {} axis {} {}", axis_args.id, axis_args.axis, if axis_args.position < 0.0 { "-" } else { "+" }),
+        Button(Hat(hat)) => format!("Joy {} hat {}", hat.id, hat.which),
     }
 }

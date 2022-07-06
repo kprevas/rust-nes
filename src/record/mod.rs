@@ -14,17 +14,17 @@ use super::input::ControllerState;
 
 use self::byteorder::{BigEndian, ByteOrder};
 
-pub struct Recorder {
+pub struct Recorder<const B: usize> {
     start_frame: u32,
     sender: Option<Sender<u64>>,
     join_handle: Option<thread::JoinHandle<()>>,
     record_path: PathBuf,
     recording: bool,
-    playback: Option<Playback>,
+    playback: Option<Playback<B>>,
 }
 
-impl Recorder {
-    pub fn new(path: &Path) -> Recorder {
+impl<const B: usize> Recorder<B> {
+    pub fn new(path: &Path) -> Recorder<B> {
         let (sender, receiver) = mpsc::channel();
         let path = PathBuf::from(path);
         let record_path = path.clone();
@@ -60,7 +60,7 @@ impl Recorder {
         }
     }
 
-    pub fn input_changed(&mut self, inputs: &[ControllerState; 2], frame_count: u32) {
+    pub fn input_changed(&mut self, inputs: &[ControllerState<B>; 2], frame_count: u32) {
         if self.recording {
             if let Some(ref sender) = self.sender {
                 sender.send((((frame_count - self.start_frame) as u64) << 32)
@@ -84,7 +84,7 @@ impl Recorder {
         }
     }
 
-    pub fn set_frame_inputs(&mut self, inputs: &mut [ControllerState; 2], frame: u32) {
+    pub fn set_frame_inputs(&mut self, inputs: &mut [ControllerState<B>; 2], frame: u32) {
         let mut done = false;
         if let Some(ref mut playback) = self.playback {
             done = playback.set_frame_inputs(inputs, frame);
@@ -104,14 +104,14 @@ impl Recorder {
     }
 }
 
-struct Playback {
+struct Playback<const B: usize> {
     start_frame: u32,
     next_frame: u32,
     input_data: VecDeque<u8>,
 }
 
-impl Playback {
-    fn new(src: &mut dyn Read, start_frame: u32) -> Playback {
+impl<const B: usize> Playback<B> {
+    fn new(src: &mut dyn Read, start_frame: u32) -> Playback<B> {
         let mut input_vec = Vec::new();
         src.read_to_end(&mut input_vec).unwrap();
         let mut input_data = VecDeque::from(input_vec);
@@ -130,7 +130,7 @@ impl Playback {
         }
     }
 
-    pub fn set_frame_inputs(&mut self, inputs: &mut [ControllerState; 2], frame: u32) -> bool {
+    pub fn set_frame_inputs(&mut self, inputs: &mut [ControllerState<B>; 2], frame: u32) -> bool {
         if frame == self.next_frame {
             inputs[0].set_from_u8(self.input_data.pop_front().unwrap());
             inputs[1].set_from_u8(self.input_data.pop_front().unwrap());

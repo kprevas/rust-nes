@@ -1,6 +1,6 @@
 use std::cmp::max;
-use std::io::{Cursor, Result};
 use std::io::prelude::*;
+use std::io::Result;
 
 use bytes::*;
 
@@ -74,7 +74,7 @@ impl CartridgeBus for Mapper0Cpu {
         out.put_slice(&self.prg_ram);
     }
 
-    fn load_state(&mut self, state: &mut Cursor<Vec<u8>>) {
+    fn load_state(&mut self, state: &mut dyn Buf) {
         state.copy_to_slice(&mut self.prg_ram);
     }
 }
@@ -128,7 +128,7 @@ impl CartridgeBus for Mapper0Ppu {
         }
     }
 
-    fn load_state(&mut self, state: &mut Cursor<Vec<u8>>) {
+    fn load_state(&mut self, state: &mut dyn Buf) {
         if self.uses_chr_ram {
             state.copy_to_slice(&mut self.chr_rom);
         }

@@ -1,6 +1,6 @@
 use std::cell::Cell;
-use std::io::{Cursor, Result};
 use std::io::prelude::*;
+use std::io::Result;
 use std::rc::Rc;
 
 use bytes::*;
@@ -76,7 +76,7 @@ impl CartridgeBus for Mapper3Cpu {
         out.put_u8(self.chr_bank.get() as u8);
     }
 
-    fn load_state(&mut self, state: &mut Cursor<Vec<u8>>) {
+    fn load_state(&mut self, state: &mut dyn Buf) {
         self.chr_bank.replace(state.get_u8() as usize);
     }
 }
@@ -119,5 +119,5 @@ impl CartridgeBus for Mapper3Ppu {
 
     fn save_state(&self, _out: &mut Vec<u8>) {}
 
-    fn load_state(&mut self, _state: &mut Cursor<Vec<u8>>) {}
+    fn load_state(&mut self, _state: &mut dyn Buf) {}
 }

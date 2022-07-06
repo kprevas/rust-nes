@@ -1,18 +1,20 @@
 extern crate env_logger;
 extern crate piston_window;
 
+use std::cell::RefCell;
+use std::io::Read;
+
 use nes::apu::*;
 use nes::apu::bus::*;
 use nes::cartridge;
 use nes::cpu::*;
-use nes::input::ControllerState;
+use nes::input::{player_1_nes, player_2_nes};
 use nes::ppu::*;
 use nes::ppu::bus::*;
-use self::piston_window::*;
-use std::cell::RefCell;
-use std::io::Read;
 
-pub fn run_test_to_pc(rom: &mut Read,
+use self::piston_window::*;
+
+pub fn run_test_to_pc(rom: &mut dyn Read,
                       pc_start: Option<u16>,
                       pc_end: u16,
                       assert: &[(u16, u8)]) {
@@ -27,7 +29,7 @@ pub fn run_test_to_pc(rom: &mut Read,
              });
 }
 
-pub fn run_test_to_pc_and_check_accumulator(rom: &mut Read,
+pub fn run_test_to_pc_and_check_accumulator(rom: &mut dyn Read,
                                             pc_start: Option<u16>,
                                             pc_end: u16,
                                             expected_accumulator: u8) {
@@ -40,7 +42,7 @@ pub fn run_test_to_pc_and_check_accumulator(rom: &mut Read,
              });
 }
 
-pub fn run_test_to_success_or_fail_pc(rom: &mut Read,
+pub fn run_test_to_success_or_fail_pc(rom: &mut dyn Read,
                                       pc_start: Option<u16>,
                                       pc_success: u16,
                                       pc_fail: u16,
@@ -56,7 +58,7 @@ pub fn run_test_to_success_or_fail_pc(rom: &mut Read,
              });
 }
 
-pub fn run_test_until_memory_matches(rom: &mut Read,
+pub fn run_test_until_memory_matches(rom: &mut dyn Read,
                                      valid_signal_addr: u16,
                                      valid_signal_val: &[u8],
                                      status_addr: u16,
@@ -84,19 +86,19 @@ pub fn run_test_until_memory_matches(rom: &mut Read,
              });
 }
 
-fn run_test(rom: &mut Read,
+fn run_test(rom: &mut dyn Read,
             pc_start: Option<u16>,
-            terminate_condition: &mut FnMut(&mut Cpu) -> bool,
+            terminate_condition: &mut dyn FnMut(&mut Cpu) -> bool,
             status: Option<(u16, u8, u8)>,
-            assert: &mut FnMut(&mut Cpu)) {
-    let _ = env_logger::init();
+            assert: &mut dyn FnMut(&mut Cpu)) {
+    let _ = env_logger::try_init();
     let ppu_bus = RefCell::new(PpuBus::new());
     let apu_bus = RefCell::new(ApuBus::new());
     let mut cartridge = cartridge::read(rom, None).unwrap();
     let ppu = Ppu::new::<NoWindow>(&mut cartridge.ppu_bus, &ppu_bus, None, true);
     let apu = Apu::new(&apu_bus, None).unwrap();
     let mut cpu = Cpu::boot(&mut cartridge.cpu_bus, ppu, &ppu_bus, apu, &apu_bus, true);
-    let inputs = [ControllerState::player_1(), ControllerState::player_2()];
+    let inputs = [player_1_nes(), player_2_nes()];
 
     if let Some(pc_start) = pc_start {
         cpu.setup_for_test(0x24, pc_start);
