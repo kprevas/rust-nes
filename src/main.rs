@@ -19,6 +19,11 @@ fn main() {
             (@arg instrument_ppu: -p "instruments PPU")
             (@arg bench_mode: -b "runs in benchmark mode")
         )
+        (@subcommand m68k =>
+            (about: "blast processing")
+            (@arg instrument_cpu: -c "instruments CPU")
+            (@arg bench_mode: -b "runs in benchmark mode")
+        )
     ).get_matches();
     nes::run(matches);
 }

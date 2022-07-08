@@ -32,12 +32,13 @@ pub mod apu;
 pub mod cpu;
 pub mod cartridge;
 pub mod input;
+pub mod m68k;
 pub mod ppu;
 pub mod control;
 pub mod record;
 pub mod menu;
 
-pub fn run(matches: clap::ArgMatches) {
+pub fn run(matches: ArgMatches) {
     if let Some(matches) = matches.subcommand_matches("disassemble") {
         let output_path = matches.value_of("OUTPUT");
         let mut out = match output_path {
@@ -165,12 +166,45 @@ pub fn run(matches: clap::ArgMatches) {
         }
         recorder.stop();
         menu.save_settings();
+    } else if let Some(matches) = matches.subcommand_matches("m68k") {
+        let window: PistonWindow<sdl2_window::Sdl2Window> = WindowSettings::new(
+            "gen",
+            [320, 224],
+        )
+            .build()
+            .unwrap();
+        let mut window = window
+            .ups(60)
+            .ups_reset(0)
+            .bench_mode(matches.is_present("bench_mode"));
+
+        let mut reset = false;
+
+        let mut frame_count = 0u32;
+
+        let mut inputs = [input::player_1_nes(), input::player_2_nes()];
+
+        let instrument_cpu = matches.is_present("instrument_cpu");
+        let mut cpu = m68k::Cpu::boot(instrument_cpu);
+
+        while let Some(e) = window.next() {
+            if let Some(u) = e.update_args() {
+                if reset {
+                    reset = false;
+                    cpu.reset(true);
+                }
+                cpu.do_frame(u.dt, &inputs);
+                frame_count += 1;
+            }
+        }
+
+        cpu.close();
     }
 }
 
 fn load_cartridge(matches: &ArgMatches) -> Option<(Cartridge, PathBuf)> {
     let mut save_path: PathBuf;
-    let cartridge: cartridge::Cartridge = loop {
+    let cartridge: Cartridge = loop {
         let input_file = match matches.value_of("INPUT") {
             Some(i) => Some(PathBuf::from(i)),
             None => {
