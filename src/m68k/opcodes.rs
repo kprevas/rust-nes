@@ -1,12 +1,12 @@
 #[derive(Debug)]
 pub enum AddressingMode {
-    DataRegister(u8),
-    AddressRegister(u8),
-    Address(u8),
-    AddressWithPostincrement(u8),
-    AddressWithPredecrement(u8),
-    AddressWithDisplacement(u8),
-    AddressWithIndex(u8),
+    DataRegister(usize),
+    AddressRegister(usize),
+    Address(usize),
+    AddressWithPostincrement(usize),
+    AddressWithPredecrement(usize),
+    AddressWithDisplacement(usize),
+    AddressWithIndex(usize),
     ProgramCounterWithDisplacement,
     ProgramCounterWithIndex,
     AbsoluteShort,
@@ -17,18 +17,18 @@ pub enum AddressingMode {
 
 impl AddressingMode {
     pub fn from_opcode(opcode: u16) -> AddressingMode {
-        let address_register = (opcode & 0b111) as u8;
+        let address_register = (opcode & 0b111) as usize;
         let mode = (opcode >> 3) & 0b111;
         Self::from(mode, address_register)
     }
 
     pub fn from_opcode_dest(opcode: u16) -> AddressingMode {
-        let address_register = ((opcode >> 9) & 0b111) as u8;
+        let address_register = ((opcode >> 9) & 0b111) as usize;
         let mode = (opcode >> 6) & 0b111;
         Self::from(mode, address_register)
     }
 
-    fn from(mode: u16, address_register: u8) -> AddressingMode {
+    fn from(mode: u16, address_register: usize) -> AddressingMode {
         match mode {
             0 => AddressingMode::DataRegister(address_register),
             1 => AddressingMode::AddressRegister(address_register),
@@ -191,31 +191,31 @@ impl OperandDirection {
 #[derive(Debug)]
 pub enum BitNum {
     Immediate,
-    DataRegister(u8),
+    DataRegister(usize),
 }
 
 #[allow(non_camel_case_types)]
 #[derive(Debug)]
 pub enum Opcode {
-    ABCD { operand_mode: OperandMode, src_register: u8, dest_register: u8 },
+    ABCD { operand_mode: OperandMode, src_register: usize, dest_register: usize },
     // Add Decimal with Extend
-    ADD { mode: AddressingMode, size: Size, operand_direction: OperandDirection, register: u8 },
+    ADD { mode: AddressingMode, size: Size, operand_direction: OperandDirection, register: usize },
     // Add
-    ADDA { mode: AddressingMode, size: Size, register: u8 },
+    ADDA { mode: AddressingMode, size: Size, register: usize },
     // Add Address
     ADDI { mode: AddressingMode, size: Size },
     // Add Immediate
     ADDQ { mode: AddressingMode, size: Size, data: u8 },
     // Add Quick
-    ADDX { operand_mode: OperandMode, size: Size, src_register: u8, dest_register: u8 },
+    ADDX { operand_mode: OperandMode, size: Size, src_register: usize, dest_register: usize },
     // Add with Extend
-    AND { mode: AddressingMode, size: Size, operand_direction: OperandDirection, register: u8 },
+    AND { mode: AddressingMode, size: Size, operand_direction: OperandDirection, register: usize },
     // Logical AND
     ANDI { mode: AddressingMode, size: Size },
     // Logical AND Immediate
-    ASL { mode: AddressingMode, size: Size, register: Option<u8>, shift_count: Option<u8>, shift_register: Option<u8> },
+    ASL { mode: AddressingMode, size: Size, register: Option<usize>, shift_count: Option<u8>, shift_register: Option<usize> },
     // Arithmetic Shift Left
-    ASR { mode: AddressingMode, size: Size, register: Option<u8>, shift_count: Option<u8>, shift_register: Option<u8> },
+    ASR { mode: AddressingMode, size: Size, register: Option<usize>, shift_count: Option<u8>, shift_register: Option<usize> },
     // Arithmetic Shift Right
     Bcc { condition: Condition, displacement: u8 },
     // Branch Conditionally
@@ -231,29 +231,29 @@ pub enum Opcode {
     // Branch to Subroutine
     BTST { bit_num: BitNum, mode: AddressingMode },
     // Test Bit
-    CHK { register: u8, mode: AddressingMode },
+    CHK { register: usize, mode: AddressingMode },
     // Check Register Against Bound
     CLR { mode: AddressingMode, size: Size },
     // Clear
-    CMP { mode: AddressingMode, size: Size, register: u8 },
+    CMP { mode: AddressingMode, size: Size, register: usize },
     // Compare
-    CMPA { mode: AddressingMode, size: Size, register: u8 },
+    CMPA { mode: AddressingMode, size: Size, register: usize },
     // Compare Address
     CMPI { mode: AddressingMode, size: Size },
     // Compare Immediate
-    CMPM { size: Size, src_register: u8, dest_register: u8 },
+    CMPM { size: Size, src_register: usize, dest_register: usize },
     // Compare Memory to Memory
     DBcc { mode: AddressingMode, condition: Condition },
     // Test Condition, Decrement, and Branch
-    DIVS { mode: AddressingMode, register: u8 },
+    DIVS { mode: AddressingMode, register: usize },
     // Signed Divide
-    DIVU { mode: AddressingMode, register: u8 },
+    DIVU { mode: AddressingMode, register: usize },
     // Unsigned Divide
-    EOR { size: Size, mode: AddressingMode, operand_direction: OperandDirection, register: u8 },
+    EOR { size: Size, mode: AddressingMode, operand_direction: OperandDirection, register: usize },
     // Logical Exclusive-OR
     EORI { mode: AddressingMode, size: Size },
     // Logical Exclusive-OR Immediate
-    EXG { mode: ExchangeMode, src_register: u8, dest_register: u8 },
+    EXG { mode: ExchangeMode, src_register: usize, dest_register: usize },
     // Exchange Registers
     EXT { mode: AddressingMode, size: Size },
     // Sign Extend
@@ -263,13 +263,13 @@ pub enum Opcode {
     // Jump
     JSR { mode: AddressingMode },
     // Jump to Subroutine
-    LEA { register: u8, mode: AddressingMode },
+    LEA { register: usize, mode: AddressingMode },
     // Load Effective Address
-    LINK { register: u8 },
+    LINK { register: usize },
     // Link and Allocate
-    LSL { mode: AddressingMode, size: Size, register: Option<u8>, shift_count: Option<u8>, shift_register: Option<u8> },
+    LSL { mode: AddressingMode, size: Size, register: Option<usize>, shift_count: Option<u8>, shift_register: Option<usize> },
     // Logical Shift Left
-    LSR { mode: AddressingMode, size: Size, register: Option<u8>, shift_count: Option<u8>, shift_register: Option<u8> },
+    LSR { mode: AddressingMode, size: Size, register: Option<usize>, shift_count: Option<u8>, shift_register: Option<usize> },
     // Logical Shift Right
     MOVE { src_mode: AddressingMode, dest_mode: AddressingMode, size: Size },
     // Move
@@ -281,17 +281,17 @@ pub enum Opcode {
     // Move from Status Register
     MOVE_to_SR { mode: AddressingMode },
     // Move to Status Register
-    MOVE_USP { register: u8, direction: Direction },
+    MOVE_USP { register: usize, direction: Direction },
     // Move User Stack Pointer
     MOVEM { mode: AddressingMode, size: Size, direction: Direction },
     // Move Multiple Registers
-    MOVEP { register: u8, direction: Direction, mode: AddressingMode, size: Size },
+    MOVEP { register: usize, direction: Direction, mode: AddressingMode, size: Size },
     // Move Peripheral
-    MOVEQ { register: u8, data: u8 },
+    MOVEQ { register: usize, data: u8 },
     // Move Quick
-    MULS { mode: AddressingMode, register: u8 },
+    MULS { mode: AddressingMode, register: usize },
     // Signed Multiply
-    MULU { mode: AddressingMode, register: u8 },
+    MULU { mode: AddressingMode, register: usize },
     // Unsigned Multiply
     NBCD { mode: AddressingMode },
     // Negate Decimal with Extend
@@ -303,7 +303,7 @@ pub enum Opcode {
     // No Operation
     NOT { mode: AddressingMode, size: Size },
     // Logical Complement
-    OR { size: Size, mode: AddressingMode, operand_direction: OperandDirection, register: u8 },
+    OR { size: Size, mode: AddressingMode, operand_direction: OperandDirection, register: usize },
     // Logical Inclusive-OR
     ORI { mode: AddressingMode, size: Size },
     // Logical Inclusive-OR Immediate
@@ -311,13 +311,13 @@ pub enum Opcode {
     // Push Effective Address
     RESET,
     // Reset External Devices
-    ROL { mode: AddressingMode, size: Size, register: Option<u8>, shift_count: Option<u8>, shift_register: Option<u8> },
+    ROL { mode: AddressingMode, size: Size, register: Option<usize>, shift_count: Option<u8>, shift_register: Option<usize> },
     // Rotate Left
-    ROR { mode: AddressingMode, size: Size, register: Option<u8>, shift_count: Option<u8>, shift_register: Option<u8> },
+    ROR { mode: AddressingMode, size: Size, register: Option<usize>, shift_count: Option<u8>, shift_register: Option<usize> },
     // Rotate Right
-    ROXL { mode: AddressingMode, size: Size, register: Option<u8>, shift_count: Option<u8>, shift_register: Option<u8> },
+    ROXL { mode: AddressingMode, size: Size, register: Option<usize>, shift_count: Option<u8>, shift_register: Option<usize> },
     // Rotate with Extend Left
-    ROXR { mode: AddressingMode, size: Size, register: Option<u8>, shift_count: Option<u8>, shift_register: Option<u8> },
+    ROXR { mode: AddressingMode, size: Size, register: Option<usize>, shift_count: Option<u8>, shift_register: Option<usize> },
     // Rotate with Extend Right
     RTE,
     // Return from Exception
@@ -325,21 +325,21 @@ pub enum Opcode {
     // Return and Restore
     RTS,
     // Return from Subroutine
-    SBCD { operand_mode: OperandMode, src_register: u8, dest_register: u8 },
+    SBCD { operand_mode: OperandMode, src_register: usize, dest_register: usize },
     // Subtract Decimal with Extend
     Scc { mode: AddressingMode, condition: Condition },
     // Set Conditionally
     STOP,
     // Stop
-    SUB { mode: AddressingMode, size: Size, operand_direction: OperandDirection, register: u8 },
+    SUB { mode: AddressingMode, size: Size, operand_direction: OperandDirection, register: usize },
     // Subtract
-    SUBA { mode: AddressingMode, size: Size, register: u8 },
+    SUBA { mode: AddressingMode, size: Size, register: usize },
     // Subtract Address
     SUBI { mode: AddressingMode, size: Size },
     // Subtract Immediate
     SUBQ { mode: AddressingMode, size: Size, data: u8 },
     // Subtract Quick
-    SUBX { operand_mode: OperandMode, size: Size, src_register: u8, dest_register: u8 },
+    SUBX { operand_mode: OperandMode, size: Size, src_register: usize, dest_register: usize },
     // Subtract with Extend
     SWAP { mode: AddressingMode },
     // Swap Register Words
@@ -351,7 +351,7 @@ pub enum Opcode {
     // Trap on Overflow
     TST { mode: AddressingMode, size: Size },
     // Test Operand
-    UNLK { register: u8 }, // Unlink
+    UNLK { register: usize }, // Unlink
 }
 
 pub fn opcode(opcode_hex: u16) -> Opcode {
@@ -362,8 +362,8 @@ pub fn opcode(opcode_hex: u16) -> Opcode {
     let operand_direction = OperandDirection::from_opcode(opcode_hex);
     let size = Size::from_opcode(opcode_hex);
     let condition = Condition::from_opcode(opcode_hex);
-    let register = ((opcode_hex >> 9) & 0b111) as u8;
-    let src_register = (opcode_hex & 0b111) as u8;
+    let register = ((opcode_hex >> 9) & 0b111) as usize;
+    let src_register = (opcode_hex & 0b111) as usize;
     match opcode_hex >> 12 {
         0b0000 =>
             if (opcode_hex >> 8) & 0b1 > 0 {
@@ -472,12 +472,12 @@ pub fn opcode(opcode_hex: u16) -> Opcode {
                             match (opcode_hex >> 4) & 0b111 {
                                 0b100 => TRAP { vector: (opcode_hex & 0b1111) as u8 },
                                 0b101 => if (opcode_hex >> 3) & 0b1 == 0 {
-                                    LINK { register: (opcode_hex & 0b111) as u8 }
+                                    LINK { register: (opcode_hex & 0b111) as usize }
                                 } else {
-                                    UNLK { register: (opcode_hex & 0b111) as u8 }
+                                    UNLK { register: (opcode_hex & 0b111) as usize }
                                 },
                                 0b110 => MOVE_USP {
-                                    register: (opcode_hex & 0b111) as u8,
+                                    register: (opcode_hex & 0b111) as usize,
                                     direction: if (opcode_hex >> 4) & 0b1 == 0 {
                                         Direction::RegisterToMemory
                                     } else {
@@ -513,9 +513,9 @@ pub fn opcode(opcode_hex: u16) -> Opcode {
                 _ => Scc { mode, condition },
             }
             _ => if (opcode_hex >> 8) & 0b1 == 0 {
-                ADDQ { mode, size, data: register }
+                ADDQ { mode, size, data: register as u8 }
             } else {
-                SUBQ { mode, size, data: register }
+                SUBQ { mode, size, data: register as u8 }
             }
         }
         0b0110 => match condition {
@@ -648,7 +648,7 @@ pub fn opcode(opcode_hex: u16) -> Opcode {
                         None
                     };
                     let shift_register = if (opcode_hex >> 5) & 0b1 == 1 {
-                        Some(((opcode_hex >> 9) & 0b111) as u8)
+                        Some(((opcode_hex >> 9) & 0b111) as usize)
                     } else {
                         None
                     };
