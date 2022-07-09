@@ -1,6 +1,8 @@
 use apu::*;
 
-pub const TIMER_VALUES: [u16; 16] = [4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068];
+pub const TIMER_VALUES: [u16; 16] = [
+    4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068,
+];
 
 #[derive(Serialize, Deserialize)]
 pub struct Noise {
@@ -34,7 +36,11 @@ impl Noise {
         if ctrl_bus.length_counter > 0 {
             if self.curr_timer == 0 {
                 self.curr_timer = ctrl_bus.timer;
-                let feedback_bit = if ctrl_bus.loop_noise { (self.shift_register & 0x40) >> 6 } else { (self.shift_register & 0x2) >> 1 };
+                let feedback_bit = if ctrl_bus.loop_noise {
+                    (self.shift_register & 0x40) >> 6
+                } else {
+                    (self.shift_register & 0x2) >> 1
+                };
                 let feedback = (self.shift_register & 0x1) ^ feedback_bit;
                 self.shift_register >>= 1;
                 let feedback_applied = (self.shift_register & !(0x4000)) | (feedback << 14);

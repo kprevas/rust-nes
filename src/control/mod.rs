@@ -6,7 +6,18 @@ use piston_window::*;
 
 use super::record::Recorder;
 
-const SAVE_KEYS: [Key; 10] = [Key::F1, Key::F2, Key::F3, Key::F4, Key::F5, Key::F6, Key::F7, Key::F8, Key::F9, Key::F10];
+const SAVE_KEYS: [Key; 10] = [
+    Key::F1,
+    Key::F2,
+    Key::F3,
+    Key::F4,
+    Key::F5,
+    Key::F6,
+    Key::F7,
+    Key::F8,
+    Key::F9,
+    Key::F10,
+];
 
 pub struct Control<const B: usize> {
     states: [Vec<u8>; 10],
@@ -27,13 +38,15 @@ impl<const B: usize> Control<B> {
         }
     }
 
-    pub fn event(&mut self,
-                 event: &Event,
-                 cpu: &mut super::cpu::Cpu,
-                 reset: &mut bool,
-                 input_overlay: &mut bool,
-                 recorder: &mut Recorder<B>,
-                 frame_count: u32) {
+    pub fn event(
+        &mut self,
+        event: &Event,
+        cpu: &mut super::cpu::Cpu,
+        reset: &mut bool,
+        input_overlay: &mut bool,
+        recorder: &mut Recorder<B>,
+        frame_count: u32,
+    ) {
         if let Some(Button::Keyboard(key_pressed)) = event.press_args() {
             self.process_modifier_keys(key_pressed, true);
             for (i, key) in SAVE_KEYS.iter().enumerate() {

@@ -53,9 +53,10 @@ pub struct Header {
 
 pub fn read(src: &mut dyn Read, save_data: Option<&mut dyn Read>) -> SimpleResult<Cartridge> {
     let mut contents = Vec::new();
-    src.read_to_end(&mut contents).expect("error reading source");
+    src.read_to_end(&mut contents)
+        .expect("error reading source");
     if contents[0..4] != [0x4E, 0x45, 0x53, 0x1A] {
-        return Err(SimpleError::new("Not a NES file."))
+        return Err(SimpleError::new("Not a NES file."));
     }
     let header = Header {
         prg_rom_blocks: contents[4],
@@ -65,7 +66,11 @@ pub fn read(src: &mut dyn Read, save_data: Option<&mut dyn Read>) -> SimpleResul
         flags_7: contents[7],
         _flags_9: contents[9],
         _flags_10: contents[10],
-        mirroring: if contents[6] & 0b1 > 0 { NametableMirroring::Vertical } else { NametableMirroring::Horizontal },
+        mirroring: if contents[6] & 0b1 > 0 {
+            NametableMirroring::Vertical
+        } else {
+            NametableMirroring::Horizontal
+        },
         battery_save: contents[6] & 0b10 > 0,
     };
     info!(target: "cartridge", "header: {:?}", header);
@@ -83,12 +88,14 @@ pub fn read(src: &mut dyn Read, save_data: Option<&mut dyn Read>) -> SimpleResul
         0 => Ok(mapper0::read(&header, prg_rom, chr_rom)),
         1 => Ok(mapper1::read(&header, prg_rom, chr_rom)),
         3 => Ok(mapper3::read(&header, prg_rom, chr_rom)),
-        _ => unimplemented!()
+        _ => unimplemented!(),
     };
 
     if let Ok(ref mut cartridge) = cartridge {
         if let Some(save_data) = save_data {
-            let bytes = cartridge.cpu_bus.load_from_battery(save_data)
+            let bytes = cartridge
+                .cpu_bus
+                .load_from_battery(save_data)
                 .map_err(|io_error| SimpleError::new(io_error.to_string()))?;
             info!(target: "cartridge", "{} bytes loaded", bytes);
         }

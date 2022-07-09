@@ -19,8 +19,8 @@ use self::opcodes::AddressingMode;
 use self::opcodes::AddressingMode::*;
 use self::opcodes::Opcode;
 
-mod opcodes;
 pub mod disassembler;
+mod opcodes;
 
 const CPU_TICKS_PER_SECOND: f64 = 1_789_773.0;
 
@@ -65,10 +65,14 @@ const OVERFLOW: u8 = 0b1000000;
 const NEGATIVE: u8 = 0b10000000;
 
 impl<'a> Cpu<'a> {
-    pub fn boot<'b>(cartridge: &'b mut Box<dyn CartridgeBus>,
-                    ppu: Ppu<'b>, ppu_bus: &'b RefCell<PpuBus>,
-                    apu: Apu<'b>, apu_bus: &'b RefCell<ApuBus>,
-                    instrumented: bool) -> Cpu<'b> {
+    pub fn boot<'b>(
+        cartridge: &'b mut Box<dyn CartridgeBus>,
+        ppu: Ppu<'b>,
+        ppu_bus: &'b RefCell<PpuBus>,
+        apu: Apu<'b>,
+        apu_bus: &'b RefCell<ApuBus>,
+        instrumented: bool,
+    ) -> Cpu<'b> {
         let mut cpu = Cpu {
             a: 0,
             x: 0,
@@ -130,9 +134,10 @@ impl<'a> Cpu<'a> {
             }
         }
         if self.oam_dma_write.is_none() && self.dmc_delay == 0 {
-            let irq_interrupt = apu_bus.irq_interrupt() && !match self.delayed_irq_flag {
+            let irq_interrupt = apu_bus.irq_interrupt()
+                && !match self.delayed_irq_flag {
                 Some(val) => val,
-                None => self.flag(INTERRUPT)
+                None => self.flag(INTERRUPT),
             };
             let ppu_bus = self.ppu_bus.borrow();
             let nmi_interrupt = ppu_bus.nmi_interrupt && ppu_bus.nmi_interrupt_age > 1;
@@ -161,16 +166,19 @@ impl<'a> Cpu<'a> {
     }
 
     fn read_word_no_tick(&mut self, address: u16) -> u16 {
-        (u16::from(self.read_memory_no_tick(address + 1)) << 8) + u16::from(self.read_memory_no_tick(address))
+        (u16::from(self.read_memory_no_tick(address + 1)) << 8)
+            + u16::from(self.read_memory_no_tick(address))
     }
 
     fn read_word_zeropage_wrapped(&mut self, address: u16) -> u16 {
-        (u16::from(self.read_memory(u16::from((address as u8).wrapping_add(1)))) << 8) + u16::from(self.read_memory(address))
+        (u16::from(self.read_memory(u16::from((address as u8).wrapping_add(1)))) << 8)
+            + u16::from(self.read_memory(address))
     }
 
     fn read_word_page_wrapped(&mut self, address: u16) -> u16 {
         if address & 0xff == 0xff {
-            (u16::from(self.read_memory(address & (!0xff))) << 8) + u16::from(self.read_memory(address))
+            (u16::from(self.read_memory(address & (!0xff))) << 8)
+                + u16::from(self.read_memory(address))
         } else {
             self.read_word(address)
         }
@@ -180,7 +188,9 @@ impl<'a> Cpu<'a> {
         self.tick(None);
         while self.dmc_delay > 0 {
             self.tick(None);
-            if (address != 0x4016 && address != 0x4017 && self.cycle_count & 1 > 0) || self.dmc_delay == 1 {
+            if (address != 0x4016 && address != 0x4017 && self.cycle_count & 1 > 0)
+                || self.dmc_delay == 1
+            {
                 self.read_memory_no_tick(address);
             }
         }
@@ -244,20 +254,34 @@ impl<'a> Cpu<'a> {
             0x4000..=0x4013 | 0x4015 | 0x4017 => self.apu_bus.borrow_mut().write(address, value),
             0x4016 => self.controller_strobe = value & 1 > 0,
             0x4018..=0x401F => (),
-            _ => self.cartridge.write_memory(address, value, self.cycle_count),
+            _ => self
+                .cartridge
+                .write_memory(address, value, self.cycle_count),
         }
     }
 
-    fn read_memory_mode(&mut self, mode: &AddressingMode, operand: u16, page_boundary_penalty: bool) -> u8 {
+    fn read_memory_mode(
+        &mut self,
+        mode: &AddressingMode,
+        operand: u16,
+        page_boundary_penalty: bool,
+    ) -> u8 {
         self.read_memory_mode_with_dummy_read(mode, operand, page_boundary_penalty, false)
     }
 
-    fn read_memory_mode_with_dummy_read(&mut self, mode: &AddressingMode, operand: u16, page_boundary_penalty: bool, dummy_read: bool) -> u8 {
+    fn read_memory_mode_with_dummy_read(
+        &mut self,
+        mode: &AddressingMode,
+        operand: u16,
+        page_boundary_penalty: bool,
+        dummy_read: bool,
+    ) -> u8 {
         match *mode {
             Accumulator => self.a,
             Immediate => operand as u8,
             _ => {
-                let target = self.apply_memory_mode(mode, operand, page_boundary_penalty, dummy_read);
+                let target =
+                    self.apply_memory_mode(mode, operand, page_boundary_penalty, dummy_read);
                 self.read_memory(target)
             }
         }
@@ -267,7 +291,13 @@ impl<'a> Cpu<'a> {
         self.write_memory_mode_with_dummy_read(mode, operand, value, false)
     }
 
-    fn write_memory_mode_with_dummy_read(&mut self, mode: &AddressingMode, operand: u16, value: u8, dummy_read: bool) {
+    fn write_memory_mode_with_dummy_read(
+        &mut self,
+        mode: &AddressingMode,
+        operand: u16,
+        value: u8,
+        dummy_read: bool,
+    ) {
         match *mode {
             Accumulator => self.a = value,
             Immediate => panic!("Attempted to write with immediate addressing"),
@@ -278,7 +308,13 @@ impl<'a> Cpu<'a> {
         }
     }
 
-    fn apply_memory_mode(&mut self, mode: &AddressingMode, operand: u16, page_boundary_penalty: bool, dummy_read: bool) -> u16 {
+    fn apply_memory_mode(
+        &mut self,
+        mode: &AddressingMode,
+        operand: u16,
+        page_boundary_penalty: bool,
+        dummy_read: bool,
+    ) -> u16 {
         match *mode {
             ZeropageX => {
                 self.read_memory(operand);
@@ -313,19 +349,34 @@ impl<'a> Cpu<'a> {
             }
             Indirect => self.read_word_page_wrapped(operand),
             Absolute => operand,
-            _ => panic!("Invalid memory mode {:?}", mode)
+            _ => panic!("Invalid memory mode {:?}", mode),
         }
     }
 
-    fn dummy_read(&mut self, operand: u16, page_boundary_penalty: bool, dummy_read: bool, address: u16) {
+    fn dummy_read(
+        &mut self,
+        operand: u16,
+        page_boundary_penalty: bool,
+        dummy_read: bool,
+        address: u16,
+    ) {
         if (page_boundary_penalty || dummy_read) && address & (!0xff) != operand & (!0xff) {
-            self.read_memory(if address >= 0x100 { address - 0x100 } else { address + 0xFF00 });
+            self.read_memory(if address >= 0x100 {
+                address - 0x100
+            } else {
+                address + 0xFF00
+            });
         } else if dummy_read {
             self.read_memory(address);
         }
     }
 
-    fn read_modify_write(&mut self, mode: &AddressingMode, operand: u16, modify: &mut dyn FnMut(u8, &mut Cpu) -> u8) -> u8 {
+    fn read_modify_write(
+        &mut self,
+        mode: &AddressingMode,
+        operand: u16,
+        modify: &mut dyn FnMut(u8, &mut Cpu) -> u8,
+    ) -> u8 {
         let (addr, operand_value) = match *mode {
             Accumulator => (0, self.a),
             _ => {
@@ -360,7 +411,10 @@ impl<'a> Cpu<'a> {
         let a_sign = a & 0x80 > 0;
         let op_sign = operand & 0x80 > 0;
         let result_sign = result & 0x80 > 0;
-        self.set_flag(OVERFLOW, ((a_sign ^ op_sign) ^ (!sbc)) & (a_sign ^ result_sign));
+        self.set_flag(
+            OVERFLOW,
+            ((a_sign ^ op_sign) ^ (!sbc)) & (a_sign ^ result_sign),
+        );
     }
 
     fn push(&mut self, value: u8) {
@@ -402,7 +456,8 @@ impl<'a> Cpu<'a> {
 
     fn adc(&mut self, operand_value: u8) {
         let prev_a = self.a;
-        let result = u16::from(self.a) + u16::from(operand_value) + (if self.flag(CARRY) { 1 } else { 0 });
+        let result =
+            u16::from(self.a) + u16::from(operand_value) + (if self.flag(CARRY) { 1 } else { 0 });
         self.a = (result & 0xff) as u8;
         self.set_zero_flag(result as u8);
         self.set_negative_flag(result as u8);
@@ -427,7 +482,7 @@ impl<'a> Cpu<'a> {
             }
             1 => u16::from(self.read_memory(operand_pc)),
             2 => self.read_word(operand_pc),
-            _ => panic!("too many bytes")
+            _ => panic!("too many bytes"),
         };
         self.pc += u16::from(mode.bytes());
 
@@ -609,7 +664,11 @@ impl<'a> Cpu<'a> {
                 let p = self.p | 0b00110000;
 
                 self.push_word(old_pc);
-                let vector = if self.ppu_bus.borrow().nmi_interrupt { 0xFFFA } else { 0xFFFE };
+                let vector = if self.ppu_bus.borrow().nmi_interrupt {
+                    0xFFFA
+                } else {
+                    0xFFFE
+                };
                 self.push(p);
                 self.pc = self.read_word(vector);
                 self.set_flag(INTERRUPT, true);
@@ -806,7 +865,9 @@ impl<'a> Cpu<'a> {
             NOP => {
                 match *mode {
                     Implied => (),
-                    _ => { self.read_memory_mode(mode, operand, true); }
+                    _ => {
+                        self.read_memory_mode(mode, operand, true);
+                    }
                 };
             }
 
@@ -843,12 +904,13 @@ impl<'a> Cpu<'a> {
             }
 
             RLA => {
-                let rol_result = self.read_modify_write(mode, operand, &mut |operand_value, cpu| {
-                    let new_carry = operand_value & 0x80 > 0;
-                    let rol_result = (operand_value << 1) + if cpu.flag(CARRY) { 1 } else { 0 };
-                    cpu.set_flag(CARRY, new_carry);
-                    rol_result
-                });
+                let rol_result =
+                    self.read_modify_write(mode, operand, &mut |operand_value, cpu| {
+                        let new_carry = operand_value & 0x80 > 0;
+                        let rol_result = (operand_value << 1) + if cpu.flag(CARRY) { 1 } else { 0 };
+                        cpu.set_flag(CARRY, new_carry);
+                        rol_result
+                    });
                 let result = self.a & rol_result;
                 self.set_zero_flag(result);
                 self.set_negative_flag(result);
@@ -947,11 +1009,12 @@ impl<'a> Cpu<'a> {
             }
 
             SLO => {
-                let asl_result = self.read_modify_write(mode, operand, &mut |operand_value, cpu| {
-                    let result = u16::from(operand_value) << 1;
-                    cpu.set_carry_flag(result);
-                    result as u8
-                });
+                let asl_result =
+                    self.read_modify_write(mode, operand, &mut |operand_value, cpu| {
+                        let result = u16::from(operand_value) << 1;
+                        cpu.set_carry_flag(result);
+                        result as u8
+                    });
                 let result = self.a | asl_result as u8;
                 self.set_zero_flag(result);
                 self.set_negative_flag(result);
@@ -959,10 +1022,11 @@ impl<'a> Cpu<'a> {
             }
 
             SRE => {
-                let lsr_result = self.read_modify_write(mode, operand, &mut |operand_value, cpu| {
-                    cpu.set_flag(CARRY, operand_value & 0b1 > 0);
-                    operand_value >> 1
-                });
+                let lsr_result =
+                    self.read_modify_write(mode, operand, &mut |operand_value, cpu| {
+                        cpu.set_flag(CARRY, operand_value & 0b1 > 0);
+                        operand_value >> 1
+                    });
                 let result = self.a ^ lsr_result;
                 self.a = result;
                 self.set_zero_flag(result);
@@ -1039,7 +1103,9 @@ impl<'a> Cpu<'a> {
                 self.set_negative_flag(value);
             }
 
-            XXX => { unimplemented!("{:02X}", opcode_hex) }
+            XXX => {
+                unimplemented!("{:02X}", opcode_hex)
+            }
         }
     }
 
@@ -1050,7 +1116,11 @@ impl<'a> Cpu<'a> {
         self.read_memory(old_pc);
         self.push_word(old_pc);
         self.push(p);
-        let vector = if self.ppu_bus.borrow().nmi_interrupt { 0xFFFA } else { 0xFFFE };
+        let vector = if self.ppu_bus.borrow().nmi_interrupt {
+            0xFFFA
+        } else {
+            0xFFFE
+        };
         self.pc = self.read_word(vector);
         if vector == 0xFFFA {
             self.ppu_bus.borrow_mut().nmi_interrupt = false;
@@ -1083,7 +1153,13 @@ impl<'a> Cpu<'a> {
         }
     }
 
-    pub fn render(&mut self, c: Context, texture_ctx: &mut G2dTextureContext, gl: &mut G2d, glyphs: &mut Glyphs) {
+    pub fn render(
+        &mut self,
+        c: Context,
+        texture_ctx: &mut G2dTextureContext,
+        gl: &mut G2d,
+        glyphs: &mut Glyphs,
+    ) {
         self.ppu.render(c, texture_ctx, gl, glyphs);
     }
 
@@ -1103,7 +1179,7 @@ impl<'a> Cpu<'a> {
 
         for _ in 0..28 {
             self.ppu.tick();
-        };
+        }
         for _ in 0..9 {
             self.apu.tick(self.cartridge);
         }

@@ -177,42 +177,43 @@ impl PpuBus {
             first_write: false,
             nmi_interrupt: false,
             nmi_interrupt_age: 0,
-            decay_register: DecayRegister::new(
-                [0xFF, 0xFF, 0x1F, 0xFF, 0x00, 0xFF, 0xFF, 0x00]),
+            decay_register: DecayRegister::new([0xFF, 0xFF, 0x1F, 0xFF, 0x00, 0xFF, 0xFF, 0x00]),
         }
     }
 
     pub fn read(&mut self, addr: u16) -> u8 {
         let addr = (addr % 8) as usize;
-        self.decay_register.read(addr,
-                                 match addr {
-                                     0 => 0,
-                                     1 => 0,
-                                     2 => {
-                                         let value = self.status.to_u8();
-                                         self.status.vertical_blank = false;
-                                         self.first_write = false;
-                                         self.status.just_read = true;
-                                         if self.nmi_interrupt_age < 2 {
-                                             self.nmi_interrupt = false;
-                                         }
-                                         value
-                                     }
-                                     3 => 0,
-                                     4 => self.oam_data,
-                                     5 => 0,
-                                     6 => 0,
-                                     7 => {
-                                         let buffer_data = self.read_buffer.take();
-                                         if self.addr >= 0x3F00 {
-                                             self.palette_data
-                                         } else {
-                                             buffer_data.unwrap()
-                                         }
-                                     },
-                                     _ => panic!()
-                                 },
-                                 addr == 7 && self.addr >= 0x3F00)
+        self.decay_register.read(
+            addr,
+            match addr {
+                0 => 0,
+                1 => 0,
+                2 => {
+                    let value = self.status.to_u8();
+                    self.status.vertical_blank = false;
+                    self.first_write = false;
+                    self.status.just_read = true;
+                    if self.nmi_interrupt_age < 2 {
+                        self.nmi_interrupt = false;
+                    }
+                    value
+                }
+                3 => 0,
+                4 => self.oam_data,
+                5 => 0,
+                6 => 0,
+                7 => {
+                    let buffer_data = self.read_buffer.take();
+                    if self.addr >= 0x3F00 {
+                        self.palette_data
+                    } else {
+                        buffer_data.unwrap()
+                    }
+                }
+                _ => panic!(),
+            },
+            addr == 7 && self.addr >= 0x3F00,
+        )
     }
 
     pub fn write(&mut self, addr: u16, value: u8) {
@@ -225,7 +226,11 @@ impl PpuBus {
                 if !self.ctrl.gen_nmi && self.nmi_interrupt_age < 2 {
                     self.nmi_interrupt = false;
                 }
-                if self.ctrl.gen_nmi && !was_gen_nmi && self.status.vertical_blank && !self.status.vertical_blank_about_to_clear {
+                if self.ctrl.gen_nmi
+                    && !was_gen_nmi
+                    && self.status.vertical_blank
+                    && !self.status.vertical_blank_about_to_clear
+                {
                     self.nmi_interrupt = true;
                     self.nmi_interrupt_age = 0;
                 }
@@ -247,7 +252,7 @@ impl PpuBus {
             7 => {
                 self.data_write = Some(value);
             }
-            _ => panic!()
+            _ => panic!(),
         }
     }
 

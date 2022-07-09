@@ -16,10 +16,7 @@ pub struct ControllerState<const N: usize> {
 
 impl<const N: usize> ControllerState<N> {
     fn new(inputs: [Input; N]) -> ControllerState<N> {
-        ControllerState {
-            inputs,
-            state: 0,
-        }
+        ControllerState { inputs, state: 0 }
     }
 
     pub fn event(&mut self, event: &Event) -> bool {
@@ -43,8 +40,11 @@ impl<const N: usize> ControllerState<N> {
         if let Some(axis_args) = event.controller_axis_args() {
             for (i, input) in self.inputs.iter().enumerate() {
                 if let Axis(input_axis_args) = *input {
-                    if axis_args.id == input_axis_args.id && axis_args.axis == input_axis_args.axis {
-                        if axis_args.position == 0.0 || axis_args.position.signum() != input_axis_args.position.signum() {
+                    if axis_args.id == input_axis_args.id && axis_args.axis == input_axis_args.axis
+                    {
+                        if axis_args.position == 0.0
+                            || axis_args.position.signum() != input_axis_args.position.signum()
+                        {
                             self.state &= !(1 << i);
                         } else {
                             self.state |= 1 << i;
@@ -77,12 +77,27 @@ impl<const N: usize> ControllerState<N> {
 
     pub fn render_overlay(&self, c: Context, gl: &mut G2d, glyphs: &mut Glyphs) {
         const INPUT_STRS: [&str; 8] = ["A ", "B ", "s ", "S ", "^ ", "v ", "< ", "> "];
-        let value = (0..8).map(|i| { if self.state & (1 << i) > 0 { INPUT_STRS[i] } else { "  " } }).collect::<String>();
-        text([0.0, 0.0, 0.0, 1.0], 8, &value, glyphs, c.trans(1.0, 1.0).transform, gl).unwrap();
+        let value = (0..8)
+            .map(|i| {
+                if self.state & (1 << i) > 0 {
+                    INPUT_STRS[i]
+                } else {
+                    "  "
+                }
+            })
+            .collect::<String>();
+        text(
+            [0.0, 0.0, 0.0, 1.0],
+            8,
+            &value,
+            glyphs,
+            c.trans(1.0, 1.0).transform,
+            gl,
+        )
+            .unwrap();
         text([1.0, 1.0, 0.5, 1.0], 8, &value, glyphs, c.transform, gl).unwrap();
     }
 }
-
 
 pub fn player_1_nes() -> ControllerState<8> {
     ControllerState::new([

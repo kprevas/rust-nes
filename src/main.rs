@@ -24,7 +24,7 @@ fn main() {
             (@arg instrument_cpu: -c "instruments CPU")
             (@arg bench_mode: -b "runs in benchmark mode")
         )
-    ).get_matches();
+    )
+        .get_matches();
     nes::run(matches);
 }
-

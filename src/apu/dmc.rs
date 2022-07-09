@@ -1,7 +1,9 @@
 use apu::bus::*;
 use cartridge::CartridgeBus;
 
-pub const TIMER_VALUES: [u16; 16] = [428, 380, 340, 320, 286, 254, 226, 214, 190, 160, 142, 128, 106, 84, 72, 54];
+pub const TIMER_VALUES: [u16; 16] = [
+    428, 380, 340, 320, 286, 254, 226, 214, 190, 160, 142, 128, 106, 84, 72, 54,
+];
 
 #[derive(Serialize, Deserialize)]
 pub struct Dmc {

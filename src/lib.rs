@@ -31,14 +31,14 @@ use cartridge::Cartridge;
 use menu::NES_CONTROLS;
 
 pub mod apu;
-pub mod cpu;
 pub mod cartridge;
+pub mod control;
+pub mod cpu;
 pub mod input;
 pub mod m68k;
-pub mod ppu;
-pub mod control;
-pub mod record;
 pub mod menu;
+pub mod ppu;
+pub mod record;
 
 pub fn run(matches: ArgMatches) {
     if let Some(matches) = matches.subcommand_matches("disassemble") {
@@ -47,15 +47,15 @@ pub fn run(matches: ArgMatches) {
             Some(ref path) => Box::new(File::create(&Path::new(path)).unwrap()) as Box<dyn Write>,
             None => Box::new(std::io::stdout()) as Box<dyn Write>,
         };
-        let cartridge = if let Some((cartridge, _)) = load_cartridge(matches) { cartridge } else { return; };
+        let cartridge = if let Some((cartridge, _)) = load_cartridge(matches) {
+            cartridge
+        } else {
+            return;
+        };
         cpu::disassembler::disassemble(cartridge.cpu_bus, 0x8000, &mut out).unwrap();
     } else if let Some(matches) = matches.subcommand_matches("run") {
-        let window: PistonWindow<sdl2_window::Sdl2Window> = WindowSettings::new(
-            "nes",
-            [293, 240],
-        )
-            .build()
-            .unwrap();
+        let window: PistonWindow<sdl2_window::Sdl2Window> =
+            WindowSettings::new("nes", [293, 240]).build().unwrap();
         let mut window = window
             .ups(60)
             .ups_reset(0)
@@ -84,16 +84,33 @@ pub fn run(matches: ArgMatches) {
         let ppu_bus = RefCell::new(ppu::bus::PpuBus::new());
         let apu_bus = RefCell::new(apu::bus::ApuBus::new());
 
-        let ppu = ppu::Ppu::new(&mut cartridge.ppu_bus, &ppu_bus, Some(&mut window), instrument_ppu);
+        let ppu = ppu::Ppu::new(
+            &mut cartridge.ppu_bus,
+            &ppu_bus,
+            Some(&mut window),
+            instrument_ppu,
+        );
         let apu = apu::Apu::new(&apu_bus, Some(PortAudio::new().unwrap())).unwrap();
 
-        let mut cpu = cpu::Cpu::boot(&mut cartridge.cpu_bus, ppu, &ppu_bus, apu, &apu_bus, instrument_cpu);
+        let mut cpu = cpu::Cpu::boot(
+            &mut cartridge.cpu_bus,
+            ppu,
+            &ppu_bus,
+            apu,
+            &apu_bus,
+            instrument_cpu,
+        );
 
-        let assets = find_folder::Search::ParentsThenKids(3, 3).for_folder("src").unwrap();
+        let assets = find_folder::Search::ParentsThenKids(3, 3)
+            .for_folder("src")
+            .unwrap();
         let ref font = assets.join("VeraMono.ttf");
-        let mut glyphs = Glyphs::new(font,
-                                     window.create_texture_context(),
-                                     TextureSettings::new()).unwrap();
+        let mut glyphs = Glyphs::new(
+            font,
+            window.create_texture_context(),
+            TextureSettings::new(),
+        )
+            .unwrap();
         let mut texture_ctx = window.create_texture_context();
 
         let mut scale = 1.0;
@@ -112,12 +129,14 @@ pub fn run(matches: ArgMatches) {
             if !menu_handled {
                 input_changed |= inputs[0].event(&e);
                 input_changed |= inputs[1].event(&e);
-                control.event(&e,
-                              &mut cpu,
-                              &mut reset,
-                              &mut input_overlay,
-                              &mut recorder,
-                              frame_count);
+                control.event(
+                    &e,
+                    &mut cpu,
+                    &mut reset,
+                    &mut input_overlay,
+                    &mut recorder,
+                    frame_count,
+                );
             } else {
                 menu.update_controls(&mut inputs);
             }
@@ -164,17 +183,16 @@ pub fn run(matches: ArgMatches) {
         let mut save: Vec<u8> = Vec::new();
         cpu.save_to_battery(&mut save).unwrap();
         if save.len() > 0 {
-            File::create(save_path.as_path()).unwrap().write(save.as_slice()).unwrap();
+            File::create(save_path.as_path())
+                .unwrap()
+                .write(save.as_slice())
+                .unwrap();
         }
         recorder.stop();
         menu.save_settings();
     } else if let Some(matches) = matches.subcommand_matches("m68k") {
-        let window: PistonWindow<sdl2_window::Sdl2Window> = WindowSettings::new(
-            "gen",
-            [320, 224],
-        )
-            .build()
-            .unwrap();
+        let window: PistonWindow<sdl2_window::Sdl2Window> =
+            WindowSettings::new("gen", [320, 224]).build().unwrap();
         let mut window = window
             .ups(60)
             .ups_reset(0)
@@ -209,25 +227,29 @@ fn load_cartridge(matches: &ArgMatches) -> Option<(Cartridge, PathBuf)> {
     let cartridge: Cartridge = loop {
         let input_file = match matches.value_of("INPUT") {
             Some(i) => Some(PathBuf::from(i)),
-            None => {
-                match nfd::open_file_dialog(None, None).unwrap() {
-                    Response::Okay(p) => Some(PathBuf::from(p)),
-                    Response::OkayMultiple(v) => Some(PathBuf::from(&v[0])),
-                    Response::Cancel => None,
-                }
-            }
+            None => match nfd::open_file_dialog(None, None).unwrap() {
+                Response::Okay(p) => Some(PathBuf::from(p)),
+                Response::OkayMultiple(v) => Some(PathBuf::from(&v[0])),
+                Response::Cancel => None,
+            },
         };
         if let Some(input_file) = input_file {
-            save_path = PathBuf::from(".").join(input_file.file_name().unwrap()).with_extension("sav");
-            match cartridge::read(File::open(input_file).as_mut().unwrap(),
-                                  match File::open(save_path.as_path()) {
-                                      Ok(ref mut file) => Some(file),
-                                      Err(_) => None,
-                                  }) {
-                Ok(c) => break c,
-                Err(e) => if matches.is_present("INPUT") {
-                    panic!("{}", e);
+            save_path = PathBuf::from(".")
+                .join(input_file.file_name().unwrap())
+                .with_extension("sav");
+            match cartridge::read(
+                File::open(input_file).as_mut().unwrap(),
+                match File::open(save_path.as_path()) {
+                    Ok(ref mut file) => Some(file),
+                    Err(_) => None,
                 },
+            ) {
+                Ok(c) => break c,
+                Err(e) => {
+                    if matches.is_present("INPUT") {
+                        panic!("{}", e);
+                    }
+                }
             };
         } else {
             return None;

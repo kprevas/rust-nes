@@ -35,7 +35,9 @@ impl<const B: usize> Recorder<B> {
                 match receiver.recv() {
                     Ok(input) => {
                         BigEndian::write_u64(&mut buf, input);
-                        file.get_or_insert_with(|| { File::create(&path).unwrap() }).write_all(&buf).unwrap();
+                        file.get_or_insert_with(|| File::create(&path).unwrap())
+                            .write_all(&buf)
+                            .unwrap();
                     }
                     Err(_) => break,
                 };
@@ -63,9 +65,13 @@ impl<const B: usize> Recorder<B> {
     pub fn input_changed(&mut self, inputs: &[ControllerState<B>; 2], frame_count: u32) {
         if self.recording {
             if let Some(ref sender) = self.sender {
-                sender.send((((frame_count - self.start_frame) as u64) << 32)
-                    | ((inputs[0].to_u8() as u64) << 8)
-                    | (inputs[1].to_u8() as u64)).unwrap();
+                sender
+                    .send(
+                        (((frame_count - self.start_frame) as u64) << 32)
+                            | ((inputs[0].to_u8() as u64) << 8)
+                            | (inputs[1].to_u8() as u64),
+                    )
+                    .unwrap();
             }
         }
     }
@@ -96,10 +102,20 @@ impl<const B: usize> Recorder<B> {
 
     pub fn render_overlay(&self, c: Context, gl: &mut G2d) {
         if self.recording {
-            ellipse([1.0, 0.0, 0.0, 1.0], [0.0, 0.0, 10.0, 10.0], c.transform, gl);
+            ellipse(
+                [1.0, 0.0, 0.0, 1.0],
+                [0.0, 0.0, 10.0, 10.0],
+                c.transform,
+                gl,
+            );
         }
         if self.playback.is_some() {
-            polygon([0.0, 1.0, 0.0, 1.0], &[[0.0, 0.0], [10.0, 5.0], [0.0, 10.0]], c.transform, gl);
+            polygon(
+                [0.0, 1.0, 0.0, 1.0],
+                &[[0.0, 0.0], [10.0, 5.0], [0.0, 10.0]],
+                c.transform,
+                gl,
+            );
         }
     }
 }

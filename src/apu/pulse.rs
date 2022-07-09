@@ -33,7 +33,13 @@ impl Pulse {
         if ctrl_bus.sweep.enabled {
             let shift_amount = ctrl_bus.timer >> ctrl_bus.sweep.shift_count;
             if ctrl_bus.sweep.negate {
-                ctrl_bus.timer - shift_amount - if ctrl_bus.sweep.ones_complement_adj { 1 } else { 0 }
+                ctrl_bus.timer
+                    - shift_amount
+                    - if ctrl_bus.sweep.ones_complement_adj {
+                    1
+                } else {
+                    0
+                }
             } else {
                 ctrl_bus.timer + shift_amount
             }
@@ -51,7 +57,10 @@ impl Pulse {
         }
 
         let tick_val;
-        if ctrl_bus.length_counter > 0 && self.sweep_target_period(&ctrl_bus) <= 0x7FF && ctrl_bus.timer >= 8 {
+        if ctrl_bus.length_counter > 0
+            && self.sweep_target_period(&ctrl_bus) <= 0x7FF
+            && ctrl_bus.timer >= 8
+        {
             if self.curr_timer == 0 {
                 self.curr_timer = ctrl_bus.timer;
                 if ctrl_bus.timer >= 8 {

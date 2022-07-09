@@ -31,7 +31,11 @@ pub fn read(header: &Header, prg_rom: &[u8], chr_rom: &[u8]) -> Cartridge {
         }),
         ppu_bus: Box::new(Mapper3Ppu {
             chr_rom: chr_rom.to_vec(),
-            mirroring: if header.flags_6 & 0x1 == 1 { Vertical } else { Horizontal },
+            mirroring: if header.flags_6 & 0x1 == 1 {
+                Vertical
+            } else {
+                Horizontal
+            },
             chr_bank: chr_bank.clone(),
         }),
     }
@@ -41,12 +45,13 @@ impl CartridgeBus for Mapper3Cpu {
     fn read_memory(&self, address: u16, open_bus: u8) -> u8 {
         match address {
             0x8000..=0xBFFF => self.prg_rom[(address - 0x8000) as usize],
-            0xC000..=0xFFFF =>
+            0xC000..=0xFFFF => {
                 if self.prg_rom.len() <= 0x4000 {
                     self.prg_rom[(address - 0xC000) as usize]
                 } else {
                     self.prg_rom[(address - 0x8000) as usize]
                 }
+            }
             _ => open_bus,
         }
     }

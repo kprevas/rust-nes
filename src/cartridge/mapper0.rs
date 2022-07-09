@@ -29,7 +29,11 @@ pub fn read(header: &Header, prg_rom: &[u8], chr_rom: &[u8]) -> Cartridge {
             prg_ram: vec![0; (u16::from(max(header.prg_ram_blocks, 1)) * 0x2000) as usize],
         }),
         ppu_bus: Box::new(Mapper0Ppu {
-            chr_rom: if uses_chr_ram { vec!(0; 0x2000) } else { chr_rom.to_vec() },
+            chr_rom: if uses_chr_ram {
+                vec![0; 0x2000]
+            } else {
+                chr_rom.to_vec()
+            },
             mirroring: header.mirroring,
             uses_chr_ram,
         }),
@@ -41,12 +45,13 @@ impl CartridgeBus for Mapper0Cpu {
         match address {
             0x6000..=0x7FFF => self.prg_ram[(address - 0x6000) as usize],
             0x8000..=0xBFFF => self.prg_rom[(address - 0x8000) as usize],
-            0xC000..=0xFFFF =>
+            0xC000..=0xFFFF => {
                 if self.prg_rom.len() <= 0x4000 {
                     self.prg_rom[(address - 0xC000) as usize]
                 } else {
                     self.prg_rom[(address - 0x8000) as usize]
                 }
+            }
             _ => open_bus,
         }
     }

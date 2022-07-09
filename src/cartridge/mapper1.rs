@@ -60,7 +60,7 @@ impl CtrlRegisters {
                     0xE000..=0xFFFF => {
                         self.prg_ram_enabled = value & 0b10000 == 0;
                         self.prg_bank = (value & 0b1111) as usize;
-                    },
+                    }
                     _ => unreachable!(),
                 }
                 self.shift_reg_written = 0;
@@ -69,8 +69,8 @@ impl CtrlRegisters {
     }
 
     fn write_ctrl(&mut self, val: u8) {
-        use self::PrgBankMode::*;
         use self::ChrBankMode::*;
+        use self::PrgBankMode::*;
         self.mirroring = match val & 3 {
             0 => {
                 self.one_screen_mirroring_hi = false;
@@ -90,12 +90,16 @@ impl CtrlRegisters {
             3 => FixHiBank,
             _ => unreachable!(),
         };
-        self.chr_bank_mode = if (val >> 4) & 1 > 0 { Switch4K } else { Switch8K }
+        self.chr_bank_mode = if (val >> 4) & 1 > 0 {
+            Switch4K
+        } else {
+            Switch8K
+        }
     }
 
     fn read_ctrl(&self) -> u8 {
-        use self::PrgBankMode::*;
         use self::ChrBankMode::*;
+        use self::PrgBankMode::*;
 
         let mut val = 0;
         match self.mirroring {
@@ -117,33 +121,41 @@ impl CtrlRegisters {
     }
 
     fn chr_low_bank(&self, addr: u16, max_addr: usize) -> usize {
-        ((addr as usize) + match self.chr_bank_mode {
+        ((addr as usize)
+            + match self.chr_bank_mode {
             ChrBankMode::Switch8K => (self.chr_bank_low & (!1)) << 12,
             ChrBankMode::Switch4K => self.chr_bank_low << 12,
-        }) % max_addr
+        })
+            % max_addr
     }
 
     fn chr_hi_bank(&self, addr: u16, max_addr: usize) -> usize {
-        ((addr as usize) + match self.chr_bank_mode {
+        ((addr as usize)
+            + match self.chr_bank_mode {
             ChrBankMode::Switch8K => (self.chr_bank_low | 1) << 12,
             ChrBankMode::Switch4K => self.chr_bank_hi << 12,
-        }) % max_addr
+        })
+            % max_addr
     }
 
     fn prg_low_bank(&self, addr: u16, max_addr: usize) -> usize {
-        ((addr as usize) + match self.prg_bank_mode {
+        ((addr as usize)
+            + match self.prg_bank_mode {
             PrgBankMode::Switch32K => (self.prg_bank & (!1)) << 14,
             PrgBankMode::FixLowBank => 0,
             PrgBankMode::FixHiBank => self.prg_bank << 14,
-        }) % max_addr
+        })
+            % max_addr
     }
 
     fn prg_hi_bank(&self, addr: u16, max_addr: usize) -> usize {
-        ((addr as usize) + match self.prg_bank_mode {
+        ((addr as usize)
+            + match self.prg_bank_mode {
             PrgBankMode::Switch32K => (self.prg_bank | 1) << 14,
             PrgBankMode::FixLowBank => self.prg_bank << 14,
             PrgBankMode::FixHiBank => max_addr - 0x4000,
-        }) % max_addr
+        })
+            % max_addr
     }
 }
 
@@ -185,7 +197,11 @@ pub fn read(header: &Header, prg_rom: &[u8], chr_rom: &[u8]) -> Cartridge {
     Cartridge {
         cpu_bus,
         ppu_bus: Box::new(Mapper1Ppu {
-            chr_rom: if uses_chr_ram { vec!(0; 0x80000) } else { chr_rom.to_vec() },
+            chr_rom: if uses_chr_ram {
+                vec![0; 0x80000]
+            } else {
+                chr_rom.to_vec()
+            },
             uses_chr_ram,
             ctrl: Rc::clone(&ctrl_register),
         }),
@@ -197,7 +213,9 @@ impl CartridgeBus for Mapper1Cpu {
         let ctrl = self.ctrl.borrow();
         match address {
             0x6000..=0x7FFF => self.prg_ram[(address - 0x6000) as usize],
-            0x8000..=0xBFFF => self.prg_rom[ctrl.prg_low_bank(address - 0x8000, self.prg_rom.len())],
+            0x8000..=0xBFFF => {
+                self.prg_rom[ctrl.prg_low_bank(address - 0x8000, self.prg_rom.len())]
+            }
             0xC000..=0xFFFF => self.prg_rom[ctrl.prg_hi_bank(address - 0xC000, self.prg_rom.len())],
             _ => open_bus,
         }
@@ -215,7 +233,7 @@ impl CartridgeBus for Mapper1Cpu {
                 if cpu_cycle - self.last_write_cycle > 2 {
                     ctrl.write(address, value);
                 }
-            },
+            }
             _ => (),
         }
         self.last_write_cycle = cpu_cycle;
@@ -274,7 +292,9 @@ impl CartridgeBus for Mapper1Ppu {
             let max_addr = self.chr_rom.len();
             match address {
                 0x0000..=0x0FFF => self.chr_rom[ctrl.chr_low_bank(address, max_addr)] = value,
-                0x1000..=0x1FFF => self.chr_rom[ctrl.chr_hi_bank(address - 0x1000, max_addr)] = value,
+                0x1000..=0x1FFF => {
+                    self.chr_rom[ctrl.chr_hi_bank(address - 0x1000, max_addr)] = value
+                }
                 _ => (),
             }
         }
@@ -287,18 +307,36 @@ impl CartridgeBus for Mapper1Ppu {
             0x2400..=0x27FF => match ctrl.mirroring {
                 Vertical => address - 0x2000,
                 Horizontal => address - 0x2400,
-                SingleScreen => if ctrl.one_screen_mirroring_hi { address - 0x2000 } else { address - 0x2400 },
+                SingleScreen => {
+                    if ctrl.one_screen_mirroring_hi {
+                        address - 0x2000
+                    } else {
+                        address - 0x2400
+                    }
+                }
                 _ => unimplemented!(),
             },
             0x2800..=0x2BFF => match ctrl.mirroring {
                 Vertical => address - 0x2800,
                 Horizontal => address - 0x2400,
-                SingleScreen => if ctrl.one_screen_mirroring_hi { address - 0x2400 } else { address - 0x2800 },
+                SingleScreen => {
+                    if ctrl.one_screen_mirroring_hi {
+                        address - 0x2400
+                    } else {
+                        address - 0x2800
+                    }
+                }
                 _ => unimplemented!(),
             },
             0x2C00..=0x2FFF => match ctrl.mirroring {
                 Vertical | Horizontal => address - 0x2800,
-                SingleScreen => if ctrl.one_screen_mirroring_hi { address - 0x2800 } else { address - 0x2C00 },
+                SingleScreen => {
+                    if ctrl.one_screen_mirroring_hi {
+                        address - 0x2800
+                    } else {
+                        address - 0x2C00
+                    }
+                }
                 _ => unimplemented!(),
             },
             _ => panic!("Bad nametable mirror request {:04X}", address),

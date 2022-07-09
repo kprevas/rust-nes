@@ -22,10 +22,7 @@ pub const NES_CONTROLS: [(&str, usize); 8] = [
 ];
 
 #[derive(Serialize, Deserialize)]
-struct Buttons<const B: usize>(
-    #[serde(with = "serde_arrays")]
-    [Input; B],
-);
+struct Buttons<const B: usize>(#[serde(with = "serde_arrays")] [Input; B]);
 
 pub struct Menu<'a, const B: usize> {
     showing: bool,
@@ -36,15 +33,23 @@ pub struct Menu<'a, const B: usize> {
 }
 
 impl<'a, const B: usize> Menu<'a, B> {
-    pub fn new(control_labels: [(&'a str, usize); B],
-               default_controls: &[ControllerState<B>; 2]) -> Menu<'a, B> {
+    pub fn new(
+        control_labels: [(&'a str, usize); B],
+        default_controls: &[ControllerState<B>; 2],
+    ) -> Menu<'a, B> {
         let settings_file = File::open(Path::new("settings.dat"));
         let buttons = match settings_file {
             Ok(file) => match bincode::deserialize_from(file) {
                 Ok(buttons) => buttons,
-                Err(_) => [Buttons(default_controls[0].buttons()), Buttons(default_controls[1].buttons())],
+                Err(_) => [
+                    Buttons(default_controls[0].buttons()),
+                    Buttons(default_controls[1].buttons()),
+                ],
             },
-            Err(_) => [Buttons(default_controls[0].buttons()), Buttons(default_controls[1].buttons())],
+            Err(_) => [
+                Buttons(default_controls[0].buttons()),
+                Buttons(default_controls[1].buttons()),
+            ],
         };
         Menu {
             showing: false,
@@ -63,15 +68,28 @@ impl<'a, const B: usize> Menu<'a, B> {
     pub fn event(&mut self, event: &Event) -> bool {
         if self.awaiting_input {
             if let Some(button) = event.release_args() {
-                self.buttons[self.current_index / 8].0[self.control_labels[self.current_index % 8].1] = Button(button);
+                self.buttons[self.current_index / 8].0
+                    [self.control_labels[self.current_index % 8].1] = Button(button);
                 self.awaiting_input = false;
             }
         } else {
             match event.release_args() {
                 Some(Keyboard(Key::Escape)) => self.showing = !self.showing,
-                Some(Keyboard(Key::Up)) => if self.showing && self.current_index > 0 { self.current_index -= 1 },
-                Some(Keyboard(Key::Down)) => if self.showing && self.current_index < 15 { self.current_index += 1 },
-                Some(Keyboard(Key::Return)) => if self.showing { self.awaiting_input = true },
+                Some(Keyboard(Key::Up)) => {
+                    if self.showing && self.current_index > 0 {
+                        self.current_index -= 1
+                    }
+                }
+                Some(Keyboard(Key::Down)) => {
+                    if self.showing && self.current_index < 15 {
+                        self.current_index += 1
+                    }
+                }
+                Some(Keyboard(Key::Return)) => {
+                    if self.showing {
+                        self.awaiting_input = true
+                    }
+                }
                 _ => (),
             }
         }
@@ -80,21 +98,49 @@ impl<'a, const B: usize> Menu<'a, B> {
 
     pub fn render(&self, c: Context, gl: &mut G2d, glyphs: &mut Glyphs) {
         if self.showing {
-            rectangle([0.0, 0.0, 0.0, 0.7], [0.0, 0.0, 293.0, 240.0], c.transform, gl);
-            self.render_controls_menu("Player 1", 0, self.buttons[0].0, c.trans(10.0, 20.0), gl, glyphs);
-            self.render_controls_menu("Player 2", 8, self.buttons[1].0, c.trans(10.0, 135.0), gl, glyphs);
+            rectangle(
+                [0.0, 0.0, 0.0, 0.7],
+                [0.0, 0.0, 293.0, 240.0],
+                c.transform,
+                gl,
+            );
+            self.render_controls_menu(
+                "Player 1",
+                0,
+                self.buttons[0].0,
+                c.trans(10.0, 20.0),
+                gl,
+                glyphs,
+            );
+            self.render_controls_menu(
+                "Player 2",
+                8,
+                self.buttons[1].0,
+                c.trans(10.0, 135.0),
+                gl,
+                glyphs,
+            );
         }
     }
 
-    fn render_controls_menu(&self, header_text: &str, start_index: usize,
-                            buttons: [Input; B],
-                            c: Context, gl: &mut G2d, glyphs: &mut Glyphs) {
+    fn render_controls_menu(
+        &self,
+        header_text: &str,
+        start_index: usize,
+        buttons: [Input; B],
+        c: Context,
+        gl: &mut G2d,
+        glyphs: &mut Glyphs,
+    ) {
         self.render_header(header_text, c, gl, glyphs);
         for (menu_index, &(name, array_index)) in self.control_labels.iter().enumerate() {
-            self.render_item(name, &input_to_string(buttons[array_index]),
-                             self.current_index == start_index + menu_index,
-                             c.trans(0.0, 12.0 * (1.0 + menu_index as f64)),
-                             gl, glyphs,
+            self.render_item(
+                name,
+                &input_to_string(buttons[array_index]),
+                self.current_index == start_index + menu_index,
+                c.trans(0.0, 12.0 * (1.0 + menu_index as f64)),
+                gl,
+                glyphs,
             );
         }
     }
@@ -103,12 +149,37 @@ impl<'a, const B: usize> Menu<'a, B> {
         text([1.0, 1.0, 1.0, 1.0], 10, value, glyphs, c.transform, gl).unwrap();
     }
 
-    fn render_item(&self, name: &str, value: &str, highlight: bool, c: Context, gl: &mut G2d, glyphs: &mut Glyphs) {
+    fn render_item(
+        &self,
+        name: &str,
+        value: &str,
+        highlight: bool,
+        c: Context,
+        gl: &mut G2d,
+        glyphs: &mut Glyphs,
+    ) {
         if highlight {
-            rectangle(if self.awaiting_input { [0.7, 0.5, 0.3, 1.0] } else { [0.5, 0.7, 0.3, 1.0] }, [0.0, -8.0, 150.0, 12.0], c.transform, gl);
+            rectangle(
+                if self.awaiting_input {
+                    [0.7, 0.5, 0.3, 1.0]
+                } else {
+                    [0.5, 0.7, 0.3, 1.0]
+                },
+                [0.0, -8.0, 150.0, 12.0],
+                c.transform,
+                gl,
+            );
         }
         text([1.0, 1.0, 1.0, 1.0], 8, name, glyphs, c.transform, gl).unwrap();
-        text([1.0, 1.0, 1.0, 1.0], 8, value, glyphs, c.trans(50.0, 0.0).transform, gl).unwrap();
+        text(
+            [1.0, 1.0, 1.0, 1.0],
+            8,
+            value,
+            glyphs,
+            c.trans(50.0, 0.0).transform,
+            gl,
+        )
+            .unwrap();
     }
 
     pub fn save_settings(&self) {
@@ -122,7 +193,12 @@ fn input_to_string(input: Input) -> String {
         Button(Keyboard(key)) => format!("{:?}", key),
         Button(Mouse(button)) => format!("Mouse {:?}", button),
         Button(Controller(button)) => format!("Joy {} button {}", button.id, button.button),
-        Axis(axis_args) => format!("Joy {} axis {} {}", axis_args.id, axis_args.axis, if axis_args.position < 0.0 { "-" } else { "+" }),
+        Axis(axis_args) => format!(
+            "Joy {} axis {} {}",
+            axis_args.id,
+            axis_args.axis,
+            if axis_args.position < 0.0 { "-" } else { "+" }
+        ),
         Button(Hat(hat)) => format!("Joy {} hat {}", hat.id, hat.which),
     }
 }

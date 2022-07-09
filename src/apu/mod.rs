@@ -19,10 +19,10 @@ use self::rb::{Producer, RB, RbConsumer, RbInspector, RbProducer, SpscRb};
 use self::triangle::*;
 
 pub mod bus;
+mod dmc;
+mod noise;
 mod pulse;
 mod triangle;
-mod noise;
-mod dmc;
 
 const CHANNELS: i32 = 1;
 const TARGET_HZ: f64 = 44_100.0;
@@ -31,10 +31,8 @@ const APPROX_TICKS_PER_FRAME: usize = 14915;
 const MAX_BUFFER_FRAMES: usize = 3;
 
 const LENGTH_TABLE: [u8; 0x20] = [
-    0x0A, 0xFE, 0x14, 0x02, 0x28, 0x04, 0x50, 0x06,
-    0xA0, 0x08, 0x3C, 0x0A, 0x0E, 0x0C, 0x1A, 0x0E,
-    0x0C, 0x10, 0x18, 0x12, 0x30, 0x14, 0x60, 0x16,
-    0xC0, 0x18, 0x48, 0x1A, 0x10, 0x1C, 0x20, 0x1E,
+    0x0A, 0xFE, 0x14, 0x02, 0x28, 0x04, 0x50, 0x06, 0xA0, 0x08, 0x3C, 0x0A, 0x0E, 0x0C, 0x1A, 0x0E,
+    0x0C, 0x10, 0x18, 0x12, 0x30, 0x14, 0x60, 0x16, 0xC0, 0x18, 0x48, 0x1A, 0x10, 0x1C, 0x20, 0x1E,
 ];
 
 pub type OutputStream = Stream<NonBlocking, Output<f32>>;
@@ -96,10 +94,13 @@ impl<'a> Apu<'a> {
             Continue
         };
         let stream = pa.map(|pa| {
-            let settings = pa.default_output_stream_settings::<f32>(
-                CHANNELS,
-                TARGET_HZ,
-                FRAMES_PER_BUFFER_UNSPECIFIED).unwrap();
+            let settings = pa
+                .default_output_stream_settings::<f32>(
+                    CHANNELS,
+                    TARGET_HZ,
+                    FRAMES_PER_BUFFER_UNSPECIFIED,
+                )
+                .unwrap();
             let mut stream = pa.open_non_blocking_stream(settings, callback).unwrap();
             stream.start().unwrap();
             stream
@@ -194,13 +195,11 @@ impl<'a> Apu<'a> {
             let noise = self.noise.tick(&mut bus.noise);
             let dmc = self.dmc.tick(&mut bus, cartridge);
             if self.stream.is_some() {
-                self.output_buffer.write_blocking(
-                    &[
-                        (pulse_1 + pulse_2) * 0.00752
-                            + triangle * 0.00851
-                            + noise * 0.00494
-                            + dmc * 0.00335
-                    ]);
+                self.output_buffer
+                    .write_blocking(&[(pulse_1 + pulse_2) * 0.00752
+                        + triangle * 0.00851
+                        + noise * 0.00494
+                        + dmc * 0.00335]);
             }
         }
 

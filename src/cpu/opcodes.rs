@@ -21,7 +21,7 @@ impl AddressingMode {
         match *self {
             Accumulator | Implied => 0,
             Absolute | AbsoluteIndexedX | AbsoluteIndexedY | Indirect => 2,
-            _ => 1
+            _ => 1,
         }
     }
 
@@ -42,12 +42,11 @@ impl AddressingMode {
                 } else {
                     pc.wrapping_sub((-offset) as u16)
                 }
-            }
-            ),
+            }),
             AbsoluteIndexedX => format!("${:04X},X ", operand),
             AbsoluteIndexedY => format!("${:04X},Y ", operand),
             Indirect => format!("(${:04X})", operand),
-            _ => String::from("")
+            _ => String::from(""),
         }
     }
 }
@@ -223,7 +222,6 @@ pub const OPCODES: [(Opcode, AddressingMode); 256] = [
     (Opcode::ORA, AddressingMode::Absolute),
     (Opcode::ASL, AddressingMode::Absolute),
     (Opcode::SLO, AddressingMode::Absolute),
-
     // 1x
     (Opcode::BPL, AddressingMode::Relative),
     (Opcode::ORA, AddressingMode::IndirectIndexed),
@@ -241,7 +239,6 @@ pub const OPCODES: [(Opcode, AddressingMode); 256] = [
     (Opcode::ORA, AddressingMode::AbsoluteIndexedX),
     (Opcode::ASL, AddressingMode::AbsoluteIndexedX),
     (Opcode::SLO, AddressingMode::AbsoluteIndexedX),
-
     // 2x
     (Opcode::JSR, AddressingMode::Absolute),
     (Opcode::AND, AddressingMode::IndexedIndirect),
@@ -259,7 +256,6 @@ pub const OPCODES: [(Opcode, AddressingMode); 256] = [
     (Opcode::AND, AddressingMode::Absolute),
     (Opcode::ROL, AddressingMode::Absolute),
     (Opcode::RLA, AddressingMode::Absolute),
-
     // 3x
     (Opcode::BMI, AddressingMode::Relative),
     (Opcode::AND, AddressingMode::IndirectIndexed),
@@ -277,7 +273,6 @@ pub const OPCODES: [(Opcode, AddressingMode); 256] = [
     (Opcode::AND, AddressingMode::AbsoluteIndexedX),
     (Opcode::ROL, AddressingMode::AbsoluteIndexedX),
     (Opcode::RLA, AddressingMode::AbsoluteIndexedX),
-
     // 4x
     (Opcode::RTI, AddressingMode::Implied),
     (Opcode::EOR, AddressingMode::IndexedIndirect),
@@ -295,7 +290,6 @@ pub const OPCODES: [(Opcode, AddressingMode); 256] = [
     (Opcode::EOR, AddressingMode::Absolute),
     (Opcode::LSR, AddressingMode::Absolute),
     (Opcode::SRE, AddressingMode::Absolute),
-
     // 5x
     (Opcode::BVC, AddressingMode::Relative),
     (Opcode::EOR, AddressingMode::IndirectIndexed),
@@ -313,7 +307,6 @@ pub const OPCODES: [(Opcode, AddressingMode); 256] = [
     (Opcode::EOR, AddressingMode::AbsoluteIndexedX),
     (Opcode::LSR, AddressingMode::AbsoluteIndexedX),
     (Opcode::SRE, AddressingMode::AbsoluteIndexedX),
-
     // 6x
     (Opcode::RTS, AddressingMode::Implied),
     (Opcode::ADC, AddressingMode::IndexedIndirect),
@@ -331,7 +324,6 @@ pub const OPCODES: [(Opcode, AddressingMode); 256] = [
     (Opcode::ADC, AddressingMode::Absolute),
     (Opcode::ROR, AddressingMode::Absolute),
     (Opcode::RRA, AddressingMode::Absolute),
-
     // 7x
     (Opcode::BVS, AddressingMode::Relative),
     (Opcode::ADC, AddressingMode::IndirectIndexed),
@@ -349,7 +341,6 @@ pub const OPCODES: [(Opcode, AddressingMode); 256] = [
     (Opcode::ADC, AddressingMode::AbsoluteIndexedX),
     (Opcode::ROR, AddressingMode::AbsoluteIndexedX),
     (Opcode::RRA, AddressingMode::AbsoluteIndexedX),
-
     // 8x
     (Opcode::NOP, AddressingMode::Immediate),
     (Opcode::STA, AddressingMode::IndexedIndirect),
@@ -367,7 +358,6 @@ pub const OPCODES: [(Opcode, AddressingMode); 256] = [
     (Opcode::STA, AddressingMode::Absolute),
     (Opcode::STX, AddressingMode::Absolute),
     (Opcode::SAX, AddressingMode::Absolute),
-
     // 9x
     (Opcode::BCC, AddressingMode::Relative),
     (Opcode::STA, AddressingMode::IndirectIndexed),
@@ -385,7 +375,6 @@ pub const OPCODES: [(Opcode, AddressingMode); 256] = [
     (Opcode::STA, AddressingMode::AbsoluteIndexedX),
     (Opcode::SHX, AddressingMode::AbsoluteIndexedY),
     (Opcode::AHX, AddressingMode::AbsoluteIndexedY),
-
     // Ax
     (Opcode::LDY, AddressingMode::Immediate),
     (Opcode::LDA, AddressingMode::IndexedIndirect),
@@ -403,7 +392,6 @@ pub const OPCODES: [(Opcode, AddressingMode); 256] = [
     (Opcode::LDA, AddressingMode::Absolute),
     (Opcode::LDX, AddressingMode::Absolute),
     (Opcode::LAX, AddressingMode::Absolute),
-
     // Bx
     (Opcode::BCS, AddressingMode::Relative),
     (Opcode::LDA, AddressingMode::IndirectIndexed),
@@ -421,7 +409,6 @@ pub const OPCODES: [(Opcode, AddressingMode); 256] = [
     (Opcode::LDA, AddressingMode::AbsoluteIndexedX),
     (Opcode::LDX, AddressingMode::AbsoluteIndexedY),
     (Opcode::LAX, AddressingMode::AbsoluteIndexedY),
-
     // Cx
     (Opcode::CPY, AddressingMode::Immediate),
     (Opcode::CMP, AddressingMode::IndexedIndirect),
@@ -439,7 +426,6 @@ pub const OPCODES: [(Opcode, AddressingMode); 256] = [
     (Opcode::CMP, AddressingMode::Absolute),
     (Opcode::DEC, AddressingMode::Absolute),
     (Opcode::DCP, AddressingMode::Absolute),
-
     // Dx
     (Opcode::BNE, AddressingMode::Relative),
     (Opcode::CMP, AddressingMode::IndirectIndexed),
@@ -457,7 +443,6 @@ pub const OPCODES: [(Opcode, AddressingMode); 256] = [
     (Opcode::CMP, AddressingMode::AbsoluteIndexedX),
     (Opcode::DEC, AddressingMode::AbsoluteIndexedX),
     (Opcode::DCP, AddressingMode::AbsoluteIndexedX),
-
     // Ex
     (Opcode::CPX, AddressingMode::Immediate),
     (Opcode::SBC, AddressingMode::IndexedIndirect),
@@ -475,7 +460,6 @@ pub const OPCODES: [(Opcode, AddressingMode); 256] = [
     (Opcode::SBC, AddressingMode::Absolute),
     (Opcode::INC, AddressingMode::Absolute),
     (Opcode::ISC, AddressingMode::Absolute),
-
     // Fx
     (Opcode::BEQ, AddressingMode::Relative),
     (Opcode::SBC, AddressingMode::IndirectIndexed),

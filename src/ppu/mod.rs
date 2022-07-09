@@ -91,14 +91,25 @@ pub struct Ppu<'a> {
 }
 
 impl<'a> Ppu<'a> {
-    pub fn new<'b, W: Window>(cartridge: &'b mut Box<dyn CartridgeBus>, bus: &'b RefCell<PpuBus>, window: Option<&mut PistonWindow<W>>, instrumented: bool) -> Ppu<'b> {
+    pub fn new<'b, W: Window>(
+        cartridge: &'b mut Box<dyn CartridgeBus>,
+        bus: &'b RefCell<PpuBus>,
+        window: Option<&mut PistonWindow<W>>,
+        instrumented: bool,
+    ) -> Ppu<'b> {
         let image = Arc::new(Mutex::new(DynamicImage::new_rgba8(256, 240)));
         let image_clone = image.clone();
         let texture = window.map(|window| {
-            G2dTexture::from_image(&mut window.create_texture_context(), image.lock().unwrap().as_rgba8().unwrap(), &TextureSettings::new()).unwrap()
+            G2dTexture::from_image(
+                &mut window.create_texture_context(),
+                image.lock().unwrap().as_rgba8().unwrap(),
+                &TextureSettings::new(),
+            )
+                .unwrap()
         });
 
-        let (image_buffer, mut image_buffer_out) = TripleBuffer::new(&Box::new([0usize; 61440])).split();
+        let (image_buffer, mut image_buffer_out) =
+            TripleBuffer::new(&Box::new([0usize; 61440])).split();
         let closed = Arc::new(AtomicBool::new(false));
         let closed_clone = closed.clone();
 
@@ -113,8 +124,16 @@ impl<'a> Ppu<'a> {
                 let mut dot = 0;
                 let mut scanline = 0;
                 for color_index in pixels.iter() {
-                    image.put_pixel(dot, scanline,
-                                    Rgba([NES_RGB[*color_index], NES_RGB[*color_index + 1], NES_RGB[*color_index + 2], 0xff]));
+                    image.put_pixel(
+                        dot,
+                        scanline,
+                        Rgba([
+                            NES_RGB[*color_index],
+                            NES_RGB[*color_index + 1],
+                            NES_RGB[*color_index + 2],
+                            0xff,
+                        ]),
+                    );
                     dot += 1;
                     if dot == 256 {
                         dot = 0;
@@ -124,7 +143,6 @@ impl<'a> Ppu<'a> {
                 image_clone.lock().unwrap().copy_from(&image, 0, 0).unwrap();
             }
         });
-
 
         Ppu {
             image,
@@ -168,20 +186,26 @@ impl<'a> Ppu<'a> {
     }
 
     fn spr_height(&self) -> u8 {
-        if self.bus.borrow().ctrl.sprite_size_large { 16 } else { 8 }
+        if self.bus.borrow().ctrl.sprite_size_large {
+            16
+        } else {
+            8
+        }
     }
 
     fn update_tmp_addr(&mut self) {
         let mut bus = self.bus.borrow_mut();
         if let Some(nametable_address) = bus.ctrl.nametable_select.take() {
-            self.tmp_vram_addr = (self.tmp_vram_addr & (!0xC00)) | (u16::from(nametable_address) << 10);
+            self.tmp_vram_addr =
+                (self.tmp_vram_addr & (!0xC00)) | (u16::from(nametable_address) << 10);
         }
         if let Some(scroll) = bus.scroll.take() {
             if bus.first_write {
                 self.fine_x_scroll = scroll & 0x7;
                 self.tmp_vram_addr = (self.tmp_vram_addr & (!0x1F)) | (u16::from(scroll) >> 3);
             } else {
-                self.tmp_vram_addr = (self.tmp_vram_addr & 0xC1F) | ((u16::from(scroll) & 0x7) << 12)
+                self.tmp_vram_addr = (self.tmp_vram_addr & 0xC1F)
+                    | ((u16::from(scroll) & 0x7) << 12)
                     | ((u16::from(scroll) >> 3) << 5);
             }
         }
@@ -200,7 +224,11 @@ impl<'a> Ppu<'a> {
         if let Some(data) = bus.data_write.take() {
             let addr = self.vram_addr;
             self.write_memory(addr, data);
-            self.vram_addr += if bus.ctrl.address_increment_vertical { 32 } else { 1 };
+            self.vram_addr += if bus.ctrl.address_increment_vertical {
+                32
+            } else {
+                1
+            };
         }
         if let Some(mut data) = bus.oam_data_write.take() {
             let addr = bus.oam_addr;
@@ -216,13 +244,16 @@ impl<'a> Ppu<'a> {
         match address {
             0x0000..=0x1FFF => self.cartridge.read_memory(address, 0),
             0x2000..=0x2FFF => self.internal_ram[self.cartridge.mirror_nametable(address) as usize],
-            0x3000..=0x3EFF => self.internal_ram[(self.cartridge.mirror_nametable(address - 0x1000)) as usize],
+            0x3000..=0x3EFF => {
+                self.internal_ram[(self.cartridge.mirror_nametable(address - 0x1000)) as usize]
+            }
             0x3F00..=0x3FFF => {
                 let mut palette_address = address;
                 if palette_address & 0x13 == 0x10 {
                     palette_address &= !0x10;
                 }
-                self.palette_ram[(palette_address % 0x20) as usize] & (if grayscale { 0x30 } else { 0xFF })
+                self.palette_ram[(palette_address % 0x20) as usize]
+                    & (if grayscale { 0x30 } else { 0xFF })
             }
             _ => panic!("Bad PPU memory read {:04X}", address),
         }
@@ -235,8 +266,13 @@ impl<'a> Ppu<'a> {
     fn write_memory(&mut self, address: u16, value: u8) {
         match address {
             0x0000..=0x1FFF => self.cartridge.write_memory(address, value, 0),
-            0x2000..=0x2FFF => self.internal_ram[self.cartridge.mirror_nametable(address) as usize] = value,
-            0x3000..=0x3EFF => self.internal_ram[(self.cartridge.mirror_nametable(address - 0x1000)) as usize] = value,
+            0x2000..=0x2FFF => {
+                self.internal_ram[self.cartridge.mirror_nametable(address) as usize] = value
+            }
+            0x3000..=0x3EFF => {
+                self.internal_ram[(self.cartridge.mirror_nametable(address - 0x1000)) as usize] =
+                    value
+            }
             0x3F00..=0x3FFF => {
                 let mut palette_address = address;
                 if palette_address & 0x13 == 0x10 {
@@ -264,12 +300,20 @@ impl<'a> Ppu<'a> {
                 bus.palette_data = self.read_memory(self.vram_addr, bus.mask.grayscale);
                 if bus.read_buffer.is_none() {
                     bus.read_buffer = Some(self.read_memory_under_palette(self.vram_addr));
-                    self.vram_addr += if bus.ctrl.address_increment_vertical { 32 } else { 1 };
+                    self.vram_addr += if bus.ctrl.address_increment_vertical {
+                        32
+                    } else {
+                        1
+                    };
                 }
             } else {
                 if bus.read_buffer.is_none() {
                     bus.read_buffer = Some(self.read_memory(self.vram_addr, bus.mask.grayscale));
-                    self.vram_addr += if bus.ctrl.address_increment_vertical { 32 } else { 1 };
+                    self.vram_addr += if bus.ctrl.address_increment_vertical {
+                        32
+                    } else {
+                        1
+                    };
                 }
             }
             bus.oam_data = self.oam_ram[bus.oam_addr as usize];
@@ -281,7 +325,7 @@ impl<'a> Ppu<'a> {
             240 => self.tick_post_render(),
             241..=260 => self.tick_vblank(),
             261 => self.tick_prerender(),
-            _ => panic!("Bad scanline {}", self.scanline)
+            _ => panic!("Bad scanline {}", self.scanline),
         }
         self.dot += 1;
         if self.dot == 341 || (self.skip_tick && self.dot == 340) {
@@ -292,7 +336,8 @@ impl<'a> Ppu<'a> {
                 self.odd_frame = !self.odd_frame;
             }
         }
-        self.skip_tick = self.scanline == 261 && self.dot == 339 && self.odd_frame && self.rendering();
+        self.skip_tick =
+            self.scanline == 261 && self.dot == 339 && self.odd_frame && self.rendering();
         let mut bus = self.bus.borrow_mut();
         bus.status.just_read = false;
         bus.addr = self.vram_addr;
@@ -326,8 +371,10 @@ impl<'a> Ppu<'a> {
                 palette = (((self.shift_bgd_high >> (15 - self.fine_x_scroll)) & 1) << 1)
                     | ((self.shift_bgd_low >> (15 - self.fine_x_scroll)) & 1);
                 if palette > 0 {
-                    palette |= u16::from((((self.shift_attrtable_high >> (7 - self.fine_x_scroll)) & 1) << 3)
-                        | (((self.shift_attrtable_low >> (7 - self.fine_x_scroll)) & 1) << 2));
+                    palette |= u16::from(
+                        (((self.shift_attrtable_high >> (7 - self.fine_x_scroll)) & 1) << 3)
+                            | (((self.shift_attrtable_low >> (7 - self.fine_x_scroll)) & 1) << 2),
+                    );
                 }
             }
             if show_sprite && (show_sprite_left8 || self.dot >= 10) {
@@ -339,7 +386,8 @@ impl<'a> Ppu<'a> {
                                 sprite_x ^= 7;
                             }
 
-                            let mut sprite_palette = (((sprite.data_high >> (7 - sprite_x)) & 1) << 1)
+                            let mut sprite_palette = (((sprite.data_high >> (7 - sprite_x)) & 1)
+                                << 1)
                                 | ((sprite.data_low >> (7 - sprite_x)) & 1);
                             if sprite_palette > 0 {
                                 if sprite.id == 0 && palette > 0 && self.dot != 257 {
@@ -357,9 +405,13 @@ impl<'a> Ppu<'a> {
                 }
             }
             let bus = self.bus.borrow();
-            let color = self.read_memory(0x3F00 + if self.rendering() { palette } else { 0 }, bus.mask.grayscale);
+            let color = self.read_memory(
+                0x3F00 + if self.rendering() { palette } else { 0 },
+                bus.mask.grayscale,
+            );
             let color_index = (0xc0 * bus.mask.color_emphasis + color * 3) as usize;
-            self.image_buffer.input_buffer()[(self.dot - 2 + self.scanline * 256) as usize] = color_index;
+            self.image_buffer.input_buffer()[(self.dot - 2 + self.scanline * 256) as usize] =
+                color_index;
         }
         self.adjust_shifts();
     }
@@ -367,8 +419,10 @@ impl<'a> Ppu<'a> {
     fn adjust_shifts(&mut self) {
         self.shift_bgd_low <<= 1;
         self.shift_bgd_high <<= 1;
-        self.shift_attrtable_low = (self.shift_attrtable_low << 1) | if self.attrtable_latch_low { 1 } else { 0 };
-        self.shift_attrtable_high = (self.shift_attrtable_high << 1) | if self.attrtable_latch_high { 1 } else { 0 };
+        self.shift_attrtable_low =
+            (self.shift_attrtable_low << 1) | if self.attrtable_latch_low { 1 } else { 0 };
+        self.shift_attrtable_high =
+            (self.shift_attrtable_high << 1) | if self.attrtable_latch_high { 1 } else { 0 };
     }
 
     fn scroll_horizontal(&mut self) {
@@ -425,7 +479,10 @@ impl<'a> Ppu<'a> {
                 self.nametable = self.read_memory(self.addr, bus.mask.grayscale);
             }
             3 => {
-                self.addr = 0x23C0 | (self.vram_addr & 0x0C00) | ((self.vram_addr >> 4) & 0x38) | ((self.vram_addr >> 2) & 0x07);
+                self.addr = 0x23C0
+                    | (self.vram_addr & 0x0C00)
+                    | ((self.vram_addr >> 4) & 0x38)
+                    | ((self.vram_addr >> 2) & 0x07);
             }
             4 => {
                 self.latch_attrtable = self.read_memory(self.addr, bus.mask.grayscale);
@@ -437,8 +494,12 @@ impl<'a> Ppu<'a> {
                 }
             }
             5 => {
-                self.addr = if self.bus.borrow().ctrl.bgd_pattern_table_high { 0x1000 } else { 0 } +
-                    u16::from(self.nametable) * 16 + ((self.vram_addr & 0x7000) >> 12);
+                self.addr = if self.bus.borrow().ctrl.bgd_pattern_table_high {
+                    0x1000
+                } else {
+                    0
+                } + u16::from(self.nametable) * 16
+                    + ((self.vram_addr & 0x7000) >> 12);
             }
             6 => {
                 self.latch_bgd_low = self.read_memory(self.addr, bus.mask.grayscale);
@@ -516,10 +577,15 @@ impl<'a> Ppu<'a> {
             if bus.ctrl.sprite_size_large {
                 addr = (u16::from(sprite.tile & 1) * 0x1000) + (u16::from(sprite.tile & (!1)) * 16);
             } else {
-                addr = if bus.ctrl.sprite_pattern_table_high { 0x1000 } else { 0 } + u16::from(sprite.tile) * 16;
+                addr = if bus.ctrl.sprite_pattern_table_high {
+                    0x1000
+                } else {
+                    0
+                } + u16::from(sprite.tile) * 16;
             }
             if self.scanline >= u16::from(sprite.y) {
-                let mut sprite_y = (self.scanline - u16::from(sprite.y)) % u16::from(self.spr_height());
+                let mut sprite_y =
+                    (self.scanline - u16::from(sprite.y)) % u16::from(self.spr_height());
                 if sprite.attr & 0x80 > 0 {
                     sprite_y ^= u16::from(self.spr_height()) - 1;
                 }
@@ -615,9 +681,20 @@ impl<'a> Ppu<'a> {
         }
     }
 
-    pub fn render(&mut self, c: Context, mut texture_ctx: &mut G2dTextureContext, gl: &mut G2d, _glyphs: &mut Glyphs) {
+    pub fn render(
+        &mut self,
+        c: Context,
+        mut texture_ctx: &mut G2dTextureContext,
+        gl: &mut G2d,
+        _glyphs: &mut Glyphs,
+    ) {
         if let Some(ref mut texture) = self.texture {
-            texture.update(&mut texture_ctx, self.image.lock().unwrap().as_rgba8().unwrap()).unwrap();
+            texture
+                .update(
+                    &mut texture_ctx,
+                    self.image.lock().unwrap().as_rgba8().unwrap(),
+                )
+                .unwrap();
             image(texture, c.transform.scale(8.0 / 7.0, 1.0), gl);
         }
     }

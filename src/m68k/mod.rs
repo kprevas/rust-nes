@@ -178,7 +178,8 @@ impl<'a> Cpu<'a> {
                     opcodes::Size::Long => self.read::<u32>(ext_mode),
                     _ => panic!(),
                 };
-                let addr = self.pc
+                let addr = self
+                    .pc
                     .wrapping_add(ext_register_value)
                     .wrapping_add_signed(index as i32);
                 self.pc += 2;

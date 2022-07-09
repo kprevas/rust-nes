@@ -84,7 +84,7 @@ impl TriangleCtrl {
             0 => {
                 self.control_flag = value & 0x80 > 0;
                 self.reload_value = value & (!0x80);
-            },
+            }
             1 => (),
             2 => {
                 let timer = (self.timer & (!0xFF)) + u16::from(value);
@@ -280,7 +280,7 @@ impl ApuBus {
                 if !self.dmc.irq_enabled {
                     self.dmc_interrupt = false;
                 }
-            },
+            }
             0x4015 => {
                 self.pulse_1.enabled = value & 1 > 0;
                 self.pulse_2.enabled = value & 2 > 0;
