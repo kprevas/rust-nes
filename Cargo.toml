@@ -37,3 +37,5 @@ travis-ci = { repository = "kprevas/rust-nes", branch = "master" }
 
 [profile.release]
 debug = true
+
+[features]

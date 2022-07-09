@@ -1,3 +1,5 @@
+#![feature(mixed_integer_ops)]
+
 extern crate bincode;
 extern crate bytes;
 extern crate clap;
