@@ -220,6 +220,20 @@ impl<'a> Cpu<'a> {
         let opcode = opcode(opcode_hex);
 
         match opcode {
+            Opcode::JMP { mode } => {
+                match mode {
+                    AddressingMode::Address(_)
+                    | AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::AbsoluteShort
+                    | AddressingMode::AbsoluteLong
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::ProgramCounterWithIndex => {
+                        self.pc = self.read(mode);
+                    }
+                    _ => panic!("{:04X} {:?}", opcode_hex, opcode)
+                }
+            }
             Opcode::NOP => {}
             _ => {
                 unimplemented!("{:04X} {:?}", opcode_hex, opcode)
