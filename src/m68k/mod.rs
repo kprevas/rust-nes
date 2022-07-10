@@ -220,6 +220,7 @@ impl<'a> Cpu<'a> {
         let opcode = opcode(opcode_hex);
 
         match opcode {
+            Opcode::NOP => {}
             _ => {
                 unimplemented!("{:04X} {:?}", opcode_hex, opcode)
             }
