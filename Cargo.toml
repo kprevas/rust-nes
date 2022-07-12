@@ -31,6 +31,7 @@ array-init = "2.0.1"
 byteorder = "1.4.3"
 pistoncore-sdl2_window = "0.68.0"
 triple_buffer = "6.2.0"
+json = "0.12.4"
 
 [badges]
 travis-ci = { repository = "kprevas/rust-nes", branch = "master" }

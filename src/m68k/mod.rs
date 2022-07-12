@@ -1,11 +1,10 @@
 use std::convert::TryFrom;
 use std::marker::PhantomData;
 
-use dasp::Sample;
 use input::ControllerState;
-use m68k::opcodes::{AddressingMode, brief_extension_word, opcode, Opcode, OperandDirection, Size};
+use m68k::opcodes::{AddressingMode, brief_extension_word, opcode, Opcode};
 
-mod opcodes;
+pub mod opcodes;
 
 const CPU_TICKS_PER_SECOND: f64 = 7_670_454.0;
 
@@ -145,7 +144,7 @@ impl<'a> Cpu<'a> {
                 self.read_addr(self.a[register])
             }
             AddressingMode::AddressWithDisplacement(register) => {
-                let displacement: i16 = self.read_addr::<u16>(self.pc).to_signed_sample();
+                let displacement: i16 = self.read_addr::<u16>(self.pc) as i16;
                 self.pc += 2;
                 let addr = self.a[register].wrapping_add_signed(displacement as i32);
                 self.read_addr(addr)
@@ -165,7 +164,7 @@ impl<'a> Cpu<'a> {
                 self.read_addr(addr)
             }
             AddressingMode::ProgramCounterWithDisplacement => {
-                let displacement: i16 = self.read_addr::<u16>(self.pc).to_signed_sample();
+                let displacement: i16 = self.read_addr::<u16>(self.pc) as i16;
                 let addr = self.pc.wrapping_add_signed(displacement as i32);
                 self.pc += 2;
                 self.read_addr(addr)
@@ -188,7 +187,7 @@ impl<'a> Cpu<'a> {
             AddressingMode::AbsoluteShort => {
                 let extension = self.read_addr::<u16>(self.pc);
                 self.pc += 2;
-                let short_addr = extension.to_signed_sample();
+                let short_addr = extension as i8;
                 let addr = if short_addr < 0 {
                     u32::MAX - (short_addr + 1) as u32
                 } else {
