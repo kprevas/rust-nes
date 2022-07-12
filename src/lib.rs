@@ -3,6 +3,7 @@
 extern crate bincode;
 extern crate bytes;
 extern crate clap;
+extern crate core;
 extern crate dasp;
 extern crate find_folder;
 extern crate hex_slice;

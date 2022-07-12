@@ -1047,7 +1047,16 @@ version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b2b3ea6ff95e175473f8ffe6a7eb7c00d054240321b84c57051175fe3c1e075e"
 dependencies = [
- "libc",
+    "libc",
+]
+
+[[package]]
+name = "itertools"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a9a9d19fa1e79b6215ff29b9d6880b706147f16e9b1dbb1e4e5947b5b02bc5e3"
+dependencies = [
+    "either",
 ]
 
 [[package]]
@@ -1314,7 +1323,7 @@ checksum = "e1bcdd74c20ad5d95aacd60ef9ba40fdf77f767051040541df557b7a9b2a2121"
 name = "nes"
 version = "0.1.0"
 dependencies = [
- "array-init",
+    "array-init",
     "bincode",
     "bitflags 1.3.2",
     "byteorder",
@@ -1325,6 +1334,7 @@ dependencies = [
     "find_folder",
     "hex-slice",
     "image",
+    "itertools",
     "json",
     "log",
     "nfd",
@@ -1336,12 +1346,12 @@ dependencies = [
     "portaudio",
     "rb",
     "serde",
- "serde_arrays",
- "serde_derive",
- "serde_with",
- "simple-error",
- "time",
- "triple_buffer",
+    "serde_arrays",
+    "serde_derive",
+    "serde_with",
+    "simple-error",
+    "time",
+    "triple_buffer",
 ]
 
 [[package]]

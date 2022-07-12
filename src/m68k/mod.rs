@@ -9,24 +9,27 @@ pub mod opcodes;
 const CPU_TICKS_PER_SECOND: f64 = 7_670_454.0;
 
 trait DataSize: TryFrom<u32> {
-    fn max_value() -> Self;
     fn address_size() -> u32;
     fn word_aligned_address_size() -> u32;
-    fn from(value: u32) -> Self {
-        Self::try_from(value).unwrap_or(Self::max_value())
-    }
+    fn from_register_value(value: u32) -> Self;
+    fn from_memory_bytes(bytes: &[u8]) -> Self;
     fn apply_to_register(self, register_val: u32) -> u32;
 }
 
 impl DataSize for u8 {
-    fn max_value() -> Self {
-        Self::MAX
-    }
     fn address_size() -> u32 {
         1
     }
     fn word_aligned_address_size() -> u32 {
         2
+    }
+
+    fn from_register_value(value: u32) -> Self {
+        (value & 0xff) as Self
+    }
+
+    fn from_memory_bytes(bytes: &[u8]) -> Self {
+        bytes[0]
     }
 
     fn apply_to_register(self, register_val: u32) -> u32 {
@@ -35,14 +38,19 @@ impl DataSize for u8 {
 }
 
 impl DataSize for u16 {
-    fn max_value() -> Self {
-        Self::MAX
-    }
     fn address_size() -> u32 {
         2
     }
     fn word_aligned_address_size() -> u32 {
         2
+    }
+
+    fn from_register_value(value: u32) -> Self {
+        (value & 0xffff) as Self
+    }
+
+    fn from_memory_bytes(bytes: &[u8]) -> Self {
+        ((bytes[0] as u16) << 8) | (bytes[1] as u16)
     }
 
     fn apply_to_register(self, register_val: u32) -> u32 {
@@ -50,10 +58,24 @@ impl DataSize for u16 {
     }
 }
 
-impl DataSize for u32 {
-    fn max_value() -> Self {
-        Self::MAX
+impl DataSize for i16 {
+    fn address_size() -> u32 { 2 }
+    fn word_aligned_address_size() -> u32 { 2 }
+
+    fn from_register_value(value: u32) -> Self {
+        (value & 0xffff) as Self
     }
+
+    fn from_memory_bytes(bytes: &[u8]) -> Self {
+        (((bytes[0] as u16) << 8) | (bytes[1] as u16)) as i16
+    }
+
+    fn apply_to_register(self, register_val: u32) -> u32 {
+        (register_val & !0xFFFF) + ((self as u16) as u32)
+    }
+}
+
+impl DataSize for u32 {
     fn address_size() -> u32 {
         4
     }
@@ -61,16 +83,46 @@ impl DataSize for u32 {
         4
     }
 
-    fn apply_to_register(self, register_val: u32) -> u32 {
+    fn from_register_value(value: u32) -> Self {
+        value as Self
+    }
+
+    fn from_memory_bytes(bytes: &[u8]) -> Self {
+        ((bytes[0] as u32) << 24) | ((bytes[1] as u32) << 16)
+            | ((bytes[2] as u32) << 8) | (bytes[3] as u32)
+    }
+
+    fn apply_to_register(self, _register_val: u32) -> u32 {
         self
+    }
+}
+
+impl DataSize for i32 {
+    fn address_size() -> u32 { 4 }
+    fn word_aligned_address_size() -> u32 { 4 }
+
+    fn from_register_value(value: u32) -> Self {
+        value as Self
+    }
+
+    fn from_memory_bytes(bytes: &[u8]) -> Self {
+        (((bytes[0] as u32) << 24) | ((bytes[1] as u32) << 16)
+            | ((bytes[2] as u32) << 8) | (bytes[3] as u32)) as i32
+    }
+
+    fn apply_to_register(self, _register_val: u32) -> u32 {
+        self as u32
     }
 }
 
 pub struct Cpu<'a> {
     a: [u32; 8],
+    ssp: u32,
     d: [u32; 8],
     status: u16,
     pc: u32,
+    internal_ram: Box<[u8]>,
+    supervisor_mode: bool,
     ticks: f64,
     instrumented: bool,
     cycle_count: u64,
@@ -87,9 +139,12 @@ impl<'a> Cpu<'a> {
     pub fn boot<'b>(instrumented: bool) -> Cpu<'b> {
         let mut cpu = Cpu {
             a: [0, 0, 0, 0, 0, 0, 0, 0],
+            ssp: 0,
             d: [0, 0, 0, 0, 0, 0, 0, 0],
             status: 0,
             pc: 0,
+            internal_ram: vec![0; 0x10000].into_boxed_slice(),
+            supervisor_mode: true,
             ticks: 0.0,
             instrumented,
             cycle_count: 0,
@@ -109,96 +164,138 @@ impl<'a> Cpu<'a> {
         self.status = (self.status & (!INTERRUPT)) | (level << INTERRUPT_SHIFT)
     }
 
-    fn read_addr<Size: DataSize>(&mut self, _addr: u32) -> Size {
-        Size::from(0)
+    fn read_addr<Size: DataSize>(&mut self, addr: u32) -> Size {
+        self.read_addr_no_tick(addr)
     }
 
-    fn read_addr_word_aligned<Size: DataSize>(&mut self, _addr: u32) -> Size {
-        Size::from(0)
+    fn read_addr_word_aligned<Size: DataSize>(&mut self, addr: u32) -> Size {
+        self.read_addr_word_aligned_no_tick(addr)
     }
 
-    fn read_addr_no_tick<Size: DataSize>(&mut self, _addr: u32) -> Size {
-        Size::from(0)
+    fn read_addr_no_tick<Size: DataSize>(&mut self, addr: u32) -> Size {
+        Size::from_memory_bytes(&self.internal_ram[
+            (addr as usize)..((addr + Size::address_size()) as usize)])
     }
 
-    fn read<Size: DataSize>(&mut self, mode: AddressingMode) -> Size {
+    fn read_addr_word_aligned_no_tick<Size: DataSize>(&mut self, _addr: u32) -> Size {
+        Size::from_register_value(0)
+    }
+
+    fn addr_register(&self, register: usize) -> u32 {
+        if register == 7 && self.supervisor_mode {
+            self.ssp
+        } else {
+            self.a[register]
+        }
+    }
+
+    fn inc_addr_register(&mut self, register: usize, val: u32) {
+        if register == 7 && self.supervisor_mode {
+            self.ssp += val
+        } else {
+            self.a[register] += val
+        }
+    }
+
+    fn dec_addr_register(&mut self, register: usize, val: u32) {
+        if register == 7 && self.supervisor_mode {
+            self.ssp -= val
+        } else {
+            self.a[register] -= val
+        }
+    }
+
+    fn effective_addr(&mut self, mode: AddressingMode) -> u32 {
         match mode {
-            AddressingMode::DataRegister(register) => Size::from(self.d[register]),
-            AddressingMode::AddressRegister(register) => Size::from(self.a[register]),
-            AddressingMode::Address(register) => self.read_addr(self.a[register]),
-            AddressingMode::AddressWithPostincrement(register) => {
-                let val = self.read_addr(self.a[register]);
-                self.a[register] += if register == 7 {
-                    Size::word_aligned_address_size()
-                } else {
-                    Size::address_size()
-                };
-                val
-            }
-            AddressingMode::AddressWithPredecrement(register) => {
-                self.a[register] -= if register == 7 {
-                    Size::word_aligned_address_size()
-                } else {
-                    Size::address_size()
-                };
-                self.read_addr(self.a[register])
-            }
+            AddressingMode::Address(register) => self.addr_register(register),
             AddressingMode::AddressWithDisplacement(register) => {
                 let displacement: i16 = self.read_addr::<u16>(self.pc) as i16;
                 self.pc += 2;
-                let addr = self.a[register].wrapping_add_signed(displacement as i32);
-                self.read_addr(addr)
+                self.addr_register(register).wrapping_add_signed(displacement as i32)
             }
             AddressingMode::AddressWithIndex(register) => {
                 let extension = self.read_addr::<u16>(self.pc);
                 self.pc += 2;
                 let (ext_mode, size, index) = brief_extension_word(extension);
                 let ext_register_value = match size {
-                    opcodes::Size::Word => self.read::<u16>(ext_mode) as u32,
-                    opcodes::Size::Long => self.read::<u32>(ext_mode),
+                    opcodes::Size::Word => self.read::<i16>(ext_mode) as i32,
+                    opcodes::Size::Long => self.read::<i32>(ext_mode),
                     _ => panic!(),
                 };
-                let addr = self.a[register]
-                    .wrapping_add(ext_register_value)
-                    .wrapping_add_signed(index as i32);
-                self.read_addr(addr)
+                self.addr_register(register)
+                    .wrapping_add_signed(ext_register_value)
+                    .wrapping_add_signed(index as i32)
             }
             AddressingMode::ProgramCounterWithDisplacement => {
                 let displacement: i16 = self.read_addr::<u16>(self.pc) as i16;
                 let addr = self.pc.wrapping_add_signed(displacement as i32);
                 self.pc += 2;
-                self.read_addr(addr)
+                addr
             }
             AddressingMode::ProgramCounterWithIndex => {
                 let extension = self.read_addr::<u16>(self.pc);
                 let (ext_mode, size, index) = brief_extension_word(extension);
                 let ext_register_value = match size {
-                    opcodes::Size::Word => self.read::<u16>(ext_mode) as u32,
-                    opcodes::Size::Long => self.read::<u32>(ext_mode),
+                    opcodes::Size::Word => self.read::<i16>(ext_mode) as i32,
+                    opcodes::Size::Long => self.read::<i32>(ext_mode),
                     _ => panic!(),
                 };
                 let addr = self
                     .pc
-                    .wrapping_add(ext_register_value)
+                    .wrapping_add_signed(ext_register_value)
                     .wrapping_add_signed(index as i32);
                 self.pc += 2;
-                self.read_addr(addr)
+                addr
             }
             AddressingMode::AbsoluteShort => {
-                let extension = self.read_addr::<u16>(self.pc);
+                let extension = self.read_addr::<i16>(self.pc);
                 self.pc += 2;
-                let short_addr = extension as i8;
-                let addr = if short_addr < 0 {
-                    u32::MAX - (short_addr + 1) as u32
+                if extension < 0 {
+                    u32::MAX - (extension + 1) as u32
                 } else {
-                    short_addr as u32
-                };
-                self.read_addr(addr)
+                    extension as u32
+                }
             }
             AddressingMode::AbsoluteLong => {
                 let addr = self.read_addr::<u32>(self.pc);
                 self.pc += 4;
+                addr
+            }
+            _ => panic!()
+        }
+    }
+
+    fn read<Size: DataSize>(&mut self, mode: AddressingMode) -> Size {
+        match mode {
+            AddressingMode::DataRegister(register) => Size::from_register_value(self.d[register]),
+            AddressingMode::AddressRegister(register) => Size::from_register_value(self.addr_register(register)),
+            AddressingMode::Address(_)
+            | AddressingMode::AddressWithDisplacement(_)
+            | AddressingMode::AddressWithIndex(_)
+            | AddressingMode::ProgramCounterWithDisplacement
+            | AddressingMode::ProgramCounterWithIndex
+            | AddressingMode::AbsoluteShort
+            | AddressingMode::AbsoluteLong
+            => {
+                let addr = self.effective_addr(mode);
                 self.read_addr(addr)
+            }
+            AddressingMode::AddressWithPostincrement(register) => {
+                let val = self.read_addr(self.addr_register(register));
+                self.inc_addr_register(register, if register == 7 {
+                    Size::word_aligned_address_size()
+                } else {
+                    Size::address_size()
+                });
+                val
+            }
+            AddressingMode::AddressWithPredecrement(register) => {
+                self.dec_addr_register(register, if register == 7 {
+                    Size::word_aligned_address_size()
+                } else {
+                    Size::address_size()
+                });
+                self.read_addr(self.addr_register(register))
             }
             AddressingMode::Immediate => {
                 let val = self.read_addr_word_aligned::<Size>(self.pc);
@@ -219,20 +316,7 @@ impl<'a> Cpu<'a> {
         let opcode = opcode(opcode_hex);
 
         match opcode {
-            Opcode::JMP { mode } => {
-                match mode {
-                    AddressingMode::Address(_)
-                    | AddressingMode::AddressWithDisplacement(_)
-                    | AddressingMode::AddressWithIndex(_)
-                    | AddressingMode::AbsoluteShort
-                    | AddressingMode::AbsoluteLong
-                    | AddressingMode::ProgramCounterWithDisplacement
-                    | AddressingMode::ProgramCounterWithIndex => {
-                        self.pc = self.read(mode);
-                    }
-                    _ => panic!("{:04X} {:?}", opcode_hex, opcode)
-                }
-            }
+            Opcode::JMP { mode } => self.pc = self.effective_addr(mode),
             Opcode::NOP => {}
             _ => {
                 unimplemented!("{:04X} {:?}", opcode_hex, opcode)
@@ -253,10 +337,50 @@ impl<'a> Cpu<'a> {
     }
 
     pub fn reset(&mut self, _soft: bool) {
-        self.a[7] = self.read_addr_no_tick(0x000000);
+        self.ssp = self.read_addr_no_tick(0x000000);
         self.pc = self.read_addr_no_tick(0x000004);
         self.set_interrupt_level(7);
+        self.supervisor_mode = true;
     }
 
     pub fn close(&mut self) {}
+}
+
+#[cfg(feature = "test")]
+#[allow(dead_code)]
+pub mod testing {
+    use m68k::Cpu;
+    use m68k::opcodes::{Opcode, opcode};
+
+    impl Cpu<'_> {
+        pub fn init_state(&mut self, pc: u32, sr: u16, d: [u32; 8], a: [u32; 8], ssp: u32) {
+            self.pc = pc;
+            self.status = sr;
+            self.d = d;
+            self.a = a;
+            self.ssp = ssp;
+        }
+
+        pub fn verify_state(&self, pc: u32, sr: u16, d: [u32; 8], a: [u32; 8], ssp: u32) {
+            assert_eq!(self.pc, pc, "PC");
+            assert_eq!(self.status, sr, "SR");
+            for i in 0..8 {
+                assert_eq!(self.d[i], d[i], "D{}", i);
+                assert_eq!(self.a[i], a[i], "A{}", i);
+            }
+            assert_eq!(self.ssp, ssp, "SSP");
+        }
+
+        pub fn poke_ram(&mut self, addr: usize, val: u8) {
+            self.internal_ram[addr] = val;
+        }
+
+        pub fn peek_opcode(&mut self) -> Opcode {
+            opcode(self.read_addr(self.pc))
+        }
+
+        pub fn verify_ram(&self, addr: usize, val: u8) {
+            assert_eq!(self.internal_ram[addr], val);
+        }
+    }
 }
