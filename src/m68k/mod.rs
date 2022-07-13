@@ -12,7 +12,9 @@ trait DataSize: TryFrom<u32> {
     fn address_size() -> u32;
     fn word_aligned_address_size() -> u32;
     fn from_register_value(value: u32) -> Self;
+    fn to_register_value(self) -> u32;
     fn from_memory_bytes(bytes: &[u8]) -> Self;
+    fn set_memory_bytes(self, bytes: &mut [u8]);
     fn apply_to_register(self, register_val: u32) -> u32;
 }
 
@@ -25,11 +27,19 @@ impl DataSize for u8 {
     }
 
     fn from_register_value(value: u32) -> Self {
-        (value & 0xff) as Self
+        (value & 0xFF) as Self
+    }
+
+    fn to_register_value(self) -> u32 {
+        self as u32
     }
 
     fn from_memory_bytes(bytes: &[u8]) -> Self {
         bytes[0]
+    }
+
+    fn set_memory_bytes(self, bytes: &mut [u8]) {
+        bytes[0] = self;
     }
 
     fn apply_to_register(self, register_val: u32) -> u32 {
@@ -46,11 +56,20 @@ impl DataSize for u16 {
     }
 
     fn from_register_value(value: u32) -> Self {
-        (value & 0xffff) as Self
+        (value & 0xFFFF) as Self
+    }
+
+    fn to_register_value(self) -> u32 {
+        self as u32
     }
 
     fn from_memory_bytes(bytes: &[u8]) -> Self {
         ((bytes[0] as u16) << 8) | (bytes[1] as u16)
+    }
+
+    fn set_memory_bytes(self, bytes: &mut [u8]) {
+        bytes[0] = ((self & 0xFF00) >> 8) as u8;
+        bytes[1] = (self & 0xFF) as u8;
     }
 
     fn apply_to_register(self, register_val: u32) -> u32 {
@@ -63,11 +82,20 @@ impl DataSize for i16 {
     fn word_aligned_address_size() -> u32 { 2 }
 
     fn from_register_value(value: u32) -> Self {
-        (value & 0xffff) as Self
+        (value & 0xFFFF) as Self
+    }
+
+    fn to_register_value(self) -> u32 {
+        self as u32
     }
 
     fn from_memory_bytes(bytes: &[u8]) -> Self {
         (((bytes[0] as u16) << 8) | (bytes[1] as u16)) as i16
+    }
+
+    fn set_memory_bytes(self, bytes: &mut [u8]) {
+        bytes[0] = (((self as u16) & 0xFF00) >> 8) as u8;
+        bytes[1] = ((self as u16) & 0xFF) as u8;
     }
 
     fn apply_to_register(self, register_val: u32) -> u32 {
@@ -87,9 +115,20 @@ impl DataSize for u32 {
         value as Self
     }
 
+    fn to_register_value(self) -> u32 {
+        self
+    }
+
     fn from_memory_bytes(bytes: &[u8]) -> Self {
         ((bytes[0] as u32) << 24) | ((bytes[1] as u32) << 16)
             | ((bytes[2] as u32) << 8) | (bytes[3] as u32)
+    }
+
+    fn set_memory_bytes(self, bytes: &mut [u8]) {
+        bytes[0] = ((self & 0xFF000000) >> 24) as u8;
+        bytes[1] = ((self & 0xFF0000) >> 16) as u8;
+        bytes[2] = ((self & 0xFF00) >> 8) as u8;
+        bytes[3] = (self & 0xFF) as u8;
     }
 
     fn apply_to_register(self, _register_val: u32) -> u32 {
@@ -105,9 +144,20 @@ impl DataSize for i32 {
         value as Self
     }
 
+    fn to_register_value(self) -> u32 {
+        self as u32
+    }
+
     fn from_memory_bytes(bytes: &[u8]) -> Self {
         (((bytes[0] as u32) << 24) | ((bytes[1] as u32) << 16)
             | ((bytes[2] as u32) << 8) | (bytes[3] as u32)) as i32
+    }
+
+    fn set_memory_bytes(self, bytes: &mut [u8]) {
+        bytes[0] = (((self as u32) & 0xFF000000) >> 24) as u8;
+        bytes[1] = (((self as u32) & 0xFF0000) >> 16) as u8;
+        bytes[2] = (((self as u32) & 0xFF00) >> 8) as u8;
+        bytes[3] = ((self as u32) & 0xFF) as u8;
     }
 
     fn apply_to_register(self, _register_val: u32) -> u32 {
@@ -173,6 +223,7 @@ impl<'a> Cpu<'a> {
     }
 
     fn read_addr_no_tick<Size: DataSize>(&mut self, addr: u32) -> Size {
+        let addr = addr & 0xFFFFFF;
         Size::from_memory_bytes(&self.internal_ram[
             (addr as usize)..((addr + Size::address_size()) as usize)])
     }
@@ -181,11 +232,35 @@ impl<'a> Cpu<'a> {
         Size::from_register_value(0)
     }
 
+    fn write_addr<Size: DataSize>(&mut self, addr: u32, val: Size) {
+        self.write_addr_no_tick(addr, val);
+    }
+
+    fn write_addr_word_aligned<Size: DataSize>(&mut self, addr: u32, val: Size) {
+        self.write_addr_word_aligned_no_tick(addr, val);
+    }
+
+    fn write_addr_no_tick<Size: DataSize>(&mut self, addr: u32, val: Size) {
+        let addr = addr & 0xFFFFFF;
+        val.set_memory_bytes(&mut self.internal_ram[
+            (addr as usize)..((addr + Size::address_size()) as usize)])
+    }
+
+    fn write_addr_word_aligned_no_tick<Size: DataSize>(&mut self, _addr: u32, _val: Size) {}
+
     fn addr_register(&self, register: usize) -> u32 {
         if register == 7 && self.supervisor_mode {
             self.ssp
         } else {
             self.a[register]
+        }
+    }
+
+    fn set_addr_register(&mut self, register: usize, val: u32) {
+        if register == 7 && self.supervisor_mode {
+            self.ssp = val
+        } else {
+            self.a[register] = val
         }
     }
 
@@ -306,7 +381,41 @@ impl<'a> Cpu<'a> {
         }
     }
 
-    fn write<Size: DataSize>(&mut self, mode: AddressingMode, val: Size) {}
+    fn write<Size: DataSize>(&mut self, mode: AddressingMode, val: Size) {
+        match mode {
+            AddressingMode::DataRegister(register) => self.d[register] = val.to_register_value(),
+            AddressingMode::AddressRegister(register) => self.set_addr_register(register, val.to_register_value()),
+            AddressingMode::Address(_)
+            | AddressingMode::AddressWithDisplacement(_)
+            | AddressingMode::AddressWithIndex(_)
+            | AddressingMode::ProgramCounterWithDisplacement
+            | AddressingMode::ProgramCounterWithIndex
+            | AddressingMode::AbsoluteShort
+            | AddressingMode::AbsoluteLong
+            => {
+                let addr = self.effective_addr(mode);
+                self.write_addr(addr, val);
+            }
+            AddressingMode::AddressWithPostincrement(register) => {
+                let addr = self.addr_register(register);
+                self.inc_addr_register(register, if register == 7 {
+                    Size::word_aligned_address_size()
+                } else {
+                    Size::address_size()
+                });
+                self.write_addr(addr, val);
+            }
+            AddressingMode::AddressWithPredecrement(register) => {
+                self.dec_addr_register(register, if register == 7 {
+                    Size::word_aligned_address_size()
+                } else {
+                    Size::address_size()
+                });
+                self.write_addr(self.addr_register(register), val);
+            }
+            AddressingMode::Immediate | AddressingMode::Illegal => panic!(),
+        }
+    }
 
     fn execute_opcode(&mut self) {
         let opcode_pc = self.pc;
@@ -317,6 +426,11 @@ impl<'a> Cpu<'a> {
 
         match opcode {
             Opcode::JMP { mode } => self.pc = self.effective_addr(mode),
+            Opcode::JSR { mode } => {
+                let addr = self.effective_addr(mode);
+                self.write(AddressingMode::AddressWithPredecrement(7), self.pc);
+                self.pc = addr;
+            }
             Opcode::NOP => {}
             _ => {
                 unimplemented!("{:04X} {:?}", opcode_hex, opcode)
@@ -353,6 +467,10 @@ pub mod testing {
     use m68k::opcodes::{Opcode, opcode};
 
     impl Cpu<'_> {
+        pub fn expand_ram(&mut self, amount: usize) {
+            self.internal_ram = vec![0; amount].into_boxed_slice();
+        }
+
         pub fn init_state(&mut self, pc: u32, sr: u16, d: [u32; 8], a: [u32; 8], ssp: u32) {
             self.pc = pc;
             self.status = sr;
