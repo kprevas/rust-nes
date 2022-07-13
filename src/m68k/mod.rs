@@ -1,8 +1,9 @@
 use std::convert::TryFrom;
 use std::marker::PhantomData;
+use std::ops::Sub;
 
 use input::ControllerState;
-use m68k::opcodes::{AddressingMode, brief_extension_word, opcode, Opcode};
+use m68k::opcodes::{AddressingMode, brief_extension_word, opcode, Opcode, Size};
 
 pub mod opcodes;
 
@@ -44,6 +45,35 @@ impl DataSize for u8 {
 
     fn apply_to_register(self, register_val: u32) -> u32 {
         (register_val & !0xFF) + (self as u32)
+    }
+}
+
+impl DataSize for i8 {
+    fn address_size() -> u32 {
+        1
+    }
+    fn word_aligned_address_size() -> u32 {
+        2
+    }
+
+    fn from_register_value(value: u32) -> Self {
+        (value & 0xFF) as Self
+    }
+
+    fn to_register_value(self) -> u32 {
+        self as u32
+    }
+
+    fn from_memory_bytes(bytes: &[u8]) -> Self {
+        bytes[0] as Self
+    }
+
+    fn set_memory_bytes(self, bytes: &mut [u8]) {
+        bytes[0] = self as u8;
+    }
+
+    fn apply_to_register(self, register_val: u32) -> u32 {
+        (register_val & !0xFF) + ((self as u8) as u32)
     }
 }
 
@@ -182,6 +212,12 @@ pub struct Cpu<'a> {
     phantom: PhantomData<&'a u8>,
 }
 
+const CARRY: u16 = 0b1;
+const OVERFLOW: u16 = 0b10;
+const ZERO: u16 = 0b100;
+const NEGATIVE: u16 = 0b1000;
+const EXTEND: u16 = 0b10000;
+
 const INTERRUPT: u16 = 0b0000011100000000;
 const INTERRUPT_SHIFT: u16 = 8;
 
@@ -209,6 +245,18 @@ impl<'a> Cpu<'a> {
 
     fn tick(&mut self) {}
 
+    fn flag(&self, flag: u16) -> bool {
+        self.status & flag > 0
+    }
+
+    fn set_flag(&mut self, flag: u16, val: bool) {
+        if val {
+            self.status |= flag
+        } else {
+            self.status &= !flag;
+        }
+    }
+
     fn set_interrupt_level(&mut self, level: u16) {
         assert!(level <= (INTERRUPT >> INTERRUPT_SHIFT));
         self.status = (self.status & (!INTERRUPT)) | (level << INTERRUPT_SHIFT)
@@ -228,8 +276,12 @@ impl<'a> Cpu<'a> {
             (addr as usize)..((addr + Size::address_size()) as usize)])
     }
 
-    fn read_addr_word_aligned_no_tick<Size: DataSize>(&mut self, _addr: u32) -> Size {
-        Size::from_register_value(0)
+    fn read_addr_word_aligned_no_tick<Size: DataSize>(&mut self, addr: u32) -> Size {
+        let addr = addr & 0xFFFFFF;
+        let addr_size = Size::word_aligned_address_size();
+        let addr_offset = Size::word_aligned_address_size() - Size::address_size();
+        Size::from_memory_bytes(&self.internal_ram[
+            ((addr + addr_offset) as usize)..((addr + addr_size) as usize)])
     }
 
     fn write_addr<Size: DataSize>(&mut self, addr: u32, val: Size) {
@@ -246,7 +298,13 @@ impl<'a> Cpu<'a> {
             (addr as usize)..((addr + Size::address_size()) as usize)])
     }
 
-    fn write_addr_word_aligned_no_tick<Size: DataSize>(&mut self, _addr: u32, _val: Size) {}
+    fn write_addr_word_aligned_no_tick<Size: DataSize>(&mut self, addr: u32, val: Size) {
+        let addr = addr & 0xFFFFFF;
+        let addr_size = Size::word_aligned_address_size();
+        let addr_offset = Size::word_aligned_address_size() - Size::address_size();
+        val.set_memory_bytes(&mut self.internal_ram[
+            ((addr + addr_offset) as usize)..((addr + addr_size) as usize)])
+    }
 
     fn addr_register(&self, register: usize) -> u32 {
         if register == 7 && self.supervisor_mode {
@@ -326,7 +384,7 @@ impl<'a> Cpu<'a> {
                 let extension = self.read_addr::<i16>(self.pc);
                 self.pc += 2;
                 if extension < 0 {
-                    u32::MAX - (extension + 1) as u32
+                    self.internal_ram.len().sub((-extension) as usize) as u32
                 } else {
                     extension as u32
                 }
@@ -383,8 +441,12 @@ impl<'a> Cpu<'a> {
 
     fn write<Size: DataSize>(&mut self, mode: AddressingMode, val: Size) {
         match mode {
-            AddressingMode::DataRegister(register) => self.d[register] = val.to_register_value(),
-            AddressingMode::AddressRegister(register) => self.set_addr_register(register, val.to_register_value()),
+            AddressingMode::DataRegister(register) => {
+                self.d[register] = val.apply_to_register(self.d[register])
+            }
+            AddressingMode::AddressRegister(register) => {
+                self.set_addr_register(register, val.apply_to_register(self.addr_register(register)));
+            }
             AddressingMode::Address(_)
             | AddressingMode::AddressWithDisplacement(_)
             | AddressingMode::AddressWithIndex(_)
@@ -430,6 +492,21 @@ impl<'a> Cpu<'a> {
                 let addr = self.effective_addr(mode);
                 self.write(AddressingMode::AddressWithPredecrement(7), self.pc);
                 self.pc = addr;
+            }
+            Opcode::MOVE { src_mode, dest_mode, size } => {
+                match size {
+                    Size::Byte => {
+                        let val = self.read::<i8>(src_mode);
+                        self.set_flag(NEGATIVE, val < 0);
+                        self.set_flag(ZERO, val == 0);
+                        self.set_flag(OVERFLOW, false);
+                        self.set_flag(CARRY, false);
+                        self.write(dest_mode, val);
+                    }
+                    Size::Word => {}
+                    Size::Long => {}
+                    Size::Illegal => panic!()
+                }
             }
             Opcode::NOP => {}
             _ => {
@@ -481,7 +558,7 @@ pub mod testing {
 
         pub fn verify_state(&self, pc: u32, sr: u16, d: [u32; 8], a: [u32; 8], ssp: u32) {
             assert_eq!(self.pc, pc, "PC");
-            assert_eq!(self.status, sr, "SR");
+            assert_eq!(self.status, sr, "SR {:016b} {:016b}", self.status, sr);
             for i in 0..8 {
                 assert_eq!(self.d[i], d[i], "D{}", i);
                 assert_eq!(self.a[i], a[i], "A{}", i);
