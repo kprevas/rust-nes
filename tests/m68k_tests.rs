@@ -21,6 +21,11 @@ fn opcode_decoding() {
 }
 
 #[test]
+fn btst_bchg_bclr_bset() {
+    run_json_test(json::parse(include_str!("m68k/btst_bchg_bclr_bset.json")).unwrap());
+}
+
+#[test]
 fn jmp_jsr() {
     run_json_test(json::parse(include_str!("m68k/jmp_jsr.json")).unwrap());
 }
@@ -76,7 +81,6 @@ fn run_json_test(test_cases: JsonValue) {
         | Opcode::ANDI { .. }
         | Opcode::ANDI_to_CCR { .. }
         | Opcode::ANDI_to_SR { .. }
-        | Opcode::BCHG { .. }
         | Opcode::BCLR { .. }
         | Opcode::BSET { .. }
         | Opcode::BTST { .. }

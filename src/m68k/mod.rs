@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use std::ops::Sub;
 
 use input::ControllerState;
-use m68k::opcodes::{AddressingMode, brief_extension_word, opcode, Opcode, Size};
+use m68k::opcodes::{AddressingMode, BitNum, brief_extension_word, opcode, Opcode, Size};
 
 pub mod opcodes;
 
@@ -479,6 +479,57 @@ impl<'a> Cpu<'a> {
         }
     }
 
+    fn read_write<Size: DataSize>(&mut self, mode: AddressingMode, op: &mut dyn FnMut(&mut Self, Size) -> Size) {
+        match mode {
+            AddressingMode::DataRegister(register) => {
+                let val = Size::from_register_value(self.d[register]);
+                let new_val = op(self, val);
+                self.d[register] = new_val.apply_to_register(self.d[register])
+            }
+            AddressingMode::AddressRegister(register) => {
+                let val = Size::from_register_value(self.addr_register(register));
+                let new_val = op(self, val);
+                self.set_addr_register(register, new_val.apply_to_register(self.addr_register(register)));
+            }
+            AddressingMode::Address(_)
+            | AddressingMode::AddressWithDisplacement(_)
+            | AddressingMode::AddressWithIndex(_)
+            | AddressingMode::ProgramCounterWithDisplacement
+            | AddressingMode::ProgramCounterWithIndex
+            | AddressingMode::AbsoluteShort
+            | AddressingMode::AbsoluteLong
+            => {
+                let addr = self.effective_addr(mode);
+                let val = self.read_addr(addr);
+                let new_val = op(self, val);
+                self.write_addr(addr, new_val);
+            }
+            AddressingMode::AddressWithPostincrement(register) => {
+                let addr = self.addr_register(register);
+                let val = self.read_addr(addr);
+                let new_val = op(self, val);
+                self.write_addr(addr, new_val);
+                self.inc_addr_register(register, if register == 7 {
+                    Size::word_aligned_address_size()
+                } else {
+                    Size::address_size()
+                });
+            }
+            AddressingMode::AddressWithPredecrement(register) => {
+                self.dec_addr_register(register, if register == 7 {
+                    Size::word_aligned_address_size()
+                } else {
+                    Size::address_size()
+                });
+                let addr = self.addr_register(register);
+                let val = self.read_addr(addr);
+                let new_val = op(self, val);
+                self.write_addr(addr, new_val);
+            }
+            AddressingMode::Immediate | AddressingMode::Illegal => panic!(),
+        }
+    }
+
     fn execute_opcode(&mut self) {
         let opcode_pc = self.pc;
         let opcode_hex = self.read_addr(opcode_pc);
@@ -487,6 +538,32 @@ impl<'a> Cpu<'a> {
         let opcode = opcode(opcode_hex);
 
         match opcode {
+            Opcode::BCHG { bit_num, mode } => {
+                let bit_mod = match mode {
+                    AddressingMode::DataRegister(_) => 32,
+                    _ => 8,
+                };
+                let bit = match bit_num {
+                    BitNum::Immediate => {
+                        let extension: u8 = self.read_addr_word_aligned(self.pc);
+                        self.pc += 2;
+                        extension as u32
+                    }
+                    BitNum::DataRegister(register) => self.d[register]
+                } % bit_mod;
+                match mode {
+                    AddressingMode::DataRegister(_) => self.read_write::<u32>(mode, &mut |cpu, val| {
+                        let bit_val = (val >> bit) & 0b1;
+                        cpu.set_flag(ZERO, bit_val == 0);
+                        val ^ (1 << bit)
+                    }),
+                    _ => self.read_write::<u8>(mode, &mut |cpu, val| {
+                        let bit_val = (val >> bit) & 0b1;
+                        cpu.set_flag(ZERO, bit_val == 0);
+                        val ^ (1 << bit)
+                    }),
+                };
+            }
             Opcode::JMP { mode } => self.pc = self.effective_addr(mode),
             Opcode::JSR { mode } => {
                 let addr = self.effective_addr(mode);
