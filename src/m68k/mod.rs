@@ -9,7 +9,7 @@ pub mod opcodes;
 
 const CPU_TICKS_PER_SECOND: f64 = 7_670_454.0;
 
-trait DataSize: TryFrom<u32> {
+trait DataSize: TryFrom<u32> + Copy {
     fn address_size() -> u32;
     fn word_aligned_address_size() -> u32;
     fn from_register_value(value: u32) -> Self;
@@ -17,6 +17,8 @@ trait DataSize: TryFrom<u32> {
     fn from_memory_bytes(bytes: &[u8]) -> Self;
     fn set_memory_bytes(self, bytes: &mut [u8]);
     fn apply_to_register(self, register_val: u32) -> u32;
+    fn is_negative(self) -> bool;
+    fn is_zero(self) -> bool;
 }
 
 impl DataSize for u8 {
@@ -46,6 +48,10 @@ impl DataSize for u8 {
     fn apply_to_register(self, register_val: u32) -> u32 {
         (register_val & !0xFF) + (self as u32)
     }
+
+    fn is_negative(self) -> bool { panic!() }
+
+    fn is_zero(self) -> bool { self == 0 }
 }
 
 impl DataSize for i8 {
@@ -75,6 +81,10 @@ impl DataSize for i8 {
     fn apply_to_register(self, register_val: u32) -> u32 {
         (register_val & !0xFF) + ((self as u8) as u32)
     }
+
+    fn is_negative(self) -> bool { self < 0 }
+
+    fn is_zero(self) -> bool { self == 0 }
 }
 
 impl DataSize for u16 {
@@ -105,6 +115,10 @@ impl DataSize for u16 {
     fn apply_to_register(self, register_val: u32) -> u32 {
         (register_val & !0xFFFF) + (self as u32)
     }
+
+    fn is_negative(self) -> bool { panic!() }
+
+    fn is_zero(self) -> bool { self == 0 }
 }
 
 impl DataSize for i16 {
@@ -131,6 +145,10 @@ impl DataSize for i16 {
     fn apply_to_register(self, register_val: u32) -> u32 {
         (register_val & !0xFFFF) + ((self as u16) as u32)
     }
+
+    fn is_negative(self) -> bool { self < 0 }
+
+    fn is_zero(self) -> bool { self == 0 }
 }
 
 impl DataSize for u32 {
@@ -164,6 +182,10 @@ impl DataSize for u32 {
     fn apply_to_register(self, _register_val: u32) -> u32 {
         self
     }
+
+    fn is_negative(self) -> bool { panic!() }
+
+    fn is_zero(self) -> bool { self == 0 }
 }
 
 impl DataSize for i32 {
@@ -193,6 +215,10 @@ impl DataSize for i32 {
     fn apply_to_register(self, _register_val: u32) -> u32 {
         self as u32
     }
+
+    fn is_negative(self) -> bool { self < 0 }
+
+    fn is_zero(self) -> bool { self == 0 }
 }
 
 pub struct Cpu<'a> {
@@ -530,6 +556,15 @@ impl<'a> Cpu<'a> {
         }
     }
 
+    fn move_<Size: DataSize>(&mut self, src_mode: AddressingMode, dest_mode: AddressingMode) {
+        let val: Size = self.read(src_mode);
+        self.set_flag(NEGATIVE, val.is_negative());
+        self.set_flag(ZERO, val.is_zero());
+        self.set_flag(OVERFLOW, false);
+        self.set_flag(CARRY, false);
+        self.write(dest_mode, val);
+    }
+
     fn execute_opcode(&mut self) {
         let opcode_pc = self.pc;
         let opcode_hex = self.read_addr(opcode_pc);
@@ -600,16 +635,9 @@ impl<'a> Cpu<'a> {
             }
             Opcode::MOVE { src_mode, dest_mode, size } => {
                 match size {
-                    Size::Byte => {
-                        let val = self.read::<i8>(src_mode);
-                        self.set_flag(NEGATIVE, val < 0);
-                        self.set_flag(ZERO, val == 0);
-                        self.set_flag(OVERFLOW, false);
-                        self.set_flag(CARRY, false);
-                        self.write(dest_mode, val);
-                    }
-                    Size::Word => {}
-                    Size::Long => {}
+                    Size::Byte => self.move_::<i8>(src_mode, dest_mode),
+                    Size::Word => self.move_::<i16>(src_mode, dest_mode),
+                    Size::Long => self.move_::<i32>(src_mode, dest_mode),
                     Size::Illegal => panic!()
                 }
             }
