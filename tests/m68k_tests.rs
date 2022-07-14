@@ -32,7 +32,7 @@ fn eor_and_or() {
 
 #[test]
 fn eori_andi_ori() {
-    run_json_test(json::parse(include_str!("m68k/eor_and_or.json")).unwrap());
+    run_json_test(json::parse(include_str!("m68k/eori_andi_ori.json")).unwrap());
 }
 
 #[test]
