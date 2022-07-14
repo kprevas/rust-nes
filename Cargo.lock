@@ -1338,6 +1338,7 @@ dependencies = [
     "json",
     "log",
     "nfd",
+    "num-traits",
     "piston",
     "piston2d-graphics",
     "piston2d-opengl_graphics",

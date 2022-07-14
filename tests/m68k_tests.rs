@@ -26,6 +26,16 @@ fn btst_bchg_bclr_bset() {
 }
 
 #[test]
+fn eor_and_or() {
+    run_json_test(json::parse(include_str!("m68k/eor_and_or.json")).unwrap());
+}
+
+#[test]
+fn eori_andi_ori() {
+    run_json_test(json::parse(include_str!("m68k/eor_and_or.json")).unwrap());
+}
+
+#[test]
 fn jmp_jsr() {
     run_json_test(json::parse(include_str!("m68k/jmp_jsr.json")).unwrap());
 }
@@ -82,17 +92,20 @@ fn run_json_test(test_cases: JsonValue) {
         }
         if let Opcode::ILLEGAL = cpu.peek_opcode() { continue; }
         if let
-        Opcode::ADDI { .. }
-        | Opcode::ANDI { .. }
+        Opcode::ABCD { .. }
+        | Opcode::ADDI { .. }
         | Opcode::ANDI_to_CCR { .. }
         | Opcode::ANDI_to_SR { .. }
+        | Opcode::CMP { .. }
+        | Opcode::CMPA { .. }
         | Opcode::CMPI { .. }
-        | Opcode::EORI { .. }
+        | Opcode::CMPM { .. }
         | Opcode::EORI_to_CCR { .. }
         | Opcode::EORI_to_SR { .. }
-        | Opcode::ORI { .. }
+        | Opcode::EXG { .. }
         | Opcode::ORI_to_CCR { .. }
         | Opcode::ORI_to_SR { .. }
+        | Opcode::SBCD { .. }
         | Opcode::SUBI { .. }
         = cpu.peek_opcode() { continue; } // TODO
         println!("  {}", cpu.peek_opcode());

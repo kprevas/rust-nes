@@ -33,6 +33,7 @@ pistoncore-sdl2_window = "0.68.0"
 triple_buffer = "6.2.0"
 json = "0.12.4"
 itertools = "0.10.3"
+num-traits = "0.2.15"
 
 [badges]
 travis-ci = { repository = "kprevas/rust-nes", branch = "master" }

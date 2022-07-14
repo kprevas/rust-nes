@@ -2,14 +2,16 @@ use std::convert::TryFrom;
 use std::marker::PhantomData;
 use std::ops::Sub;
 
+use num_traits::PrimInt;
+
 use input::ControllerState;
-use m68k::opcodes::{AddressingMode, BitNum, brief_extension_word, Direction, opcode, Opcode, Size};
+use m68k::opcodes::{AddressingMode, BitNum, brief_extension_word, Direction, opcode, Opcode, OperandDirection, Size};
 
 pub mod opcodes;
 
 const CPU_TICKS_PER_SECOND: f64 = 7_670_454.0;
 
-trait DataSize: TryFrom<u32> + Copy {
+trait DataSize: TryFrom<u32> + PrimInt {
     fn address_size() -> u32;
     fn word_aligned_address_size() -> u32;
     fn from_register_value(value: u32) -> Self;
@@ -19,6 +21,7 @@ trait DataSize: TryFrom<u32> + Copy {
     fn apply_to_register(self, register_val: u32) -> u32;
     fn is_negative(self) -> bool;
     fn is_zero(self) -> bool;
+
 }
 
 impl DataSize for u8 {
@@ -49,7 +52,7 @@ impl DataSize for u8 {
         (register_val & !0xFF) + (self as u32)
     }
 
-    fn is_negative(self) -> bool { panic!() }
+    fn is_negative(self) -> bool { self >> 7 == 1 }
 
     fn is_zero(self) -> bool { self == 0 }
 }
@@ -116,7 +119,7 @@ impl DataSize for u16 {
         (register_val & !0xFFFF) + (self as u32)
     }
 
-    fn is_negative(self) -> bool { panic!() }
+    fn is_negative(self) -> bool { self >> 15 == 1 }
 
     fn is_zero(self) -> bool { self == 0 }
 }
@@ -183,7 +186,7 @@ impl DataSize for u32 {
         self
     }
 
-    fn is_negative(self) -> bool { panic!() }
+    fn is_negative(self) -> bool { self >> 31 == 1 }
 
     fn is_zero(self) -> bool { self == 0 }
 }
@@ -410,7 +413,7 @@ impl<'a> Cpu<'a> {
                 let extension = self.read_addr::<i16>(self.pc);
                 self.pc += 2;
                 if extension < 0 {
-                    self.internal_ram.len().sub((-extension) as usize) as u32
+                    self.internal_ram.len().sub((-(extension as i32)) as usize) as u32
                 } else {
                     extension as u32
                 }
@@ -463,6 +466,12 @@ impl<'a> Cpu<'a> {
             }
             AddressingMode::Illegal => panic!(),
         }
+    }
+
+    fn read_extension<Size: DataSize>(&mut self) -> Size {
+        let val = self.read_addr_word_aligned(self.pc);
+        self.pc += Size::word_aligned_address_size();
+        val
     }
 
     fn write<Size: DataSize>(&mut self, mode: AddressingMode, val: Size) {
@@ -556,6 +565,80 @@ impl<'a> Cpu<'a> {
         }
     }
 
+    fn and<Size: DataSize>(&mut self, mode: AddressingMode, register: usize, operand_direction: OperandDirection) {
+        let operand = Size::from_register_value(self.d[register]);
+        match operand_direction {
+            OperandDirection::ToRegister => {
+                let val: Size = self.read(mode);
+                let result = val & operand;
+                self.set_flag(NEGATIVE, result.is_negative());
+                self.set_flag(ZERO, result.is_zero());
+                self.set_flag(OVERFLOW, false);
+                self.set_flag(CARRY, false);
+                self.d[register] = result.apply_to_register(self.d[register]);
+            }
+            OperandDirection::ToMemory => {
+                self.read_write(mode, &mut |cpu, val| {
+                    let result: Size = val & operand;
+                    cpu.set_flag(NEGATIVE, result.is_negative());
+                    cpu.set_flag(ZERO, result.is_zero());
+                    cpu.set_flag(OVERFLOW, false);
+                    cpu.set_flag(CARRY, false);
+                    result
+                });
+            }
+        }
+    }
+
+    fn andi<Size: DataSize>(&mut self, mode: AddressingMode) {
+        let operand: Size = self.read_extension();
+        self.read_write::<Size>(mode, &mut |cpu, val| {
+            let result = val & operand;
+            cpu.set_flag(NEGATIVE, result.is_negative());
+            cpu.set_flag(ZERO, result.is_zero());
+            cpu.set_flag(OVERFLOW, false);
+            cpu.set_flag(CARRY, false);
+            result
+        });
+    }
+
+    fn eor<Size: DataSize>(&mut self, mode: AddressingMode, register: usize, operand_direction: OperandDirection) {
+        let operand = Size::from_register_value(self.d[register]);
+        match operand_direction {
+            OperandDirection::ToRegister => {
+                let val: Size = self.read(mode);
+                let result = val ^ operand;
+                self.set_flag(NEGATIVE, result.is_negative());
+                self.set_flag(ZERO, result.is_zero());
+                self.set_flag(OVERFLOW, false);
+                self.set_flag(CARRY, false);
+                self.d[register] = result.apply_to_register(self.d[register]);
+            }
+            OperandDirection::ToMemory => {
+                self.read_write(mode, &mut |cpu, val| {
+                    let result: Size = val ^ operand;
+                    cpu.set_flag(NEGATIVE, result.is_negative());
+                    cpu.set_flag(ZERO, result.is_zero());
+                    cpu.set_flag(OVERFLOW, false);
+                    cpu.set_flag(CARRY, false);
+                    result
+                });
+            }
+        }
+    }
+
+    fn eori<Size: DataSize>(&mut self, mode: AddressingMode) {
+        let operand: Size = self.read_extension();
+        self.read_write::<Size>(mode, &mut |cpu, val| {
+            let result = val ^ operand;
+            cpu.set_flag(NEGATIVE, result.is_negative());
+            cpu.set_flag(ZERO, result.is_zero());
+            cpu.set_flag(OVERFLOW, false);
+            cpu.set_flag(CARRY, false);
+            result
+        });
+    }
+
     fn move_<Size: DataSize>(&mut self, src_mode: AddressingMode, dest_mode: AddressingMode) {
         let val: Size = self.read(src_mode);
         self.set_flag(NEGATIVE, val.is_negative());
@@ -563,6 +646,44 @@ impl<'a> Cpu<'a> {
         self.set_flag(OVERFLOW, false);
         self.set_flag(CARRY, false);
         self.write(dest_mode, val);
+    }
+
+
+    fn or<Size: DataSize>(&mut self, mode: AddressingMode, register: usize, operand_direction: OperandDirection) {
+        let operand = Size::from_register_value(self.d[register]);
+        match operand_direction {
+            OperandDirection::ToRegister => {
+                let val: Size = self.read(mode);
+                let result = val | operand;
+                self.set_flag(NEGATIVE, result.is_negative());
+                self.set_flag(ZERO, result.is_zero());
+                self.set_flag(OVERFLOW, false);
+                self.set_flag(CARRY, false);
+                self.d[register] = result.apply_to_register(self.d[register]);
+            }
+            OperandDirection::ToMemory => {
+                self.read_write(mode, &mut |cpu, val| {
+                    let result: Size = val | operand;
+                    cpu.set_flag(NEGATIVE, result.is_negative());
+                    cpu.set_flag(ZERO, result.is_zero());
+                    cpu.set_flag(OVERFLOW, false);
+                    cpu.set_flag(CARRY, false);
+                    result
+                });
+            }
+        }
+    }
+
+    fn ori<Size: DataSize>(&mut self, mode: AddressingMode) {
+        let operand: Size = self.read_extension();
+        self.read_write::<Size>(mode, &mut |cpu, val| {
+            let result = val | operand;
+            cpu.set_flag(NEGATIVE, result.is_negative());
+            cpu.set_flag(ZERO, result.is_zero());
+            cpu.set_flag(OVERFLOW, false);
+            cpu.set_flag(CARRY, false);
+            result
+        });
     }
 
     fn execute_opcode(&mut self) {
@@ -573,6 +694,18 @@ impl<'a> Cpu<'a> {
         let opcode = opcode(opcode_hex);
 
         match opcode {
+            Opcode::AND { mode, size, operand_direction, register } => match size {
+                Size::Byte => self.and::<u8>(mode, register, operand_direction),
+                Size::Word => self.and::<u16>(mode, register, operand_direction),
+                Size::Long => self.and::<u32>(mode, register, operand_direction),
+                Size::Illegal => panic!()
+            }
+            Opcode::ANDI { mode, size } => match size {
+                Size::Byte => self.andi::<u8>(mode),
+                Size::Word => self.andi::<u16>(mode),
+                Size::Long => self.andi::<u32>(mode),
+                Size::Illegal => panic!()
+            },
             Opcode::BCHG { bit_num, mode }
             | Opcode::BCLR { bit_num, mode }
             | Opcode::BSET { bit_num, mode }
@@ -627,20 +760,30 @@ impl<'a> Cpu<'a> {
                     };
                 }
             }
+            Opcode::EOR { mode, size, operand_direction, register } => match size {
+                Size::Byte => self.eor::<u8>(mode, register, operand_direction),
+                Size::Word => self.eor::<u16>(mode, register, operand_direction),
+                Size::Long => self.eor::<u32>(mode, register, operand_direction),
+                Size::Illegal => panic!()
+            },
+            Opcode::EORI { mode, size } => match size {
+                Size::Byte => self.eori::<u8>(mode),
+                Size::Word => self.eori::<u16>(mode),
+                Size::Long => self.eori::<u32>(mode),
+                Size::Illegal => panic!()
+            },
             Opcode::JMP { mode } => self.pc = self.effective_addr(mode),
             Opcode::JSR { mode } => {
                 let addr = self.effective_addr(mode);
                 self.write(AddressingMode::AddressWithPredecrement(7), self.pc);
                 self.pc = addr;
             }
-            Opcode::MOVE { src_mode, dest_mode, size } => {
-                match size {
-                    Size::Byte => self.move_::<i8>(src_mode, dest_mode),
-                    Size::Word => self.move_::<i16>(src_mode, dest_mode),
-                    Size::Long => self.move_::<i32>(src_mode, dest_mode),
-                    Size::Illegal => panic!()
-                }
-            }
+            Opcode::MOVE { src_mode, dest_mode, size } => match size {
+                Size::Byte => self.move_::<i8>(src_mode, dest_mode),
+                Size::Word => self.move_::<i16>(src_mode, dest_mode),
+                Size::Long => self.move_::<i32>(src_mode, dest_mode),
+                Size::Illegal => panic!()
+            },
             Opcode::MOVEP { data_register, address_register, direction, size } => {
                 let addr = self.effective_addr(AddressingMode::AddressWithDisplacement(address_register));
                 match direction {
@@ -682,6 +825,18 @@ impl<'a> Cpu<'a> {
                 }
             }
             Opcode::NOP => {}
+            Opcode::OR { mode, size, operand_direction, register } => match size {
+                Size::Byte => self.or::<u8>(mode, register, operand_direction),
+                Size::Word => self.or::<u16>(mode, register, operand_direction),
+                Size::Long => self.or::<u32>(mode, register, operand_direction),
+                Size::Illegal => panic!()
+            },
+            Opcode::ORI { mode, size } => match size {
+                Size::Byte => self.ori::<u8>(mode),
+                Size::Word => self.ori::<u16>(mode),
+                Size::Long => self.ori::<u32>(mode),
+                Size::Illegal => panic!()
+            },
             _ => {
                 unimplemented!("{:04X} {:?}", opcode_hex, opcode)
             }
