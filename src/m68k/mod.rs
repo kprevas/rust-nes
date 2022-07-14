@@ -21,7 +21,6 @@ trait DataSize: TryFrom<u32> + PrimInt {
     fn apply_to_register(self, register_val: u32) -> u32;
     fn is_negative(self) -> bool;
     fn is_zero(self) -> bool;
-
 }
 
 impl DataSize for u8 {
@@ -249,6 +248,8 @@ const EXTEND: u16 = 0b10000;
 
 const INTERRUPT: u16 = 0b0000011100000000;
 const INTERRUPT_SHIFT: u16 = 8;
+
+const SR_MASK: u16 = 0b1010011100011111;
 
 impl<'a> Cpu<'a> {
     pub fn boot<'b>(instrumented: bool) -> Cpu<'b> {
@@ -706,6 +707,15 @@ impl<'a> Cpu<'a> {
                 Size::Long => self.andi::<u32>(mode),
                 Size::Illegal => panic!()
             },
+            Opcode::ANDI_to_CCR => {
+                self.status =
+                    ((self.status & 0xFF00)
+                        | ((self.status & 0xFF) & (self.read_extension::<u8>()) as u16))
+                        & SR_MASK;
+            }
+            Opcode::ANDI_to_SR => {
+                self.status = (self.status & self.read_extension::<u16>()) & SR_MASK;
+            }
             Opcode::BCHG { bit_num, mode }
             | Opcode::BCLR { bit_num, mode }
             | Opcode::BSET { bit_num, mode }
@@ -772,23 +782,32 @@ impl<'a> Cpu<'a> {
                 Size::Long => self.eori::<u32>(mode),
                 Size::Illegal => panic!()
             },
+            Opcode::EORI_to_CCR => {
+                self.status =
+                    ((self.status & 0xFF00)
+                        | ((self.status & 0xFF) ^ (self.read_extension::<u8>()) as u16))
+                        & SR_MASK;
+            }
+            Opcode::EORI_to_SR => {
+                self.status = (self.status ^ self.read_extension::<u16>()) & SR_MASK;
+            }
             Opcode::EXG { mode, src_register, dest_register } => {
                 match mode {
                     ExchangeMode::DataRegisters => {
                         let tmp = self.d[src_register];
                         self.d[src_register] = self.d[dest_register];
                         self.d[dest_register] = tmp;
-                    },
+                    }
                     ExchangeMode::AddressRegisters => {
                         let tmp = self.addr_register(src_register);
                         self.set_addr_register(src_register, self.addr_register(dest_register));
                         self.set_addr_register(dest_register, tmp);
-                    },
+                    }
                     ExchangeMode::DataRegisterAndAddressRegister => {
                         let tmp = self.d[src_register];
                         self.d[src_register] = self.addr_register(dest_register);
                         self.set_addr_register(dest_register, tmp);
-                    },
+                    }
                     ExchangeMode::Illegal => panic!()
                 };
             }
@@ -857,13 +876,22 @@ impl<'a> Cpu<'a> {
                 Size::Long => self.ori::<u32>(mode),
                 Size::Illegal => panic!()
             },
+            Opcode::ORI_to_CCR => {
+                self.status =
+                    ((self.status & 0xFF00)
+                        | ((self.status & 0xFF) | (self.read_extension::<u8>()) as u16))
+                        & SR_MASK;
+            }
+            Opcode::ORI_to_SR => {
+                self.status = (self.status | self.read_extension::<u16>()) & SR_MASK;
+            }
             _ => {
                 unimplemented!("{:04X} {:?}", opcode_hex, opcode)
             }
         }
     }
 
-    pub fn next_operation(&mut self, inputs: &[ControllerState<8>; 2]) {
+    pub fn next_operation(&mut self, _inputs: &[ControllerState<8>; 2]) {
         self.execute_opcode();
     }
 

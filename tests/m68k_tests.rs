@@ -6,7 +6,6 @@ use itertools::{Itertools, Tuples};
 use json::iterators::Members;
 use json::JsonValue;
 
-use nes::input::ControllerState;
 use nes::m68k::opcodes::Opcode;
 
 #[test]
@@ -99,17 +98,11 @@ fn run_json_test(test_cases: JsonValue) {
         if let
         Opcode::ABCD { .. }
         | Opcode::ADDI { .. }
-        | Opcode::ANDI_to_CCR { .. }
-        | Opcode::ANDI_to_SR { .. }
         | Opcode::CMP { .. }
         | Opcode::CMPA { .. }
         | Opcode::CMPI { .. }
         | Opcode::CMPM { .. }
-        | Opcode::EORI_to_CCR { .. }
-        | Opcode::EORI_to_SR { .. }
         | Opcode::MULS { .. }
-        | Opcode::ORI_to_CCR { .. }
-        | Opcode::ORI_to_SR { .. }
         | Opcode::SBCD { .. }
         | Opcode::SUBI { .. }
         = cpu.peek_opcode() { continue; } // TODO
