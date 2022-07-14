@@ -35,6 +35,11 @@ fn move_() {
     run_json_test(json::parse(include_str!("m68k/move.json")).unwrap());
 }
 
+#[test]
+fn movep() {
+    run_json_test(json::parse(include_str!("m68k/movep.json")).unwrap());
+}
+
 fn run_json_test(test_cases: JsonValue) {
     for test_case in test_cases.members() {
         if !test_case.has_key("name") { continue; }
@@ -85,7 +90,6 @@ fn run_json_test(test_cases: JsonValue) {
         | Opcode::EORI { .. }
         | Opcode::EORI_to_CCR { .. }
         | Opcode::EORI_to_SR { .. }
-        | Opcode::MOVEP { .. }
         | Opcode::ORI { .. }
         | Opcode::ORI_to_CCR { .. }
         | Opcode::ORI_to_SR { .. }

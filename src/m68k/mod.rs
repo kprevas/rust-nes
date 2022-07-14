@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use std::ops::Sub;
 
 use input::ControllerState;
-use m68k::opcodes::{AddressingMode, BitNum, brief_extension_word, opcode, Opcode, Size};
+use m68k::opcodes::{AddressingMode, BitNum, brief_extension_word, Direction, opcode, Opcode, Size};
 
 pub mod opcodes;
 
@@ -613,6 +613,46 @@ impl<'a> Cpu<'a> {
                     Size::Illegal => panic!()
                 }
             }
+            Opcode::MOVEP { data_register, address_register, direction, size } => {
+                let addr = self.effective_addr(AddressingMode::AddressWithDisplacement(address_register));
+                match direction {
+                    Direction::RegisterToMemory => {
+                        let val = self.d[data_register];
+                        match size {
+                            Size::Word => {
+                                self.write_addr(addr, ((val >> 8) & 0xFF) as u8);
+                                self.write_addr(addr + 2, (val & 0xFF) as u8);
+                            }
+                            Size::Long => {
+                                self.write_addr(addr, ((val >> 24) & 0xFF) as u8);
+                                self.write_addr(addr + 2, ((val >> 16) & 0xFF) as u8);
+                                self.write_addr(addr + 4, ((val >> 8) & 0xFF) as u8);
+                                self.write_addr(addr + 6, (val & 0xFF) as u8);
+                            }
+                            _ => panic!()
+                        }
+                    }
+                    Direction::MemoryToRegister => {
+                        match size {
+                            Size::Word => {
+                                let mut val = 0;
+                                val += (self.read_addr::<u8>(addr) as u16) << 8;
+                                val += self.read_addr::<u8>(addr + 2) as u16;
+                                self.d[data_register] = val.apply_to_register(self.d[data_register]);
+                            }
+                            Size::Long => {
+                                let mut val = 0;
+                                val += (self.read_addr::<u8>(addr) as u32) << 24;
+                                val += (self.read_addr::<u8>(addr + 2) as u32) << 16;
+                                val += (self.read_addr::<u8>(addr + 4) as u32) << 8;
+                                val += self.read_addr::<u8>(addr + 6) as u32;
+                                self.d[data_register] = val.apply_to_register(self.d[data_register]);
+                            }
+                            _ => panic!()
+                        }
+                    }
+                }
+            }
             Opcode::NOP => {}
             _ => {
                 unimplemented!("{:04X} {:?}", opcode_hex, opcode)
@@ -680,7 +720,7 @@ pub mod testing {
         }
 
         pub fn verify_ram(&self, addr: usize, val: u8) {
-            assert_eq!(self.internal_ram[addr], val);
+            assert_eq!(self.internal_ram[addr & 0xFFFFFF], val, "{:06X}", addr);
         }
     }
 }
