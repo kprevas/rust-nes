@@ -1192,10 +1192,15 @@ pub fn opcode(opcode_hex: u16) -> Opcode {
                     _ => match operand_direction {
                         OperandDirection::ToMemory => match mode {
                             AddressingMode::DataRegister(_)
-                            | AddressingMode::AddressRegister(_) => EXG {
-                                mode: ExchangeMode::from_opcode(opcode_hex),
-                                src_register: register,
-                                dest_register: src_register,
+                            | AddressingMode::AddressRegister(_) => {
+                                let exg_mode = ExchangeMode::from_opcode(opcode_hex);
+                                if let ExchangeMode::Illegal = exg_mode { ILLEGAL } else {
+                                    EXG {
+                                        mode: exg_mode,
+                                        src_register: register,
+                                        dest_register: src_register,
+                                    }
+                                }
                             },
                             _ if mode.is_memory_alterable() => AND {
                                 size,

@@ -36,6 +36,11 @@ fn eori_andi_ori() {
 }
 
 #[test]
+fn exg() {
+    run_json_test(json::parse(include_str!("m68k/exg.json")).unwrap());
+}
+
+#[test]
 fn jmp_jsr() {
     run_json_test(json::parse(include_str!("m68k/jmp_jsr.json")).unwrap());
 }
@@ -102,7 +107,7 @@ fn run_json_test(test_cases: JsonValue) {
         | Opcode::CMPM { .. }
         | Opcode::EORI_to_CCR { .. }
         | Opcode::EORI_to_SR { .. }
-        | Opcode::EXG { .. }
+        | Opcode::MULS { .. }
         | Opcode::ORI_to_CCR { .. }
         | Opcode::ORI_to_SR { .. }
         | Opcode::SBCD { .. }

@@ -5,7 +5,7 @@ use std::ops::Sub;
 use num_traits::PrimInt;
 
 use input::ControllerState;
-use m68k::opcodes::{AddressingMode, BitNum, brief_extension_word, Direction, opcode, Opcode, OperandDirection, Size};
+use m68k::opcodes::{AddressingMode, BitNum, brief_extension_word, Direction, ExchangeMode, opcode, Opcode, OperandDirection, Size};
 
 pub mod opcodes;
 
@@ -772,6 +772,26 @@ impl<'a> Cpu<'a> {
                 Size::Long => self.eori::<u32>(mode),
                 Size::Illegal => panic!()
             },
+            Opcode::EXG { mode, src_register, dest_register } => {
+                match mode {
+                    ExchangeMode::DataRegisters => {
+                        let tmp = self.d[src_register];
+                        self.d[src_register] = self.d[dest_register];
+                        self.d[dest_register] = tmp;
+                    },
+                    ExchangeMode::AddressRegisters => {
+                        let tmp = self.addr_register(src_register);
+                        self.set_addr_register(src_register, self.addr_register(dest_register));
+                        self.set_addr_register(dest_register, tmp);
+                    },
+                    ExchangeMode::DataRegisterAndAddressRegister => {
+                        let tmp = self.d[src_register];
+                        self.d[src_register] = self.addr_register(dest_register);
+                        self.set_addr_register(dest_register, tmp);
+                    },
+                    ExchangeMode::Illegal => panic!()
+                };
+            }
             Opcode::JMP { mode } => self.pc = self.effective_addr(mode),
             Opcode::JSR { mode } => {
                 let addr = self.effective_addr(mode);
