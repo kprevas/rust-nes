@@ -538,7 +538,10 @@ impl<'a> Cpu<'a> {
         let opcode = opcode(opcode_hex);
 
         match opcode {
-            Opcode::BCHG { bit_num, mode } => {
+            Opcode::BCHG { bit_num, mode }
+            | Opcode::BCLR { bit_num, mode }
+            | Opcode::BSET { bit_num, mode }
+            | Opcode::BTST { bit_num, mode } => {
                 let bit_mod = match mode {
                     AddressingMode::DataRegister(_) => 32,
                     _ => 8,
@@ -551,18 +554,43 @@ impl<'a> Cpu<'a> {
                     }
                     BitNum::DataRegister(register) => self.d[register]
                 } % bit_mod;
-                match mode {
-                    AddressingMode::DataRegister(_) => self.read_write::<u32>(mode, &mut |cpu, val| {
-                        let bit_val = (val >> bit) & 0b1;
-                        cpu.set_flag(ZERO, bit_val == 0);
-                        val ^ (1 << bit)
-                    }),
-                    _ => self.read_write::<u8>(mode, &mut |cpu, val| {
-                        let bit_val = (val >> bit) & 0b1;
-                        cpu.set_flag(ZERO, bit_val == 0);
-                        val ^ (1 << bit)
-                    }),
-                };
+                if let Opcode::BTST { .. } = opcode {
+                    match mode {
+                        AddressingMode::DataRegister(_) => {
+                            let val = self.read::<u32>(mode);
+                            let bit_val = (val >> bit) & 0b1;
+                            self.set_flag(ZERO, bit_val == 0);
+                        }
+                        _ => {
+                            let val = self.read::<u8>(mode);
+                            let bit_val = (val >> bit) & 0b1;
+                            self.set_flag(ZERO, bit_val == 0);
+                        }
+                    };
+                } else {
+                    match mode {
+                        AddressingMode::DataRegister(_) => self.read_write::<u32>(mode, &mut |cpu, val| {
+                            let bit_val = (val >> bit) & 0b1;
+                            cpu.set_flag(ZERO, bit_val == 0);
+                            match opcode {
+                                Opcode::BCHG { .. } => val ^ (1 << bit),
+                                Opcode::BCLR { .. } => val & !(1 << bit),
+                                Opcode::BSET { .. } => val | (1 << bit),
+                                _ => panic!()
+                            }
+                        }),
+                        _ => self.read_write::<u8>(mode, &mut |cpu, val| {
+                            let bit_val = (val >> bit) & 0b1;
+                            cpu.set_flag(ZERO, bit_val == 0);
+                            match opcode {
+                                Opcode::BCHG { .. } => val ^ (1 << bit),
+                                Opcode::BCLR { .. } => val & !(1 << bit),
+                                Opcode::BSET { .. } => val | (1 << bit),
+                                _ => panic!()
+                            }
+                        }),
+                    };
+                }
             }
             Opcode::JMP { mode } => self.pc = self.effective_addr(mode),
             Opcode::JSR { mode } => {

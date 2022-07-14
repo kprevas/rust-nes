@@ -81,9 +81,6 @@ fn run_json_test(test_cases: JsonValue) {
         | Opcode::ANDI { .. }
         | Opcode::ANDI_to_CCR { .. }
         | Opcode::ANDI_to_SR { .. }
-        | Opcode::BCLR { .. }
-        | Opcode::BSET { .. }
-        | Opcode::BTST { .. }
         | Opcode::CMPI { .. }
         | Opcode::EORI { .. }
         | Opcode::EORI_to_CCR { .. }
