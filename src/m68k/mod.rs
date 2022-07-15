@@ -1050,6 +1050,15 @@ impl<'a> Cpu<'a> {
             Opcode::ORI_to_SR => {
                 self.status = (self.status | self.read_extension::<u16>()) & SR_MASK;
             }
+            Opcode::SWAP { register } => {
+                let val = self.d[register];
+                let result = (val << 16) | (val >> 16);
+                self.d[register] = result;
+                self.set_flag(ZERO, result == 0);
+                self.set_flag(NEGATIVE, result >> 31 == 1);
+                self.set_flag(OVERFLOW, false);
+                self.set_flag(CARRY, false);
+            }
             _ => {
                 unimplemented!("{:04X} {:?}", opcode_hex, opcode)
             }

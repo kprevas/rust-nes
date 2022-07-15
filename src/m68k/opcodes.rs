@@ -692,7 +692,7 @@ pub enum Opcode {
     },
     // Subtract with Extend
     SWAP {
-        mode: AddressingMode,
+        register: usize,
     },
     // Swap Register Words
     TAS {
@@ -910,7 +910,7 @@ pub fn opcode(opcode_hex: u16) -> Opcode {
                                 }
                             }
                             0b01 => match mode {
-                                AddressingMode::DataRegister(_) => SWAP { mode },
+                                AddressingMode::DataRegister(register) => SWAP { register },
                                 _ if mode.is_control_addressing() => PEA { mode },
                                 _ => ILLEGAL,
                             },
@@ -1977,7 +1977,7 @@ impl Display for Opcode {
                     size, src_register, dest_register
                 )),
             },
-            Opcode::SWAP { mode } => f.write_fmt(format_args!("SWAP {}", mode)),
+            Opcode::SWAP { register } => f.write_fmt(format_args!("SWAP D{}", register)),
             Opcode::TAS { mode } => f.write_fmt(format_args!("TAS {}", mode)),
             Opcode::TRAP { vector } => f.write_fmt(format_args!("TRAP {}", vector)),
             Opcode::TRAPV => f.write_str("TRAPV"),
