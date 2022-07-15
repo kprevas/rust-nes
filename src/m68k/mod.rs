@@ -789,6 +789,14 @@ impl<'a> Cpu<'a> {
         });
     }
 
+    fn tst<Size: DataSize>(&mut self, mode: AddressingMode) {
+        let val: Size = self.read(mode);
+        self.set_flag(NEGATIVE, val.is_negative());
+        self.set_flag(ZERO, val.is_zero());
+        self.set_flag(OVERFLOW, false);
+        self.set_flag(CARRY, false);
+    }
+
     fn execute_opcode(&mut self) {
         let opcode_pc = self.pc;
         let opcode_hex = self.read_addr(opcode_pc);
@@ -1058,6 +1066,12 @@ impl<'a> Cpu<'a> {
                 self.set_flag(NEGATIVE, result >> 31 == 1);
                 self.set_flag(OVERFLOW, false);
                 self.set_flag(CARRY, false);
+            }
+            Opcode::TST { mode, size } => match size {
+                Size::Byte => self.tst::<i8>(mode),
+                Size::Word => self.tst::<i16>(mode),
+                Size::Long => self.tst::<i32>(mode),
+                Size::Illegal => panic!()
             }
             _ => {
                 unimplemented!("{:04X} {:?}", opcode_hex, opcode)
