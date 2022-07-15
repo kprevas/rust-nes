@@ -721,6 +721,26 @@ impl<'a> Cpu<'a> {
         });
     }
 
+    fn negx<Size: DataSize + Signed>(&mut self, mode: AddressingMode) {
+        self.read_write::<Size>(mode, &mut |cpu, val| {
+            let overflow = val == Size::min_value()
+                || (val == Size::max_value() && cpu.flag(EXTEND));
+            let result = if overflow {
+                val
+            } else if cpu.flag(EXTEND) {
+                -val - Size::from(1).unwrap()
+            } else {
+                -val
+            };
+            cpu.set_flag(EXTEND, !result.is_zero());
+            cpu.set_flag(NEGATIVE, result.is_negative());
+            cpu.set_flag(ZERO, result.is_zero());
+            cpu.set_flag(OVERFLOW, overflow);
+            cpu.set_flag(CARRY, !result.is_zero());
+            result
+        });
+    }
+
     fn or<Size: DataSize>(&mut self, mode: AddressingMode, register: usize, operand_direction: OperandDirection) {
         let operand = Size::from_register_value(self.d[register]);
         match operand_direction {
@@ -983,6 +1003,12 @@ impl<'a> Cpu<'a> {
                 Size::Byte => self.neg::<i8>(mode),
                 Size::Word => self.neg::<i16>(mode),
                 Size::Long => self.neg::<i32>(mode),
+                Size::Illegal => panic!()
+            }
+            Opcode::NEGX { mode, size } => match size {
+                Size::Byte => self.negx::<i8>(mode),
+                Size::Word => self.negx::<i16>(mode),
+                Size::Long => self.negx::<i32>(mode),
                 Size::Illegal => panic!()
             }
             Opcode::NOP => {}

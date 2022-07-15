@@ -74,6 +74,11 @@ fn neg_not() {
     run_json_test(json::parse(include_str!("m68k/neg_not.json")).unwrap());
 }
 
+#[test]
+fn negx_clr() {
+    run_json_test(json::parse(include_str!("m68k/negx_clr.json")).unwrap());
+}
+
 fn run_json_test(test_cases: JsonValue) {
     for test_case in test_cases.members() {
         if !test_case.has_key("name") { continue; }
@@ -129,10 +134,10 @@ fn run_json_test(test_cases: JsonValue) {
         | Opcode::CMPM { .. }
         | Opcode::MOVEM { .. }
         | Opcode::MOVE_to_CCR { .. }
+        | Opcode::MOVE_from_SR { .. }
         | Opcode::MOVE_to_SR { .. }
         | Opcode::MULS { .. }
         | Opcode::NBCD { .. }
-        | Opcode::NEGX { .. }
         | Opcode::NOT { .. }
         | Opcode::SBCD { .. }
         | Opcode::SUBI { .. }
