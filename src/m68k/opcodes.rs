@@ -470,7 +470,7 @@ pub enum Opcode {
     },
     // Exchange Registers
     EXT {
-        mode: AddressingMode,
+        register: usize,
         size: Size,
     },
     // Sign Extend
@@ -915,8 +915,8 @@ pub fn opcode(opcode_hex: u16) -> Opcode {
                                 _ => ILLEGAL,
                             },
                             _ => match mode {
-                                AddressingMode::DataRegister(_) => EXT {
-                                    mode,
+                                AddressingMode::DataRegister(register) => EXT {
+                                    register,
                                     size: Size::from_opcode_bit(opcode_hex, 6),
                                 },
                                 AddressingMode::Address(_)
@@ -1697,7 +1697,7 @@ impl Display for Opcode {
                 }
                 ExchangeMode::Illegal => f.write_str("ILLEGAL"),
             },
-            Opcode::EXT { mode, size } => f.write_fmt(format_args!("EXT{} {}", size, mode)),
+            Opcode::EXT { register, size } => f.write_fmt(format_args!("EXT{} D{}", size, register)),
             Opcode::ILLEGAL => f.write_str("ILLEGAL"),
             Opcode::JMP { mode } => f.write_fmt(format_args!("JMP {}", mode)),
             Opcode::JSR { mode } => f.write_fmt(format_args!("JSR {}", mode)),

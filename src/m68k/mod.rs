@@ -692,6 +692,13 @@ impl<'a> Cpu<'a> {
         });
     }
 
+    fn ext<From: DataSize, To: DataSize>(&mut self, register: usize) {
+        let val = To::from(From::from_register_value(self.d[register])).unwrap();
+        self.d[register] = val.apply_to_register(self.d[register]);
+        self.set_flag(NEGATIVE, val.is_negative());
+        self.set_flag(ZERO, val.is_zero());
+    }
+
     fn move_<Size: DataSize>(&mut self, src_mode: AddressingMode, dest_mode: AddressingMode) {
         let val: Size = self.read(src_mode);
         self.set_flag(NEGATIVE, val.is_negative());
@@ -898,6 +905,15 @@ impl<'a> Cpu<'a> {
                     }
                     ExchangeMode::Illegal => panic!()
                 };
+            }
+            Opcode::EXT { register, size } => {
+                match size {
+                    Size::Word => self.ext::<i8, i16>(register),
+                    Size::Long => self.ext::<i16, i32>(register),
+                    Size::Byte | Size::Illegal => panic!(),
+                }
+                self.set_flag(OVERFLOW, false);
+                self.set_flag(CARRY, false);
             }
             Opcode::JMP { mode } => self.pc = self.effective_addr(mode),
             Opcode::JSR { mode } => {

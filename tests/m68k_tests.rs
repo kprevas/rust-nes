@@ -50,6 +50,11 @@ fn exg() {
 }
 
 #[test]
+fn ext() {
+    run_json_test(json::parse(include_str!("m68k/ext.json")).unwrap());
+}
+
+#[test]
 fn jmp_jsr() {
     run_json_test(json::parse(include_str!("m68k/jmp_jsr.json")).unwrap());
 }
@@ -117,7 +122,6 @@ fn run_json_test(test_cases: JsonValue) {
         | Opcode::CMPA { .. }
         | Opcode::CMPI { .. }
         | Opcode::CMPM { .. }
-        | Opcode::EXT { .. }
         | Opcode::MOVEM { .. }
         | Opcode::MULS { .. }
         | Opcode::NBCD { .. }
@@ -126,6 +130,7 @@ fn run_json_test(test_cases: JsonValue) {
         | Opcode::NOT { .. }
         | Opcode::SBCD { .. }
         | Opcode::SUBI { .. }
+        | Opcode::SWAP { .. }
         | Opcode::TST { .. }
         = cpu.peek_opcode() { continue; } // TODO
         println!("  {}", cpu.peek_opcode());
