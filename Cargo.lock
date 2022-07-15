@@ -1047,7 +1047,7 @@ version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b2b3ea6ff95e175473f8ffe6a7eb7c00d054240321b84c57051175fe3c1e075e"
 dependencies = [
-    "libc",
+ "libc",
 ]
 
 [[package]]
@@ -1056,7 +1056,7 @@ version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a9a9d19fa1e79b6215ff29b9d6880b706147f16e9b1dbb1e4e5947b5b02bc5e3"
 dependencies = [
-    "either",
+ "either",
 ]
 
 [[package]]
@@ -1080,7 +1080,7 @@ version = "0.3.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3fac17f7123a73ca62df411b1bf727ccc805daa070338fda671c86dac1bdc27"
 dependencies = [
-    "wasm-bindgen",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -1095,8 +1095,8 @@ version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7507624b29483431c0ba2d82aece8ca6cdba9382bff4ddd0f7490560c056098d"
 dependencies = [
-    "winapi 0.2.8",
-    "winapi-build",
+ "winapi 0.2.8",
+ "winapi-build",
 ]
 
 [[package]]
@@ -1323,36 +1323,36 @@ checksum = "e1bcdd74c20ad5d95aacd60ef9ba40fdf77f767051040541df557b7a9b2a2121"
 name = "nes"
 version = "0.1.0"
 dependencies = [
-    "array-init",
-    "bincode",
-    "bitflags 1.3.2",
-    "byteorder",
-    "bytes",
-    "clap",
-    "dasp",
-    "env_logger",
-    "find_folder",
-    "hex-slice",
-    "image",
-    "itertools",
-    "json",
-    "log",
-    "nfd",
-    "num-traits",
-    "piston",
-    "piston2d-graphics",
-    "piston2d-opengl_graphics",
-    "piston_window",
-    "pistoncore-sdl2_window",
-    "portaudio",
-    "rb",
-    "serde",
-    "serde_arrays",
-    "serde_derive",
-    "serde_with",
-    "simple-error",
-    "time",
-    "triple_buffer",
+ "array-init",
+ "bincode",
+ "bitflags 1.3.2",
+ "byteorder",
+ "bytes",
+ "clap",
+ "dasp",
+ "env_logger",
+ "find_folder",
+ "hex-slice",
+ "image",
+ "itertools",
+ "json",
+ "log",
+ "nfd",
+ "num-traits",
+ "piston",
+ "piston2d-graphics",
+ "piston2d-opengl_graphics",
+ "piston_window",
+ "pistoncore-sdl2_window",
+ "portaudio",
+ "rb",
+ "serde",
+ "serde_arrays",
+ "serde_derive",
+ "serde_with",
+ "simple-error",
+ "time",
+ "triple_buffer",
 ]
 
 [[package]]
