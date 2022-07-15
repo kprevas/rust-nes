@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 use std::marker::PhantomData;
 use std::ops::Sub;
 
-use num_traits::PrimInt;
+use num_traits::{PrimInt, Signed};
 
 use input::ControllerState;
 use m68k::opcodes::{AddressingMode, BitNum, brief_extension_word, Condition, Direction, ExchangeMode, opcode, Opcode, OperandDirection, Size};
@@ -708,6 +708,18 @@ impl<'a> Cpu<'a> {
         self.write(dest_mode, val);
     }
 
+    fn neg<Size: DataSize + Signed>(&mut self, mode: AddressingMode) {
+        self.read_write::<Size>(mode, &mut |cpu, val| {
+            let overflow = val == Size::min_value();
+            let result = if overflow { val } else { -val };
+            cpu.set_flag(EXTEND, !result.is_zero());
+            cpu.set_flag(NEGATIVE, result.is_negative());
+            cpu.set_flag(ZERO, result.is_zero());
+            cpu.set_flag(OVERFLOW, overflow);
+            cpu.set_flag(CARRY, !result.is_zero());
+            result
+        });
+    }
 
     fn or<Size: DataSize>(&mut self, mode: AddressingMode, register: usize, operand_direction: OperandDirection) {
         let operand = Size::from_register_value(self.d[register]);
@@ -966,6 +978,12 @@ impl<'a> Cpu<'a> {
                         }
                     }
                 }
+            }
+            Opcode::NEG { mode, size } => match size {
+                Size::Byte => self.neg::<i8>(mode),
+                Size::Word => self.neg::<i16>(mode),
+                Size::Long => self.neg::<i32>(mode),
+                Size::Illegal => panic!()
             }
             Opcode::NOP => {}
             Opcode::OR { mode, size, operand_direction, register } => match size {
