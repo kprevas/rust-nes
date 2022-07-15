@@ -5,7 +5,7 @@ use std::ops::Sub;
 use num_traits::PrimInt;
 
 use input::ControllerState;
-use m68k::opcodes::{AddressingMode, BitNum, brief_extension_word, Direction, ExchangeMode, opcode, Opcode, OperandDirection, Size};
+use m68k::opcodes::{AddressingMode, BitNum, brief_extension_word, Condition, Direction, ExchangeMode, opcode, Opcode, OperandDirection, Size};
 
 pub mod opcodes;
 
@@ -287,6 +287,28 @@ impl<'a> Cpu<'a> {
         }
     }
 
+    fn check_condition(&self, condition: Condition) -> bool {
+        match condition {
+            Condition::True => true,
+            Condition::False => false,
+            Condition::Higher => !self.flag(CARRY) && !self.flag(ZERO),
+            Condition::LowerOrSame => self.flag(CARRY) || self.flag(ZERO),
+            Condition::CarryClear => !self.flag(CARRY),
+            Condition::CarrySet => self.flag(CARRY),
+            Condition::NotEqual => !self.flag(ZERO),
+            Condition::Equal => self.flag(ZERO),
+            Condition::OverflowClear => !self.flag(OVERFLOW),
+            Condition::OverflowSet => self.flag(OVERFLOW),
+            Condition::Plus => !self.flag(NEGATIVE),
+            Condition::Minus => self.flag(NEGATIVE),
+            Condition::GreaterOrEqual => self.flag(NEGATIVE) == self.flag(OVERFLOW),
+            Condition::LessThan => self.flag(NEGATIVE) != self.flag(OVERFLOW),
+            Condition::GreaterThan => !self.flag(ZERO) && (self.flag(NEGATIVE) == self.flag(OVERFLOW)),
+            Condition::LessOrEqual => self.flag(ZERO) || (self.flag(NEGATIVE) != self.flag(OVERFLOW)),
+            Condition::Illegal => panic!()
+        }
+    }
+
     fn set_interrupt_level(&mut self, level: u16) {
         assert!(level <= (INTERRUPT >> INTERRUPT_SHIFT));
         self.status = (self.status & (!INTERRUPT)) | (level << INTERRUPT_SHIFT)
@@ -366,6 +388,17 @@ impl<'a> Cpu<'a> {
         } else {
             self.a[register] -= val
         }
+    }
+
+    fn push(&mut self, val: u32) {
+        self.dec_addr_register(7, 4);
+        self.write_addr(self.addr_register(7), val);
+    }
+
+    fn pop(&mut self) -> u32 {
+        let val = self.read_addr(self.addr_register(7));
+        self.inc_addr_register(7, 4);
+        val
     }
 
     fn effective_addr(&mut self, mode: AddressingMode) -> u32 {
@@ -603,6 +636,18 @@ impl<'a> Cpu<'a> {
         });
     }
 
+    fn branch(&mut self, displacement: i8, do_branch: bool) {
+        let pc = self.pc;
+        let displacement = if displacement == 0 {
+            self.read_extension::<i16>() as i32
+        } else {
+            displacement as i32
+        };
+        if do_branch {
+            self.pc = pc.wrapping_add_signed(displacement);
+        }
+    }
+
     fn eor<Size: DataSize>(&mut self, mode: AddressingMode, register: usize, operand_direction: OperandDirection) {
         let operand = Size::from_register_value(self.d[register]);
         match operand_direction {
@@ -769,6 +814,16 @@ impl<'a> Cpu<'a> {
                         }),
                     };
                 }
+            }
+            Opcode::BRA { displacement } => {
+                self.branch(displacement, true);
+            }
+            Opcode::BSR { displacement } => {
+                self.push(self.pc + if displacement == 0 { 2 } else { 0 });
+                self.branch(displacement, true);
+            }
+            Opcode::Bcc { displacement, condition } => {
+                self.branch(displacement, self.check_condition(condition));
             }
             Opcode::EOR { mode, size, operand_direction, register } => match size {
                 Size::Byte => self.eor::<u8>(mode, register, operand_direction),

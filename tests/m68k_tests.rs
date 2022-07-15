@@ -20,6 +20,11 @@ fn opcode_decoding() {
 }
 
 #[test]
+fn bcc() {
+    run_json_test(json::parse(include_str!("m68k/bcc.json")).unwrap());
+}
+
+#[test]
 fn btst_bchg_bclr_bset() {
     run_json_test(json::parse(include_str!("m68k/btst_bchg_bclr_bset.json")).unwrap());
 }
