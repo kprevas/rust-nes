@@ -113,7 +113,6 @@ fn run_json_test(test_cases: JsonValue) {
         if let
         Opcode::ABCD { .. }
         | Opcode::ADDI { .. }
-        | Opcode::CLR { .. }
         | Opcode::CMP { .. }
         | Opcode::CMPA { .. }
         | Opcode::CMPI { .. }

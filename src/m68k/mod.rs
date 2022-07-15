@@ -846,6 +846,18 @@ impl<'a> Cpu<'a> {
                     self.process_exception(6);
                 }
             }
+            Opcode::CLR { mode, size } => {
+                match size {
+                    Size::Byte => self.write::<u8>(mode, 0),
+                    Size::Word => self.write::<u16>(mode, 0),
+                    Size::Long => self.write::<u32>(mode, 0),
+                    Size::Illegal => panic!(),
+                }
+                self.set_flag(NEGATIVE, false);
+                self.set_flag(ZERO, true);
+                self.set_flag(OVERFLOW, false);
+                self.set_flag(CARRY, false);
+            }
             Opcode::EOR { mode, size, operand_direction, register } => match size {
                 Size::Byte => self.eor::<u8>(mode, register, operand_direction),
                 Size::Word => self.eor::<u16>(mode, register, operand_direction),
