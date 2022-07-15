@@ -138,7 +138,6 @@ fn run_json_test(test_cases: JsonValue) {
         | Opcode::MOVE_to_SR { .. }
         | Opcode::MULS { .. }
         | Opcode::NBCD { .. }
-        | Opcode::NOT { .. }
         | Opcode::SBCD { .. }
         | Opcode::SUBI { .. }
         | Opcode::SWAP { .. }

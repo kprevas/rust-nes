@@ -741,6 +741,17 @@ impl<'a> Cpu<'a> {
         });
     }
 
+    fn not<Size: DataSize>(&mut self, mode: AddressingMode) {
+        self.read_write::<Size>(mode, &mut |cpu, val| {
+            let result = !val;
+            cpu.set_flag(NEGATIVE, result.is_negative());
+            cpu.set_flag(ZERO, result.is_zero());
+            cpu.set_flag(OVERFLOW, false);
+            cpu.set_flag(CARRY, false);
+            result
+        });
+    }
+
     fn or<Size: DataSize>(&mut self, mode: AddressingMode, register: usize, operand_direction: OperandDirection) {
         let operand = Size::from_register_value(self.d[register]);
         match operand_direction {
@@ -1012,6 +1023,12 @@ impl<'a> Cpu<'a> {
                 Size::Illegal => panic!()
             }
             Opcode::NOP => {}
+            Opcode::NOT { mode, size } => match size {
+                Size::Byte => self.not::<u8>(mode),
+                Size::Word => self.not::<u16>(mode),
+                Size::Long => self.not::<u32>(mode),
+                Size::Illegal => panic!()
+            },
             Opcode::OR { mode, size, operand_direction, register } => match size {
                 Size::Byte => self.or::<u8>(mode, register, operand_direction),
                 Size::Word => self.or::<u16>(mode, register, operand_direction),
