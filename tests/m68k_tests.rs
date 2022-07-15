@@ -30,6 +30,11 @@ fn btst_bchg_bclr_bset() {
 }
 
 #[test]
+fn chk() {
+    run_json_test(json::parse(include_str!("m68k/chk.json")).unwrap());
+}
+
+#[test]
 fn eor_and_or() {
     run_json_test(json::parse(include_str!("m68k/eor_and_or.json")).unwrap());
 }
@@ -99,17 +104,30 @@ fn run_json_test(test_cases: JsonValue) {
             }
             cpu.poke_ram(addr.as_usize().unwrap(), val.as_u8().unwrap());
         }
+        let sr_mask = if let Opcode::CHK { .. } = cpu.peek_opcode() {
+            0b1111111111111000
+        } else {
+            0b1111111111111111
+        };
         if let Opcode::ILLEGAL = cpu.peek_opcode() { continue; }
         if let
         Opcode::ABCD { .. }
         | Opcode::ADDI { .. }
+        | Opcode::CLR { .. }
         | Opcode::CMP { .. }
         | Opcode::CMPA { .. }
         | Opcode::CMPI { .. }
         | Opcode::CMPM { .. }
+        | Opcode::EXT { .. }
+        | Opcode::MOVEM { .. }
         | Opcode::MULS { .. }
+        | Opcode::NBCD { .. }
+        | Opcode::NEG { .. }
+        | Opcode::NEGX { .. }
+        | Opcode::NOT { .. }
         | Opcode::SBCD { .. }
         | Opcode::SUBI { .. }
+        | Opcode::TST { .. }
         = cpu.peek_opcode() { continue; } // TODO
         println!("  {}", cpu.peek_opcode());
         cpu.next_operation(&[nes::input::player_1_nes(), nes::input::player_2_nes()]);
@@ -137,6 +155,7 @@ fn run_json_test(test_cases: JsonValue) {
                              final_state["usp"].as_u32().unwrap(),
                          ],
                          final_state["a7"].as_u32().unwrap(),
+                         sr_mask,
         );
         let final_memory: Tuples<Members, (&JsonValue, &JsonValue)> =
             test_case["final memory"].members().tuples();

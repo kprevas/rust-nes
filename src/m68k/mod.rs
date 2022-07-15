@@ -390,14 +390,14 @@ impl<'a> Cpu<'a> {
         }
     }
 
-    fn push(&mut self, val: u32) {
-        self.dec_addr_register(7, 4);
+    fn push<Size: DataSize>(&mut self, val: Size) {
+        self.dec_addr_register(7, Size::address_size());
         self.write_addr(self.addr_register(7), val);
     }
 
-    fn pop(&mut self) -> u32 {
+    fn pop<Size: DataSize>(&mut self) -> Size {
         let val = self.read_addr(self.addr_register(7));
-        self.inc_addr_register(7, 4);
+        self.inc_addr_register(7, Size::address_size());
         val
     }
 
@@ -447,7 +447,7 @@ impl<'a> Cpu<'a> {
                 let extension = self.read_addr::<i16>(self.pc);
                 self.pc += 2;
                 if extension < 0 {
-                    self.internal_ram.len().sub((-(extension as i32)) as usize) as u32
+                    u32::MAX.sub((-(extension as i32) - 1) as u32)
                 } else {
                     extension as u32
                 }
@@ -597,6 +597,13 @@ impl<'a> Cpu<'a> {
             }
             AddressingMode::Immediate | AddressingMode::Illegal => panic!(),
         }
+    }
+
+    fn process_exception(&mut self, vector: u32) {
+        self.push(self.pc);
+        self.push(self.status);
+        self.pc = self.read_addr(vector * 4);
+        self.set_flag(SUPERVISOR_MODE, true);
     }
 
     fn and<Size: DataSize>(&mut self, mode: AddressingMode, register: usize, operand_direction: OperandDirection) {
@@ -825,6 +832,20 @@ impl<'a> Cpu<'a> {
             Opcode::Bcc { displacement, condition } => {
                 self.branch(displacement, self.check_condition(condition));
             }
+            Opcode::CHK { register, mode } => {
+                let bound = self.read::<i16>(mode);
+                let val = i16::from_register_value(self.d[register]);
+                self.set_flag(ZERO, val == 0);
+                self.set_flag(OVERFLOW, false);
+                self.set_flag(CARRY, false);
+                if val < 0 {
+                    self.set_flag(NEGATIVE, true);
+                    self.process_exception(6);
+                } else if val > bound {
+                    self.set_flag(NEGATIVE, false);
+                    self.process_exception(6);
+                }
+            }
             Opcode::EOR { mode, size, operand_direction, register } => match size {
                 Size::Byte => self.eor::<u8>(mode, register, operand_direction),
                 Size::Word => self.eor::<u16>(mode, register, operand_direction),
@@ -987,9 +1008,10 @@ pub mod testing {
             self.ssp = ssp;
         }
 
-        pub fn verify_state(&self, pc: u32, sr: u16, d: [u32; 8], a: [u32; 8], ssp: u32) {
+        pub fn verify_state(&self, pc: u32, sr: u16, d: [u32; 8], a: [u32; 8], ssp: u32,
+                            sr_mask: u16) {
             assert_eq!(self.pc, pc, "PC");
-            assert_eq!(self.status, sr, "SR {:016b} {:016b}", self.status, sr);
+            assert_eq!(self.status & sr_mask, sr & sr_mask, "SR {:016b} {:016b}", self.status, sr);
             for i in 0..8 {
                 assert_eq!(self.d[i], d[i], "D{}", i);
                 assert_eq!(self.a[i], a[i], "A{}", i);
