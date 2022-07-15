@@ -230,7 +230,6 @@ pub struct Cpu<'a> {
     status: u16,
     pc: u32,
     internal_ram: Box<[u8]>,
-    supervisor_mode: bool,
     ticks: f64,
     instrumented: bool,
     cycle_count: u64,
@@ -246,6 +245,8 @@ const ZERO: u16 = 0b100;
 const NEGATIVE: u16 = 0b1000;
 const EXTEND: u16 = 0b10000;
 
+const SUPERVISOR_MODE: u16 = 0b0010000000000000;
+
 const INTERRUPT: u16 = 0b0000011100000000;
 const INTERRUPT_SHIFT: u16 = 8;
 
@@ -260,7 +261,6 @@ impl<'a> Cpu<'a> {
             status: 0,
             pc: 0,
             internal_ram: vec![0; 0x10000].into_boxed_slice(),
-            supervisor_mode: true,
             ticks: 0.0,
             instrumented,
             cycle_count: 0,
@@ -359,7 +359,7 @@ impl<'a> Cpu<'a> {
     }
 
     fn addr_register(&self, register: usize) -> u32 {
-        if register == 7 && self.supervisor_mode {
+        if register == 7 && self.flag(SUPERVISOR_MODE) {
             self.ssp
         } else {
             self.a[register]
@@ -367,7 +367,7 @@ impl<'a> Cpu<'a> {
     }
 
     fn set_addr_register(&mut self, register: usize, val: u32) {
-        if register == 7 && self.supervisor_mode {
+        if register == 7 && self.flag(SUPERVISOR_MODE) {
             self.ssp = val
         } else {
             self.a[register] = val
@@ -375,7 +375,7 @@ impl<'a> Cpu<'a> {
     }
 
     fn inc_addr_register(&mut self, register: usize, val: u32) {
-        if register == 7 && self.supervisor_mode {
+        if register == 7 && self.flag(SUPERVISOR_MODE) {
             self.ssp += val
         } else {
             self.a[register] += val
@@ -383,7 +383,7 @@ impl<'a> Cpu<'a> {
     }
 
     fn dec_addr_register(&mut self, register: usize, val: u32) {
-        if register == 7 && self.supervisor_mode {
+        if register == 7 && self.flag(SUPERVISOR_MODE) {
             self.ssp -= val
         } else {
             self.a[register] -= val
@@ -414,8 +414,8 @@ impl<'a> Cpu<'a> {
                 self.pc += 2;
                 let (ext_mode, size, index) = brief_extension_word(extension);
                 let ext_register_value = match size {
-                    opcodes::Size::Word => self.read::<i16>(ext_mode) as i32,
-                    opcodes::Size::Long => self.read::<i32>(ext_mode),
+                    Size::Word => self.read::<i16>(ext_mode) as i32,
+                    Size::Long => self.read::<i32>(ext_mode),
                     _ => panic!(),
                 };
                 self.addr_register(register)
@@ -432,8 +432,8 @@ impl<'a> Cpu<'a> {
                 let extension = self.read_addr::<u16>(self.pc);
                 let (ext_mode, size, index) = brief_extension_word(extension);
                 let ext_register_value = match size {
-                    opcodes::Size::Word => self.read::<i16>(ext_mode) as i32,
-                    opcodes::Size::Long => self.read::<i32>(ext_mode),
+                    Size::Word => self.read::<i16>(ext_mode) as i32,
+                    Size::Long => self.read::<i32>(ext_mode),
                     _ => panic!(),
                 };
                 let addr = self
@@ -962,7 +962,7 @@ impl<'a> Cpu<'a> {
         self.ssp = self.read_addr_no_tick(0x000000);
         self.pc = self.read_addr_no_tick(0x000004);
         self.set_interrupt_level(7);
-        self.supervisor_mode = true;
+        self.set_flag(SUPERVISOR_MODE, true);
     }
 
     pub fn close(&mut self) {}
