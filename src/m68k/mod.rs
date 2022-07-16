@@ -1004,6 +1004,11 @@ impl<'a> Cpu<'a> {
                 Size::Long => self.move_::<i32>(src_mode, dest_mode),
                 Size::Illegal => panic!()
             },
+            Opcode::MOVEA { src_mode, dest_mode, size } => match size {
+                Size::Word => self.move_::<i16>(src_mode, dest_mode),
+                Size::Long => self.move_::<i32>(src_mode, dest_mode),
+                Size::Byte | Size::Illegal => panic!()
+            }
             Opcode::MOVEP { data_register, address_register, direction, size } => {
                 let addr = self.effective_addr(AddressingMode::AddressWithDisplacement(address_register));
                 match direction {
@@ -1043,6 +1048,13 @@ impl<'a> Cpu<'a> {
                         }
                     }
                 }
+            }
+            Opcode::MOVEQ { register, data } => {
+                self.set_flag(NEGATIVE, data < 0);
+                self.set_flag(ZERO, data == 0);
+                self.set_flag(OVERFLOW, false);
+                self.set_flag(CARRY, false);
+                self.d[register] = data as u32;
             }
             Opcode::MOVE_to_CCR { mode } => {
                 let val = self.read::<u16>(mode);
@@ -1141,9 +1153,7 @@ impl<'a> Cpu<'a> {
             // Opcode::DIVU { .. } => {}
             // Opcode::LSL { .. } => {}
             // Opcode::LSR { .. } => {}
-            // Opcode::MOVEA { .. } => {}
             // Opcode::MOVEM { .. } => {}
-            // Opcode::MOVEQ { .. } => {}
             // Opcode::MULS { .. } => {}
             // Opcode::MULU { .. } => {}
             // Opcode::NBCD { .. } => {}

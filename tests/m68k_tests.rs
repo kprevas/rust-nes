@@ -80,6 +80,11 @@ fn movep() {
 }
 
 #[test]
+fn moveq() {
+    run_json_test(json::parse(include_str!("m68k/moveq.json")).unwrap());
+}
+
+#[test]
 fn move_tofrom_srccr() {
     run_json_test(json::parse(include_str!("m68k/move_tofrom_srccr.json")).unwrap());
 }
