@@ -20,6 +20,26 @@ fn opcode_decoding() {
 }
 
 #[test]
+fn add_sub() {
+    run_json_test(json::parse(include_str!("m68k/add_sub.json")).unwrap());
+}
+
+#[test]
+fn addi_subi_cmpi() {
+    run_json_test(json::parse(include_str!("m68k/addi_subi_cmpi.json")).unwrap());
+}
+
+#[test]
+fn addq_subq() {
+    run_json_test(json::parse(include_str!("m68k/addq_subq.json")).unwrap());
+}
+
+#[test]
+fn addx_subx() {
+    run_json_test(json::parse(include_str!("m68k/addx_subx.json")).unwrap());
+}
+
+#[test]
 fn bcc() {
     run_json_test(json::parse(include_str!("m68k/bcc.json")).unwrap());
 }
@@ -187,7 +207,6 @@ fn run_json_test(test_cases: JsonValue) {
         if let Opcode::ILLEGAL = cpu.peek_opcode() { continue; }
         if let
         Opcode::ABCD { .. }
-        | Opcode::ADDI { .. }
         | Opcode::CMP { .. }
         | Opcode::CMPA { .. }
         | Opcode::CMPI { .. }
@@ -195,7 +214,11 @@ fn run_json_test(test_cases: JsonValue) {
         | Opcode::MULS { .. }
         | Opcode::NBCD { .. }
         | Opcode::SBCD { .. }
+        | Opcode::SUB { .. }
+        | Opcode::SUBA { .. }
         | Opcode::SUBI { .. }
+        | Opcode::SUBQ { .. }
+        | Opcode::SUBX { .. }
         = cpu.peek_opcode() { continue; } // TODO
         println!("  {}", cpu.peek_opcode());
         cpu.next_operation(&[nes::input::player_1_nes(), nes::input::player_2_nes()]);

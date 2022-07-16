@@ -1,11 +1,11 @@
 use std::convert::TryFrom;
 use std::marker::PhantomData;
-use std::ops::Sub;
+use std::ops::{AddAssign, Sub};
 
-use num_traits::{PrimInt, Signed};
+use num_traits::{PrimInt, Signed, WrappingAdd};
 
 use input::ControllerState;
-use m68k::opcodes::{AddressingMode, BitNum, brief_extension_word, Condition, Direction, ExchangeMode, opcode, Opcode, OperandDirection, Size};
+use m68k::opcodes::{AddressingMode, BitNum, brief_extension_word, Condition, Direction, ExchangeMode, opcode, Opcode, OperandDirection, OperandMode, Size};
 
 pub mod opcodes;
 
@@ -590,6 +590,135 @@ impl<'a> Cpu<'a> {
         self.set_flag(SUPERVISOR_MODE, true);
     }
 
+    fn add<Size: DataSize + WrappingAdd>(&mut self,
+                                         mode: AddressingMode,
+                                         register: usize,
+                                         operand_direction: OperandDirection) {
+        let operand = Size::from_register_value(self.d[register]);
+        match operand_direction {
+            OperandDirection::ToRegister => {
+                let val: Size = self.read(mode);
+                let (carry, result) = match val.checked_add(&operand) {
+                    Some(result) => (false, result),
+                    None => (true, val.wrapping_add(&operand)),
+                };
+                let overflow = operand.is_negative() == val.is_negative()
+                    && operand.is_negative() != result.is_negative();
+                self.set_flag(EXTEND, carry);
+                self.set_flag(NEGATIVE, result.is_negative());
+                self.set_flag(ZERO, result.is_zero());
+                self.set_flag(OVERFLOW, overflow);
+                self.set_flag(CARRY, carry);
+                self.d[register] = result.apply_to_register(self.d[register]);
+            }
+            OperandDirection::ToMemory => {
+                self.read_write(mode, &mut |cpu, val: Size| {
+                    let (carry, result) = match val.checked_add(&operand) {
+                        Some(result) => (false, result),
+                        None => (true, val.wrapping_add(&operand)),
+                    };
+                    let overflow = operand.is_negative() == val.is_negative()
+                        && operand.is_negative() != result.is_negative();
+                    cpu.set_flag(EXTEND, carry);
+                    cpu.set_flag(NEGATIVE, result.is_negative());
+                    cpu.set_flag(ZERO, result.is_zero());
+                    cpu.set_flag(OVERFLOW, overflow);
+                    cpu.set_flag(CARRY, carry);
+                    result
+                });
+            }
+        }
+    }
+
+    fn addi<Size: DataSize + WrappingAdd>(&mut self, mode: AddressingMode) {
+        let operand = self.read_extension::<Size>();
+        self.read_write(mode, &mut |cpu, val: Size| {
+            let (carry, result) = match val.checked_add(&operand) {
+                Some(result) => (false, result),
+                None => (true, val.wrapping_add(&operand)),
+            };
+            let overflow = operand.is_negative() == val.is_negative()
+                && operand.is_negative() != result.is_negative();
+            cpu.set_flag(EXTEND, carry);
+            cpu.set_flag(NEGATIVE, result.is_negative());
+            cpu.set_flag(ZERO, result.is_zero());
+            cpu.set_flag(OVERFLOW, overflow);
+            cpu.set_flag(CARRY, carry);
+            result
+        });
+    }
+
+    fn addq<Size: DataSize + WrappingAdd>(&mut self, mode: AddressingMode, data: u8) {
+        match mode {
+            AddressingMode::AddressRegister(register) => {
+                let operand = data as u32;
+                let val = self.addr_register(register);
+                self.set_addr_register(register, val.wrapping_add(operand));
+            }
+            _ => {
+                let operand = Size::from(data).unwrap();
+                self.read_write(mode, &mut |cpu, val: Size| {
+                    let (carry, result) = match val.checked_add(&operand) {
+                        Some(result) => (false, result),
+                        None => (true, val.wrapping_add(&operand)),
+                    };
+                    let overflow = operand.is_negative() == val.is_negative()
+                        && operand.is_negative() != result.is_negative();
+                    cpu.set_flag(EXTEND, carry);
+                    cpu.set_flag(NEGATIVE, result.is_negative());
+                    cpu.set_flag(ZERO, result.is_zero());
+                    cpu.set_flag(OVERFLOW, overflow);
+                    cpu.set_flag(CARRY, carry);
+                    result
+                });
+            }
+        }
+    }
+
+    fn addx<Size: DataSize + WrappingAdd + AddAssign<Size>>(&mut self,
+                                                            operand_mode: OperandMode,
+                                                            src_register: usize,
+                                                            dest_register: usize) {
+        let addx = &mut |cpu: &mut Cpu, val: Size, operand: Size| {
+            let (mut carry, mut result) = match val.checked_add(&operand) {
+                Some(result) => (false, result),
+                None => (true, val.wrapping_add(&operand)),
+            };
+            if cpu.flag(EXTEND) {
+                if result < Size::max_value() {
+                    result += Size::from(1).unwrap();
+                } else {
+                    carry = true;
+                    result = Size::min_value();
+                }
+            }
+            let overflow = operand.is_negative() == val.is_negative()
+                && operand.is_negative() != result.is_negative();
+            cpu.set_flag(EXTEND, carry);
+            cpu.set_flag(NEGATIVE, result.is_negative());
+            if !result.is_zero() {
+                cpu.set_flag(ZERO, false);
+            }
+            cpu.set_flag(OVERFLOW, overflow);
+            cpu.set_flag(CARRY, carry);
+            result
+        };
+        match operand_mode {
+            OperandMode::RegisterToRegister => {
+                let operand = Size::from_register_value(self.d[src_register]);
+                let val = Size::from_register_value(self.d[dest_register]);
+                let result = addx(self, val, operand);
+                self.d[dest_register] = result.apply_to_register(self.d[dest_register]);
+            }
+            OperandMode::MemoryToMemory => {
+                let operand = self.read(AddressingMode::AddressWithPredecrement(src_register));
+                self.read_write(AddressingMode::AddressWithPredecrement(dest_register), &mut |cpu, val| {
+                    addx(cpu, val, operand)
+                });
+            }
+        }
+    }
+
     fn and<Size: DataSize>(&mut self, mode: AddressingMode, register: usize, operand_direction: OperandDirection) {
         let operand = Size::from_register_value(self.d[register]);
         match operand_direction {
@@ -864,6 +993,39 @@ impl<'a> Cpu<'a> {
         let opcode = opcode(opcode_hex);
 
         match opcode {
+            Opcode::ADD { mode, size, operand_direction, register } => match size {
+                Size::Byte => self.add::<u8>(mode, register, operand_direction),
+                Size::Word => self.add::<u16>(mode, register, operand_direction),
+                Size::Long => self.add::<u32>(mode, register, operand_direction),
+                Size::Illegal => panic!()
+            }
+            Opcode::ADDA { mode, size, register } => {
+                let operand = match size {
+                    Size::Word => self.read::<i16>(mode) as i32,
+                    Size::Long => self.read(mode),
+                    Size::Byte | Size::Illegal => panic!()
+                };
+                let result = self.addr_register(register).wrapping_add_signed(operand);
+                self.set_addr_register(register, result);
+            }
+            Opcode::ADDI { mode, size } => match size {
+                Size::Byte => self.addi::<u8>(mode),
+                Size::Word => self.addi::<u16>(mode),
+                Size::Long => self.addi::<u32>(mode),
+                Size::Illegal => panic!()
+            }
+            Opcode::ADDQ { mode, size, data } => match size {
+                Size::Byte => self.addq::<u8>(mode, data),
+                Size::Word => self.addq::<u16>(mode, data),
+                Size::Long => self.addq::<u32>(mode, data),
+                Size::Illegal => panic!()
+            }
+            Opcode::ADDX { operand_mode, size, src_register, dest_register } => match size {
+                Size::Byte => self.addx::<u8>(operand_mode, src_register, dest_register),
+                Size::Word => self.addx::<u16>(operand_mode, src_register, dest_register),
+                Size::Long => self.addx::<u32>(operand_mode, src_register, dest_register),
+                Size::Illegal => panic!()
+            }
             Opcode::AND { mode, size, operand_direction, register } => match size {
                 Size::Byte => self.and::<u8>(mode, register, operand_direction),
                 Size::Word => self.and::<u16>(mode, register, operand_direction),
@@ -1235,11 +1397,6 @@ impl<'a> Cpu<'a> {
                 unimplemented!("{:04X} {:?}", opcode_hex, opcode)
             }
             // Opcode::ABCD { .. } => {}
-            // Opcode::ADD { .. } => {}
-            // Opcode::ADDA { .. } => {}
-            // Opcode::ADDI { .. } => {}
-            // Opcode::ADDQ { .. } => {}
-            // Opcode::ADDX { .. } => {}
             // Opcode::ASL { .. } => {}
             // Opcode::ASR { .. } => {}
             // Opcode::CMP { .. } => {}
