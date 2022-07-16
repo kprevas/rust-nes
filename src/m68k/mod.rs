@@ -233,6 +233,7 @@ pub struct Cpu<'a> {
     ticks: f64,
     instrumented: bool,
     cycle_count: u64,
+    stopped: bool,
 
     pub speed_adj: f64,
 
@@ -264,6 +265,7 @@ impl<'a> Cpu<'a> {
             ticks: 0.0,
             instrumented,
             cycle_count: 0,
+            stopped: false,
             speed_adj: 1.0,
             phantom: PhantomData,
         };
@@ -1130,6 +1132,10 @@ impl<'a> Cpu<'a> {
             Opcode::RTS => {
                 self.pc = self.pop();
             }
+            Opcode::STOP => {
+                self.set_status(self.read_extension());
+                self.stopped = true;
+            }
             Opcode::SWAP { register } => {
                 let val = self.d[register];
                 let result = (val << 16) | (val >> 16);
@@ -1181,7 +1187,6 @@ impl<'a> Cpu<'a> {
             // Opcode::ROXR { .. } => {}
             // Opcode::SBCD { .. } => {}
             // Opcode::Scc { .. } => {}
-            // Opcode::STOP => {}
             // Opcode::SUB { .. } => {}
             // Opcode::SUBA { .. } => {}
             // Opcode::SUBI { .. } => {}
@@ -1193,7 +1198,11 @@ impl<'a> Cpu<'a> {
     }
 
     pub fn next_operation(&mut self, _inputs: &[ControllerState<8>; 2]) {
-        self.execute_opcode();
+        if self.stopped {
+            self.ticks = 0.0;
+        } else {
+            self.execute_opcode();
+        }
     }
 
     pub fn do_frame(&mut self, time_secs: f64, inputs: &[ControllerState<8>; 2]) {
@@ -1209,6 +1218,7 @@ impl<'a> Cpu<'a> {
         self.pc = self.read_addr_no_tick(0x000004);
         self.set_interrupt_level(7);
         self.set_flag(SUPERVISOR_MODE, true);
+        self.stopped = false;
     }
 
     pub fn close(&mut self) {}
