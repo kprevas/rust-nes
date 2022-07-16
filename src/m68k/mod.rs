@@ -401,6 +401,10 @@ impl<'a> Cpu<'a> {
         val
     }
 
+    fn set_status(&mut self, status: u16) {
+        self.status = status & SR_MASK;
+    }
+
     fn effective_addr(&mut self, mode: AddressingMode) -> u32 {
         match mode {
             AddressingMode::Address(register) => self.addr_register(register),
@@ -828,13 +832,13 @@ impl<'a> Cpu<'a> {
                 Size::Illegal => panic!()
             },
             Opcode::ANDI_to_CCR => {
-                self.status =
-                    ((self.status & 0xFF00)
-                        | ((self.status & 0xFF) & (self.read_extension::<u8>()) as u16))
-                        & SR_MASK;
+                let new_status = (self.status & 0xFF00)
+                    | ((self.status & 0xFF) & (self.read_extension::<u8>()) as u16);
+                self.set_status(new_status);
             }
             Opcode::ANDI_to_SR => {
-                self.status = (self.status & self.read_extension::<u16>()) & SR_MASK;
+                let new_status = self.status & self.read_extension::<u16>();
+                self.set_status(new_status);
             }
             Opcode::BCHG { bit_num, mode }
             | Opcode::BCLR { bit_num, mode }
@@ -939,13 +943,13 @@ impl<'a> Cpu<'a> {
                 Size::Illegal => panic!()
             },
             Opcode::EORI_to_CCR => {
-                self.status =
-                    ((self.status & 0xFF00)
-                        | ((self.status & 0xFF) ^ (self.read_extension::<u8>()) as u16))
-                        & SR_MASK;
+                let new_status = (self.status & 0xFF00)
+                    | ((self.status & 0xFF) ^ (self.read_extension::<u8>()) as u16);
+                self.set_status(new_status);
             }
             Opcode::EORI_to_SR => {
-                self.status = (self.status ^ self.read_extension::<u16>()) & SR_MASK;
+                let new_status = self.status ^ self.read_extension::<u16>();
+                self.set_status(new_status);
             }
             Opcode::EXG { mode, src_register, dest_register } => {
                 match mode {
@@ -1028,6 +1032,18 @@ impl<'a> Cpu<'a> {
                     }
                 }
             }
+            Opcode::MOVE_to_CCR { mode } => {
+                let val = self.read::<u16>(mode);
+                let low_byte = val & 0xFF;
+                self.set_status((self.status & 0xFF00) | low_byte);
+            }
+            Opcode::MOVE_to_SR { mode } => {
+                let val = self.read::<u16>(mode);
+                self.set_status(val);
+            }
+            Opcode::MOVE_from_SR { mode } => {
+                self.write(mode, self.status);
+            }
             Opcode::NEG { mode, size } => match size {
                 Size::Byte => self.neg::<i8>(mode),
                 Size::Word => self.neg::<i16>(mode),
@@ -1060,13 +1076,13 @@ impl<'a> Cpu<'a> {
                 Size::Illegal => panic!()
             },
             Opcode::ORI_to_CCR => {
-                self.status =
-                    ((self.status & 0xFF00)
-                        | ((self.status & 0xFF) | (self.read_extension::<u8>()) as u16))
-                        & SR_MASK;
+                let new_status = (self.status & 0xFF00)
+                    | ((self.status & 0xFF) | (self.read_extension::<u8>()) as u16);
+                self.set_status(new_status);
             }
             Opcode::ORI_to_SR => {
-                self.status = (self.status | self.read_extension::<u16>()) & SR_MASK;
+                let new_status = self.status | self.read_extension::<u16>();
+                self.set_status(new_status);
             }
             Opcode::SWAP { register } => {
                 let val = self.d[register];

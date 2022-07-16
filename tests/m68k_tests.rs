@@ -70,6 +70,11 @@ fn movep() {
 }
 
 #[test]
+fn move_tofrom_srccr() {
+    run_json_test(json::parse(include_str!("m68k/move_tofrom_srccr.json")).unwrap());
+}
+
+#[test]
 fn neg_not() {
     run_json_test(json::parse(include_str!("m68k/neg_not.json")).unwrap());
 }
@@ -148,9 +153,6 @@ fn run_json_test(test_cases: JsonValue) {
         | Opcode::CMPI { .. }
         | Opcode::CMPM { .. }
         | Opcode::MOVEM { .. }
-        | Opcode::MOVE_to_CCR { .. }
-        | Opcode::MOVE_from_SR { .. }
-        | Opcode::MOVE_to_SR { .. }
         | Opcode::MULS { .. }
         | Opcode::NBCD { .. }
         | Opcode::SBCD { .. }
