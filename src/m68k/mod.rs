@@ -1044,6 +1044,10 @@ impl<'a> Cpu<'a> {
             Opcode::MOVE_from_SR { mode } => {
                 self.write(mode, self.status);
             }
+            Opcode::MOVE_USP { register, direction } => match direction {
+                Direction::RegisterToMemory => self.set_addr_register(register, self.a[7]),
+                Direction::MemoryToRegister => self.a[7] = self.addr_register(register),
+            }
             Opcode::NEG { mode, size } => match size {
                 Size::Byte => self.neg::<i8>(mode),
                 Size::Word => self.neg::<i16>(mode),
