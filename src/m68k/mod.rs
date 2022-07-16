@@ -986,6 +986,13 @@ impl<'a> Cpu<'a> {
                 self.write(AddressingMode::AddressWithPredecrement(7), self.pc);
                 self.pc = addr;
             }
+            Opcode::LINK { register } => {
+                self.push(self.addr_register(register) - if register == 7 { 4 } else { 0 });
+                self.set_addr_register(register, self.addr_register(7));
+                let displacement = self.read_extension::<i16>();
+                self.set_addr_register(7,
+                                       self.addr_register(7).wrapping_add_signed(displacement as i32));
+            }
             Opcode::MOVE { src_mode, dest_mode, size } => match size {
                 Size::Byte => self.move_::<i8>(src_mode, dest_mode),
                 Size::Word => self.move_::<i16>(src_mode, dest_mode),
@@ -1103,6 +1110,11 @@ impl<'a> Cpu<'a> {
                 Size::Word => self.tst::<i16>(mode),
                 Size::Long => self.tst::<i32>(mode),
                 Size::Illegal => panic!()
+            }
+            Opcode::UNLK { register } => {
+                self.set_addr_register(7, self.addr_register(register));
+                let val = self.pop();
+                self.set_addr_register(register, val);
             }
             _ => {
                 unimplemented!("{:04X} {:?}", opcode_hex, opcode)
