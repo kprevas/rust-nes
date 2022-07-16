@@ -36,7 +36,7 @@ impl DataSize for u8 {
     }
 
     fn to_register_value(self) -> u32 {
-        self as u32
+        ((self as i8) as i32) as u32
     }
 
     fn from_memory_bytes(bytes: &[u8]) -> Self {
@@ -69,7 +69,7 @@ impl DataSize for i8 {
     }
 
     fn to_register_value(self) -> u32 {
-        self as u32
+        (self as i32) as u32
     }
 
     fn from_memory_bytes(bytes: &[u8]) -> Self {
@@ -102,7 +102,7 @@ impl DataSize for u16 {
     }
 
     fn to_register_value(self) -> u32 {
-        self as u32
+        ((self as i16) as i32) as u32
     }
 
     fn from_memory_bytes(bytes: &[u8]) -> Self {
@@ -132,7 +132,7 @@ impl DataSize for i16 {
     }
 
     fn to_register_value(self) -> u32 {
-        self as u32
+        (self as i32) as u32
     }
 
     fn from_memory_bytes(bytes: &[u8]) -> Self {
@@ -376,30 +376,32 @@ impl<'a> Cpu<'a> {
         }
     }
 
-    fn inc_addr_register(&mut self, register: usize, val: u32) {
+    fn inc_addr_register<Size: DataSize>(&mut self, register: usize) {
+        let val = if register == 7 { Size::word_aligned_address_size() } else { Size::address_size() };
         if register == 7 && self.flag(SUPERVISOR_MODE) {
-            self.ssp += val
+            self.ssp += val;
         } else {
-            self.a[register] += val
+            self.a[register] += val;
         }
     }
 
-    fn dec_addr_register(&mut self, register: usize, val: u32) {
+    fn dec_addr_register<Size: DataSize>(&mut self, register: usize) {
+        let val = if register == 7 { Size::word_aligned_address_size() } else { Size::address_size() };
         if register == 7 && self.flag(SUPERVISOR_MODE) {
-            self.ssp -= val
+            self.ssp -= val;
         } else {
-            self.a[register] -= val
+            self.a[register] -= val;
         }
     }
 
     fn push<Size: DataSize>(&mut self, val: Size) {
-        self.dec_addr_register(7, Size::address_size());
+        self.dec_addr_register::<Size>(7);
         self.write_addr(self.addr_register(7), val);
     }
 
     fn pop<Size: DataSize>(&mut self) -> Size {
         let val = self.read_addr(self.addr_register(7));
-        self.inc_addr_register(7, Size::address_size());
+        self.inc_addr_register::<Size>(7);
         val
     }
 
@@ -484,19 +486,11 @@ impl<'a> Cpu<'a> {
             }
             AddressingMode::AddressWithPostincrement(register) => {
                 let val = self.read_addr(self.addr_register(register));
-                self.inc_addr_register(register, if register == 7 {
-                    Size::word_aligned_address_size()
-                } else {
-                    Size::address_size()
-                });
+                self.inc_addr_register::<Size>(register);
                 val
             }
             AddressingMode::AddressWithPredecrement(register) => {
-                self.dec_addr_register(register, if register == 7 {
-                    Size::word_aligned_address_size()
-                } else {
-                    Size::address_size()
-                });
+                self.dec_addr_register::<Size>(register);
                 self.read_addr(self.addr_register(register))
             }
             AddressingMode::Immediate => {
@@ -535,19 +529,11 @@ impl<'a> Cpu<'a> {
             }
             AddressingMode::AddressWithPostincrement(register) => {
                 let addr = self.addr_register(register);
-                self.inc_addr_register(register, if register == 7 {
-                    Size::word_aligned_address_size()
-                } else {
-                    Size::address_size()
-                });
+                self.inc_addr_register::<Size>(register);
                 self.write_addr(addr, val);
             }
             AddressingMode::AddressWithPredecrement(register) => {
-                self.dec_addr_register(register, if register == 7 {
-                    Size::word_aligned_address_size()
-                } else {
-                    Size::address_size()
-                });
+                self.dec_addr_register::<Size>(register);
                 self.write_addr(self.addr_register(register), val);
             }
             AddressingMode::Immediate | AddressingMode::Illegal => panic!(),
@@ -584,18 +570,10 @@ impl<'a> Cpu<'a> {
                 let val = self.read_addr(addr);
                 let new_val = op(self, val);
                 self.write_addr(addr, new_val);
-                self.inc_addr_register(register, if register == 7 {
-                    Size::word_aligned_address_size()
-                } else {
-                    Size::address_size()
-                });
+                self.inc_addr_register::<Size>(register);
             }
             AddressingMode::AddressWithPredecrement(register) => {
-                self.dec_addr_register(register, if register == 7 {
-                    Size::word_aligned_address_size()
-                } else {
-                    Size::address_size()
-                });
+                self.dec_addr_register::<Size>(register);
                 let addr = self.addr_register(register);
                 let val = self.read_addr(addr);
                 let new_val = op(self, val);
@@ -712,6 +690,71 @@ impl<'a> Cpu<'a> {
         self.set_flag(OVERFLOW, false);
         self.set_flag(CARRY, false);
         self.write(dest_mode, val);
+    }
+
+    fn movem<Size: DataSize>(&mut self, mode: AddressingMode, direction: Direction) {
+        let register_list_mask = self.read_extension::<u16>();
+        let mask_reversed =
+            if let AddressingMode::AddressWithPredecrement(_) = mode { true } else { false };
+        let mut stored_addr_register_val = 0;
+        let mut addr = match mode {
+            AddressingMode::AddressWithPredecrement(register) => {
+                stored_addr_register_val = self.addr_register(register);
+                self.addr_register(register)
+            }
+            AddressingMode::AddressWithPostincrement(register) => self.addr_register(register),
+            _ => self.effective_addr(mode)
+        };
+        for i in 0usize..16 {
+            if (register_list_mask >> i) & 0b1 == 0b1 {
+                match mode {
+                    AddressingMode::AddressWithPredecrement(register) => {
+                        self.dec_addr_register::<Size>(register);
+                        addr = self.addr_register(register);
+                    }
+                    AddressingMode::AddressWithPostincrement(register) => {
+                        addr = self.addr_register(register);
+                        self.inc_addr_register::<Size>(register);
+                    }
+                    _ => {}
+                }
+                match direction {
+                    Direction::RegisterToMemory => {
+                        let val = Size::from_register_value(
+                            if mask_reversed {
+                                if i < 8 {
+                                    match mode {
+                                        AddressingMode::AddressWithPredecrement(n) if 7 - n == i =>
+                                            stored_addr_register_val,
+                                        _ => self.addr_register(7 - i)
+                                    }
+                                } else {
+                                    self.d[15 - i]
+                                }
+                            } else {
+                                if i < 8 { self.d[i] } else { self.addr_register(i - 8) }
+                            });
+                        self.write_addr(addr, val)
+                    }
+                    Direction::MemoryToRegister => {
+                        let val = self.read_addr::<Size>(addr).to_register_value();
+                        if i < 8 {
+                            self.d[i] = val;
+                        } else {
+                            match mode {
+                                AddressingMode::AddressWithPostincrement(n) if n == i - 8 => {}
+                                _ => self.set_addr_register(i - 8, val)
+                            }
+                        }
+                    }
+                }
+                addr = match mode {
+                    AddressingMode::AddressWithPredecrement(_)
+                    | AddressingMode::AddressWithPostincrement(_) => addr,
+                    _ => addr + Size::address_size()
+                };
+            }
+        }
     }
 
     fn neg<Size: DataSize + Signed>(&mut self, mode: AddressingMode) {
@@ -1021,6 +1064,11 @@ impl<'a> Cpu<'a> {
                 Size::Long => self.move_::<i32>(src_mode, dest_mode),
                 Size::Byte | Size::Illegal => panic!()
             }
+            Opcode::MOVEM { mode, size, direction } => match size {
+                Size::Word => self.movem::<u16>(mode, direction),
+                Size::Long => self.movem::<u32>(mode, direction),
+                Size::Byte | Size::Illegal => panic!()
+            }
             Opcode::MOVEP { data_register, address_register, direction, size } => {
                 let addr = self.effective_addr(AddressingMode::AddressWithDisplacement(address_register));
                 match direction {
@@ -1202,7 +1250,6 @@ impl<'a> Cpu<'a> {
             // Opcode::DIVU { .. } => {}
             // Opcode::LSL { .. } => {}
             // Opcode::LSR { .. } => {}
-            // Opcode::MOVEM { .. } => {}
             // Opcode::MULS { .. } => {}
             // Opcode::MULU { .. } => {}
             // Opcode::NBCD { .. } => {}

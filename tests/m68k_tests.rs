@@ -80,6 +80,11 @@ fn move_() {
 }
 
 #[test]
+fn movem() {
+    run_json_test(json::parse(include_str!("m68k/movem.json")).unwrap());
+}
+
+#[test]
 fn movep() {
     run_json_test(json::parse(include_str!("m68k/movep.json")).unwrap());
 }
@@ -187,7 +192,6 @@ fn run_json_test(test_cases: JsonValue) {
         | Opcode::CMPA { .. }
         | Opcode::CMPI { .. }
         | Opcode::CMPM { .. }
-        | Opcode::MOVEM { .. }
         | Opcode::MULS { .. }
         | Opcode::NBCD { .. }
         | Opcode::SBCD { .. }
