@@ -1116,6 +1116,20 @@ impl<'a> Cpu<'a> {
                 let val = self.effective_addr(mode);
                 self.push(val);
             }
+            Opcode::RESET => {}
+            Opcode::RTE => {
+                let new_status = self.pop();
+                self.set_status(new_status);
+                self.pc = self.pop();
+            }
+            Opcode::RTR => {
+                let new_status = (self.status & 0xFF00) | (self.pop::<u16>() & 0xFF);
+                self.set_status(new_status);
+                self.pc = self.pop();
+            }
+            Opcode::RTS => {
+                self.pc = self.pop();
+            }
             Opcode::SWAP { register } => {
                 let val = self.d[register];
                 let result = (val << 16) | (val >> 16);
@@ -1161,14 +1175,10 @@ impl<'a> Cpu<'a> {
             // Opcode::MULS { .. } => {}
             // Opcode::MULU { .. } => {}
             // Opcode::NBCD { .. } => {}
-            // Opcode::RESET => {}
             // Opcode::ROL { .. } => {}
             // Opcode::ROR { .. } => {}
             // Opcode::ROXL { .. } => {}
             // Opcode::ROXR { .. } => {}
-            // Opcode::RTE => {}
-            // Opcode::RTR => {}
-            // Opcode::RTS => {}
             // Opcode::SBCD { .. } => {}
             // Opcode::Scc { .. } => {}
             // Opcode::STOP => {}

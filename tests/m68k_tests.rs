@@ -110,6 +110,16 @@ fn swap() {
 }
 
 #[test]
+fn rtr() {
+    run_json_test(json::parse(include_str!("m68k/rtr.json")).unwrap());
+}
+
+#[test]
+fn rts() {
+    run_json_test(json::parse(include_str!("m68k/rts.json")).unwrap());
+}
+
+#[test]
 fn tas() {
     run_json_test(json::parse(include_str!("m68k/tas.json")).unwrap());
 }
