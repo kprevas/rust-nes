@@ -980,6 +980,7 @@ impl<'a> Cpu<'a> {
                 self.set_flag(OVERFLOW, false);
                 self.set_flag(CARRY, false);
             }
+            Opcode::ILLEGAL => self.process_exception(4),
             Opcode::JMP { mode } => self.pc = self.effective_addr(mode),
             Opcode::JSR { mode } => {
                 let addr = self.effective_addr(mode);
@@ -1119,6 +1120,49 @@ impl<'a> Cpu<'a> {
             _ => {
                 unimplemented!("{:04X} {:?}", opcode_hex, opcode)
             }
+            // Opcode::ABCD { .. } => {}
+            // Opcode::ADD { .. } => {}
+            // Opcode::ADDA { .. } => {}
+            // Opcode::ADDI { .. } => {}
+            // Opcode::ADDQ { .. } => {}
+            // Opcode::ADDX { .. } => {}
+            // Opcode::ASL { .. } => {}
+            // Opcode::ASR { .. } => {}
+            // Opcode::CMP { .. } => {}
+            // Opcode::CMPA { .. } => {}
+            // Opcode::CMPI { .. } => {}
+            // Opcode::CMPM { .. } => {}
+            // Opcode::DBcc { .. } => {}
+            // Opcode::DIVS { .. } => {}
+            // Opcode::DIVU { .. } => {}
+            // Opcode::LEA { .. } => {}
+            // Opcode::LSL { .. } => {}
+            // Opcode::LSR { .. } => {}
+            // Opcode::MOVEA { .. } => {}
+            // Opcode::MOVEM { .. } => {}
+            // Opcode::MOVEQ { .. } => {}
+            // Opcode::MULS { .. } => {}
+            // Opcode::MULU { .. } => {}
+            // Opcode::NBCD { .. } => {}
+            // Opcode::PEA { .. } => {}
+            // Opcode::RESET => {}
+            // Opcode::ROL { .. } => {}
+            // Opcode::ROR { .. } => {}
+            // Opcode::ROXL { .. } => {}
+            // Opcode::ROXR { .. } => {}
+            // Opcode::RTE => {}
+            // Opcode::RTR => {}
+            // Opcode::RTS => {}
+            // Opcode::SBCD { .. } => {}
+            // Opcode::Scc { .. } => {}
+            // Opcode::STOP => {}
+            // Opcode::SUB { .. } => {}
+            // Opcode::SUBA { .. } => {}
+            // Opcode::SUBI { .. } => {}
+            // Opcode::SUBQ { .. } => {}
+            // Opcode::SUBX { .. } => {}
+            // Opcode::TRAP { .. } => {}
+            // Opcode::TRAPV => {}
         }
     }
 
