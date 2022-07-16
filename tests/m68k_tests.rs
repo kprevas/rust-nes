@@ -214,11 +214,6 @@ fn run_json_test(test_cases: JsonValue) {
         | Opcode::MULS { .. }
         | Opcode::NBCD { .. }
         | Opcode::SBCD { .. }
-        | Opcode::SUB { .. }
-        | Opcode::SUBA { .. }
-        | Opcode::SUBI { .. }
-        | Opcode::SUBQ { .. }
-        | Opcode::SUBX { .. }
         = cpu.peek_opcode() { continue; } // TODO
         println!("  {}", cpu.peek_opcode());
         cpu.next_operation(&[nes::input::player_1_nes(), nes::input::player_2_nes()]);

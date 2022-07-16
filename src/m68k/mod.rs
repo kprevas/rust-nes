@@ -1,8 +1,8 @@
 use std::convert::TryFrom;
 use std::marker::PhantomData;
-use std::ops::{AddAssign, Sub};
+use std::ops::{AddAssign, Sub, SubAssign};
 
-use num_traits::{PrimInt, Signed, WrappingAdd};
+use num_traits::{PrimInt, Signed, WrappingAdd, WrappingSub};
 
 use input::ControllerState;
 use m68k::opcodes::{AddressingMode, BitNum, brief_extension_word, Condition, Direction, ExchangeMode, opcode, Opcode, OperandDirection, OperandMode, Size};
@@ -967,6 +967,136 @@ impl<'a> Cpu<'a> {
         });
     }
 
+    fn sub<Size: DataSize + WrappingSub>(&mut self,
+                                         mode: AddressingMode,
+                                         register: usize,
+                                         operand_direction: OperandDirection) {
+        match operand_direction {
+            OperandDirection::ToRegister => {
+                let operand: Size = self.read(mode);
+                let val = Size::from_register_value(self.d[register]);
+                let (carry, result) = match val.checked_sub(&operand) {
+                    Some(result) => (false, result),
+                    None => (true, val.wrapping_sub(&operand)),
+                };
+                let overflow = operand.is_negative() == result.is_negative()
+                    && operand.is_negative() != val.is_negative();
+                self.set_flag(EXTEND, carry);
+                self.set_flag(NEGATIVE, result.is_negative());
+                self.set_flag(ZERO, result.is_zero());
+                self.set_flag(OVERFLOW, overflow);
+                self.set_flag(CARRY, carry);
+                self.d[register] = result.apply_to_register(self.d[register]);
+            }
+            OperandDirection::ToMemory => {
+                let operand = Size::from_register_value(self.d[register]);
+                self.read_write(mode, &mut |cpu, val: Size| {
+                    let (carry, result) = match val.checked_sub(&operand) {
+                        Some(result) => (false, result),
+                        None => (true, val.wrapping_sub(&operand)),
+                    };
+                    let overflow = operand.is_negative() == result.is_negative()
+                        && operand.is_negative() != val.is_negative();
+                    cpu.set_flag(EXTEND, carry);
+                    cpu.set_flag(NEGATIVE, result.is_negative());
+                    cpu.set_flag(ZERO, result.is_zero());
+                    cpu.set_flag(OVERFLOW, overflow);
+                    cpu.set_flag(CARRY, carry);
+                    result
+                });
+            }
+        }
+    }
+
+    fn subi<Size: DataSize + WrappingSub>(&mut self, mode: AddressingMode) {
+        let operand = self.read_extension::<Size>();
+        self.read_write(mode, &mut |cpu, val: Size| {
+            let (carry, result) = match val.checked_sub(&operand) {
+                Some(result) => (false, result),
+                None => (true, val.wrapping_sub(&operand)),
+            };
+            let overflow = operand.is_negative() == result.is_negative()
+                && operand.is_negative() != val.is_negative();
+            cpu.set_flag(EXTEND, carry);
+            cpu.set_flag(NEGATIVE, result.is_negative());
+            cpu.set_flag(ZERO, result.is_zero());
+            cpu.set_flag(OVERFLOW, overflow);
+            cpu.set_flag(CARRY, carry);
+            result
+        });
+    }
+
+    fn subq<Size: DataSize + WrappingSub>(&mut self, mode: AddressingMode, data: u8) {
+        match mode {
+            AddressingMode::AddressRegister(register) => {
+                let operand = data as u32;
+                let val = self.addr_register(register);
+                self.set_addr_register(register, val.wrapping_sub(operand));
+            }
+            _ => {
+                let operand = Size::from(data).unwrap();
+                self.read_write(mode, &mut |cpu, val: Size| {
+                    let (carry, result) = match val.checked_sub(&operand) {
+                        Some(result) => (false, result),
+                        None => (true, val.wrapping_sub(&operand)),
+                    };
+                    let overflow = operand.is_negative() == result.is_negative()
+                        && operand.is_negative() != val.is_negative();
+                    cpu.set_flag(EXTEND, carry);
+                    cpu.set_flag(NEGATIVE, result.is_negative());
+                    cpu.set_flag(ZERO, result.is_zero());
+                    cpu.set_flag(OVERFLOW, overflow);
+                    cpu.set_flag(CARRY, carry);
+                    result
+                });
+            }
+        }
+    }
+
+    fn subx<Size: DataSize + WrappingSub + SubAssign<Size>>(&mut self,
+                                                            operand_mode: OperandMode,
+                                                            src_register: usize,
+                                                            dest_register: usize) {
+        let subx = &mut |cpu: &mut Cpu, val: Size, operand: Size| {
+            let (mut carry, mut result) = match val.checked_sub(&operand) {
+                Some(result) => (false, result),
+                None => (true, val.wrapping_sub(&operand)),
+            };
+            if cpu.flag(EXTEND) {
+                if result > Size::min_value() {
+                    result -= Size::from(1).unwrap();
+                } else {
+                    carry = true;
+                    result = Size::max_value();
+                }
+            }
+            let overflow = operand.is_negative() == result.is_negative()
+                && operand.is_negative() != val.is_negative();
+            cpu.set_flag(EXTEND, carry);
+            cpu.set_flag(NEGATIVE, result.is_negative());
+            if !result.is_zero() {
+                cpu.set_flag(ZERO, false);
+            }
+            cpu.set_flag(OVERFLOW, overflow);
+            cpu.set_flag(CARRY, carry);
+            result
+        };
+        match operand_mode {
+            OperandMode::RegisterToRegister => {
+                let operand = Size::from_register_value(self.d[src_register]);
+                let val = Size::from_register_value(self.d[dest_register]);
+                let result = subx(self, val, operand);
+                self.d[dest_register] = result.apply_to_register(self.d[dest_register]);
+            }
+            OperandMode::MemoryToMemory => {
+                let operand = self.read(AddressingMode::AddressWithPredecrement(src_register));
+                self.read_write(AddressingMode::AddressWithPredecrement(dest_register), &mut |cpu, val| {
+                    subx(cpu, val, operand)
+                });
+            }
+        }
+    }
+
     fn tas(&mut self, mode: AddressingMode) {
         self.read_write::<u8>(mode, &mut |cpu, val| {
             cpu.set_flag(NEGATIVE, (val as i8).is_negative());
@@ -1364,6 +1494,39 @@ impl<'a> Cpu<'a> {
                 self.set_status(new_status);
                 self.stopped = true;
             }
+            Opcode::SUB { mode, size, operand_direction, register } => match size {
+                Size::Byte => self.sub::<u8>(mode, register, operand_direction),
+                Size::Word => self.sub::<u16>(mode, register, operand_direction),
+                Size::Long => self.sub::<u32>(mode, register, operand_direction),
+                Size::Illegal => panic!()
+            }
+            Opcode::SUBA { mode, size, register } => {
+                let operand = match size {
+                    Size::Word => self.read::<i16>(mode) as i32,
+                    Size::Long => self.read(mode),
+                    Size::Byte | Size::Illegal => panic!()
+                };
+                let result = self.addr_register(register).wrapping_add_signed(-operand);
+                self.set_addr_register(register, result);
+            }
+            Opcode::SUBI { mode, size } => match size {
+                Size::Byte => self.subi::<u8>(mode),
+                Size::Word => self.subi::<u16>(mode),
+                Size::Long => self.subi::<u32>(mode),
+                Size::Illegal => panic!()
+            }
+            Opcode::SUBQ { mode, size, data } => match size {
+                Size::Byte => self.subq::<u8>(mode, data),
+                Size::Word => self.subq::<u16>(mode, data),
+                Size::Long => self.subq::<u32>(mode, data),
+                Size::Illegal => panic!()
+            }
+            Opcode::SUBX { operand_mode, size, src_register, dest_register } => match size {
+                Size::Byte => self.subx::<u8>(operand_mode, src_register, dest_register),
+                Size::Word => self.subx::<u16>(operand_mode, src_register, dest_register),
+                Size::Long => self.subx::<u32>(operand_mode, src_register, dest_register),
+                Size::Illegal => panic!()
+            }
             Opcode::SWAP { register } => {
                 let val = self.d[register];
                 let result = (val << 16) | (val >> 16);
@@ -1415,11 +1578,6 @@ impl<'a> Cpu<'a> {
             // Opcode::ROXL { .. } => {}
             // Opcode::ROXR { .. } => {}
             // Opcode::SBCD { .. } => {}
-            // Opcode::SUB { .. } => {}
-            // Opcode::SUBA { .. } => {}
-            // Opcode::SUBI { .. } => {}
-            // Opcode::SUBQ { .. } => {}
-            // Opcode::SUBX { .. } => {}
         }
     }
 
