@@ -768,6 +768,43 @@ impl<'a> Cpu<'a> {
         }
     }
 
+    fn do_cmp<Size: DataSize + WrappingSub>(&mut self, operand: Size, val: Size) {
+        let (carry, result) = match val.checked_sub(&operand) {
+            Some(result) => (false, result),
+            None => (true, val.wrapping_sub(&operand)),
+        };
+        let overflow = operand.is_negative() == result.is_negative()
+            && operand.is_negative() != val.is_negative();
+        self.set_flag(NEGATIVE, result.is_negative());
+        self.set_flag(ZERO, result.is_zero());
+        self.set_flag(OVERFLOW, overflow);
+        self.set_flag(CARRY, carry);
+    }
+
+    fn cmp<Size: DataSize + WrappingSub>(&mut self, mode: AddressingMode, register: usize) {
+        let operand = self.read::<Size>(mode);
+        let val = Size::from_register_value(self.d[register]);
+        self.do_cmp(operand, val);
+    }
+
+    fn cmpa<Size: DataSize + WrappingSub>(&mut self, mode: AddressingMode, register: usize) {
+        let operand = Size::to_register_value(self.read::<Size>(mode));
+        let val = self.addr_register(register);
+        self.do_cmp(operand, val);
+    }
+
+    fn cmpi<Size: DataSize + WrappingSub>(&mut self, mode: AddressingMode) {
+        let operand = self.read_extension::<Size>();
+        let val = self.read::<Size>(mode);
+        self.do_cmp(operand, val);
+    }
+
+    fn cmpm<Size: DataSize + WrappingSub>(&mut self, src_register: usize, dest_register: usize) {
+        let operand = self.read::<Size>(AddressingMode::AddressWithPostincrement(src_register));
+        let val = self.read::<Size>(AddressingMode::AddressWithPostincrement(dest_register));
+        self.do_cmp(operand, val);
+    }
+
     fn eor<Size: DataSize>(&mut self, mode: AddressingMode, register: usize, operand_direction: OperandDirection) {
         let operand = Size::from_register_value(self.d[register]);
         match operand_direction {
@@ -1267,6 +1304,30 @@ impl<'a> Cpu<'a> {
                 self.set_flag(OVERFLOW, false);
                 self.set_flag(CARRY, false);
             }
+            Opcode::CMP { mode, size, register } => match size {
+                Size::Byte => self.cmp::<u8>(mode, register),
+                Size::Word => self.cmp::<u16>(mode, register),
+                Size::Long => self.cmp::<u32>(mode, register),
+                Size::Illegal => panic!()
+            }
+            Opcode::CMPA { mode, size, register } => match size {
+                Size::Byte => self.cmpa::<u8>(mode, register),
+                Size::Word => self.cmpa::<u16>(mode, register),
+                Size::Long => self.cmpa::<u32>(mode, register),
+                Size::Illegal => panic!()
+            }
+            Opcode::CMPI { mode, size } => match size {
+                Size::Byte => self.cmpi::<u8>(mode),
+                Size::Word => self.cmpi::<u16>(mode),
+                Size::Long => self.cmpi::<u32>(mode),
+                Size::Illegal => panic!()
+            }
+            Opcode::CMPM { size, src_register, dest_register } => match size {
+                Size::Byte => self.cmpm::<u8>(src_register, dest_register),
+                Size::Word => self.cmpm::<u16>(src_register, dest_register),
+                Size::Long => self.cmpm::<u32>(src_register, dest_register),
+                Size::Illegal => panic!()
+            }
             Opcode::DBcc { condition, register } => {
                 let displacement = self.read_extension::<i16>();
                 if !self.check_condition(condition) {
@@ -1562,10 +1623,6 @@ impl<'a> Cpu<'a> {
             // Opcode::ABCD { .. } => {}
             // Opcode::ASL { .. } => {}
             // Opcode::ASR { .. } => {}
-            // Opcode::CMP { .. } => {}
-            // Opcode::CMPA { .. } => {}
-            // Opcode::CMPI { .. } => {}
-            // Opcode::CMPM { .. } => {}
             // Opcode::DIVS { .. } => {}
             // Opcode::DIVU { .. } => {}
             // Opcode::LSL { .. } => {}

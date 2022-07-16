@@ -55,6 +55,11 @@ fn chk() {
 }
 
 #[test]
+fn cmp() {
+    run_json_test(json::parse(include_str!("m68k/cmp.json")).unwrap());
+}
+
+#[test]
 fn dbcc_scc() {
     run_json_test(json::parse(include_str!("m68k/dbcc_scc.json")).unwrap());
 }
@@ -207,10 +212,6 @@ fn run_json_test(test_cases: JsonValue) {
         if let Opcode::ILLEGAL = cpu.peek_opcode() { continue; }
         if let
         Opcode::ABCD { .. }
-        | Opcode::CMP { .. }
-        | Opcode::CMPA { .. }
-        | Opcode::CMPI { .. }
-        | Opcode::CMPM { .. }
         | Opcode::MULS { .. }
         | Opcode::NBCD { .. }
         | Opcode::SBCD { .. }
