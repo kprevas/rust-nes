@@ -35,6 +35,11 @@ fn chk() {
 }
 
 #[test]
+fn dbcc_scc() {
+    run_json_test(json::parse(include_str!("m68k/dbcc_scc.json")).unwrap());
+}
+
+#[test]
 fn eor_and_or() {
     run_json_test(json::parse(include_str!("m68k/eor_and_or.json")).unwrap());
 }

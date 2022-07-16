@@ -932,6 +932,16 @@ impl<'a> Cpu<'a> {
                 self.set_flag(OVERFLOW, false);
                 self.set_flag(CARRY, false);
             }
+            Opcode::DBcc { condition, register } => {
+                let displacement = self.read_extension::<i16>();
+                if !self.check_condition(condition) {
+                    let dec_value = (self.d[register] & 0xFFFF) as i16 - 1;
+                    self.d[register] = dec_value.apply_to_register(self.d[register]);
+                    if dec_value != -1 {
+                        self.pc = self.pc.wrapping_add_signed((displacement - 2) as i32);
+                    }
+                }
+            }
             Opcode::EOR { mode, size, operand_direction, register } => match size {
                 Size::Byte => self.eor::<u8>(mode, register, operand_direction),
                 Size::Word => self.eor::<u16>(mode, register, operand_direction),
@@ -1132,8 +1142,16 @@ impl<'a> Cpu<'a> {
             Opcode::RTS => {
                 self.pc = self.pop();
             }
+            Opcode::Scc { mode, condition } => {
+                if self.check_condition(condition) {
+                    self.write::<u8>(mode, 0xFF);
+                } else {
+                    self.write::<u8>(mode, 0x00);
+                }
+            }
             Opcode::STOP => {
-                self.set_status(self.read_extension());
+                let new_status = self.read_extension();
+                self.set_status(new_status);
                 self.stopped = true;
             }
             Opcode::SWAP { register } => {
@@ -1180,7 +1198,6 @@ impl<'a> Cpu<'a> {
             // Opcode::CMPA { .. } => {}
             // Opcode::CMPI { .. } => {}
             // Opcode::CMPM { .. } => {}
-            // Opcode::DBcc { .. } => {}
             // Opcode::DIVS { .. } => {}
             // Opcode::DIVU { .. } => {}
             // Opcode::LSL { .. } => {}
@@ -1194,7 +1211,6 @@ impl<'a> Cpu<'a> {
             // Opcode::ROXL { .. } => {}
             // Opcode::ROXR { .. } => {}
             // Opcode::SBCD { .. } => {}
-            // Opcode::Scc { .. } => {}
             // Opcode::SUB { .. } => {}
             // Opcode::SUBA { .. } => {}
             // Opcode::SUBI { .. } => {}
