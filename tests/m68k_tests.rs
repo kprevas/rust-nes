@@ -60,6 +60,11 @@ fn cmp() {
 }
 
 #[test]
+fn divu_divs() {
+    run_json_test(json::parse(include_str!("m68k/divu_divs.json")).unwrap());
+}
+
+#[test]
 fn dbcc_scc() {
     run_json_test(json::parse(include_str!("m68k/dbcc_scc.json")).unwrap());
 }

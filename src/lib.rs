@@ -11,6 +11,7 @@ extern crate image;
 #[macro_use]
 extern crate log;
 extern crate nfd;
+extern crate num_integer;
 extern crate num_traits;
 extern crate piston_window;
 extern crate portaudio;

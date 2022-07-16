@@ -2,6 +2,7 @@ use std::convert::TryFrom;
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Sub, SubAssign};
 
+use num_integer::Integer;
 use num_traits::{PrimInt, Signed, WrappingAdd, WrappingSub};
 
 use input::ControllerState;
@@ -1338,6 +1339,45 @@ impl<'a> Cpu<'a> {
                     }
                 }
             }
+            Opcode::DIVS { mode, register } => {
+                let val = self.d[register] as i32;
+                let operand = self.read::<i16>(mode) as i32;
+                self.set_flag(CARRY, false);
+                if operand == 0 {
+                    self.process_exception(5);
+                } else {
+                    let (quotient, remainder) = val.div_rem(&operand);
+                    let remainder = if val < 0 { -remainder } else { remainder };
+                    if quotient > i16::MAX as i32 || quotient < i16::MIN as i32 {
+                        self.set_flag(OVERFLOW, true);
+                        self.set_flag(NEGATIVE, true);
+                    } else {
+                        self.set_flag(OVERFLOW, false);
+                        self.set_flag(NEGATIVE, (quotient as i16).is_negative());
+                        self.set_flag(ZERO, quotient.is_zero());
+                        self.d[register] = ((remainder as u32) << 16) | ((quotient as u32) & 0xFFFF);
+                    }
+                }
+            }
+            Opcode::DIVU { mode, register } => {
+                let val = self.d[register];
+                let operand = self.read::<u16>(mode) as u32;
+                self.set_flag(CARRY, false);
+                if operand == 0 {
+                    self.process_exception(5);
+                } else {
+                    let (quotient, remainder) = val.div_rem(&operand);
+                    if quotient > u16::MAX as u32 {
+                        self.set_flag(OVERFLOW, true);
+                        self.set_flag(NEGATIVE, true);
+                    } else {
+                        self.set_flag(OVERFLOW, false);
+                        self.set_flag(NEGATIVE, (quotient as u16).is_negative());
+                        self.set_flag(ZERO, quotient.is_zero());
+                        self.d[register] = (remainder << 16) | quotient;
+                    }
+                }
+            }
             Opcode::EOR { mode, size, operand_direction, register } => match size {
                 Size::Byte => self.eor::<u8>(mode, register, operand_direction),
                 Size::Word => self.eor::<u16>(mode, register, operand_direction),
@@ -1643,8 +1683,6 @@ impl<'a> Cpu<'a> {
             // Opcode::ABCD { .. } => {}
             // Opcode::ASL { .. } => {}
             // Opcode::ASR { .. } => {}
-            // Opcode::DIVS { .. } => {}
-            // Opcode::DIVU { .. } => {}
             // Opcode::LSL { .. } => {}
             // Opcode::LSR { .. } => {}
             // Opcode::NBCD { .. } => {}
