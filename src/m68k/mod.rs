@@ -1485,6 +1485,26 @@ impl<'a> Cpu<'a> {
                 Direction::RegisterToMemory => self.set_addr_register(register, self.a[7]),
                 Direction::MemoryToRegister => self.a[7] = self.addr_register(register),
             }
+            Opcode::MULS { mode, register } => {
+                let val = self.read::<i16>(mode) as i32;
+                let operand = i16::from_register_value(self.d[register]) as i32;
+                let result = val * operand;
+                self.d[register] = result as u32;
+                self.set_flag(NEGATIVE, result.is_negative());
+                self.set_flag(ZERO, result.is_zero());
+                self.set_flag(OVERFLOW, false);
+                self.set_flag(CARRY, false);
+            }
+            Opcode::MULU { mode, register } => {
+                let val = self.read::<u16>(mode) as u32;
+                let operand = u16::from_register_value(self.d[register]) as u32;
+                let result = val * operand;
+                self.d[register] = result;
+                self.set_flag(NEGATIVE, result.is_negative());
+                self.set_flag(ZERO, result.is_zero());
+                self.set_flag(OVERFLOW, false);
+                self.set_flag(CARRY, false);
+            }
             Opcode::NEG { mode, size } => match size {
                 Size::Byte => self.neg::<i8>(mode),
                 Size::Word => self.neg::<i16>(mode),
@@ -1627,8 +1647,6 @@ impl<'a> Cpu<'a> {
             // Opcode::DIVU { .. } => {}
             // Opcode::LSL { .. } => {}
             // Opcode::LSR { .. } => {}
-            // Opcode::MULS { .. } => {}
-            // Opcode::MULU { .. } => {}
             // Opcode::NBCD { .. } => {}
             // Opcode::ROL { .. } => {}
             // Opcode::ROR { .. } => {}

@@ -125,6 +125,11 @@ fn move_tofrom_srccr() {
 }
 
 #[test]
+fn mulu_muls() {
+    run_json_test(json::parse(include_str!("m68k/mulu_muls.json")).unwrap());
+}
+
+#[test]
 fn nbcd_pea() {
     run_json_test(json::parse(include_str!("m68k/nbcd_pea.json")).unwrap());
 }
@@ -212,7 +217,6 @@ fn run_json_test(test_cases: JsonValue) {
         if let Opcode::ILLEGAL = cpu.peek_opcode() { continue; }
         if let
         Opcode::ABCD { .. }
-        | Opcode::MULS { .. }
         | Opcode::NBCD { .. }
         | Opcode::SBCD { .. }
         = cpu.peek_opcode() { continue; } // TODO
