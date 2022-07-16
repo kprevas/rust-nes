@@ -90,6 +90,11 @@ fn move_tofrom_srccr() {
 }
 
 #[test]
+fn nbcd_pea() {
+    run_json_test(json::parse(include_str!("m68k/nbcd_pea.json")).unwrap());
+}
+
+#[test]
 fn neg_not() {
     run_json_test(json::parse(include_str!("m68k/neg_not.json")).unwrap());
 }

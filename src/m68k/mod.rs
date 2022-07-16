@@ -1112,6 +1112,10 @@ impl<'a> Cpu<'a> {
                 let new_status = self.status | self.read_extension::<u16>();
                 self.set_status(new_status);
             }
+            Opcode::PEA { mode } => {
+                let val = self.effective_addr(mode);
+                self.push(val);
+            }
             Opcode::SWAP { register } => {
                 let val = self.d[register];
                 let result = (val << 16) | (val >> 16);
@@ -1157,7 +1161,6 @@ impl<'a> Cpu<'a> {
             // Opcode::MULS { .. } => {}
             // Opcode::MULU { .. } => {}
             // Opcode::NBCD { .. } => {}
-            // Opcode::PEA { .. } => {}
             // Opcode::RESET => {}
             // Opcode::ROL { .. } => {}
             // Opcode::ROR { .. } => {}
