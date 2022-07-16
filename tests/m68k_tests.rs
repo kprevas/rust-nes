@@ -60,6 +60,11 @@ fn jmp_jsr() {
 }
 
 #[test]
+fn lea() {
+    run_json_test(json::parse(include_str!("m68k/lea.json")).unwrap());
+}
+
+#[test]
 fn link_unlk() {
     run_json_test(json::parse(include_str!("m68k/link_unlk.json")).unwrap());
 }

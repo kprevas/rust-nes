@@ -987,6 +987,10 @@ impl<'a> Cpu<'a> {
                 self.write(AddressingMode::AddressWithPredecrement(7), self.pc);
                 self.pc = addr;
             }
+            Opcode::LEA { register, mode } => {
+                let val = self.effective_addr(mode);
+                self.set_addr_register(register, val);
+            }
             Opcode::LINK { register } => {
                 self.push(self.addr_register(register) - if register == 7 { 4 } else { 0 });
                 self.set_addr_register(register, self.addr_register(7));
@@ -1135,7 +1139,6 @@ impl<'a> Cpu<'a> {
             // Opcode::DBcc { .. } => {}
             // Opcode::DIVS { .. } => {}
             // Opcode::DIVU { .. } => {}
-            // Opcode::LEA { .. } => {}
             // Opcode::LSL { .. } => {}
             // Opcode::LSR { .. } => {}
             // Opcode::MOVEA { .. } => {}
