@@ -105,6 +105,11 @@ fn link_unlk() {
 }
 
 #[test]
+fn lslr_aslr_roxlr_rolr() {
+    run_json_test(json::parse(include_str!("m68k/lslr_aslr_roxlr_rolr.json")).unwrap());
+}
+
+#[test]
 fn move_() {
     run_json_test(json::parse(include_str!("m68k/move.json")).unwrap());
 }
@@ -222,6 +227,8 @@ fn run_json_test(test_cases: JsonValue) {
         if let Opcode::ILLEGAL = cpu.peek_opcode() { continue; }
         if let
         Opcode::ABCD { .. }
+        | Opcode::ROXL { .. }
+        | Opcode::ROXR { .. }
         | Opcode::NBCD { .. }
         | Opcode::SBCD { .. }
         = cpu.peek_opcode() { continue; } // TODO
