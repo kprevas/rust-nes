@@ -789,6 +789,16 @@ impl<'a> Cpu<'a> {
         });
     }
 
+    fn tas(&mut self, mode: AddressingMode) {
+        self.read_write::<u8>(mode, &mut |cpu, val| {
+            cpu.set_flag(NEGATIVE, (val as i8).is_negative());
+            cpu.set_flag(ZERO, val.is_zero());
+            cpu.set_flag(OVERFLOW, false);
+            cpu.set_flag(CARRY, false);
+            val | 0b10000000
+        });
+    }
+
     fn tst<Size: DataSize>(&mut self, mode: AddressingMode) {
         let val: Size = self.read(mode);
         self.set_flag(NEGATIVE, val.is_negative());
@@ -1067,6 +1077,7 @@ impl<'a> Cpu<'a> {
                 self.set_flag(OVERFLOW, false);
                 self.set_flag(CARRY, false);
             }
+            Opcode::TAS { mode } => self.tas(mode),
             Opcode::TST { mode, size } => match size {
                 Size::Byte => self.tst::<i8>(mode),
                 Size::Word => self.tst::<i16>(mode),

@@ -85,6 +85,11 @@ fn swap() {
 }
 
 #[test]
+fn tas() {
+    run_json_test(json::parse(include_str!("m68k/tas.json")).unwrap());
+}
+
+#[test]
 fn tst() {
     run_json_test(json::parse(include_str!("m68k/tst.json")).unwrap());
 }
@@ -150,7 +155,6 @@ fn run_json_test(test_cases: JsonValue) {
         | Opcode::NBCD { .. }
         | Opcode::SBCD { .. }
         | Opcode::SUBI { .. }
-        | Opcode::TAS { .. }
         = cpu.peek_opcode() { continue; } // TODO
         println!("  {}", cpu.peek_opcode());
         cpu.next_operation(&[nes::input::player_1_nes(), nes::input::player_2_nes()]);
