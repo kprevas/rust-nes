@@ -1146,6 +1146,14 @@ impl<'a> Cpu<'a> {
                 self.set_flag(CARRY, false);
             }
             Opcode::TAS { mode } => self.tas(mode),
+            Opcode::TRAP { vector } => {
+                self.process_exception((vector as u32) + 32);
+            }
+            Opcode::TRAPV => {
+                if self.flag(OVERFLOW) {
+                    self.process_exception(7);
+                }
+            }
             Opcode::TST { mode, size } => match size {
                 Size::Byte => self.tst::<i8>(mode),
                 Size::Word => self.tst::<i16>(mode),
@@ -1192,8 +1200,6 @@ impl<'a> Cpu<'a> {
             // Opcode::SUBI { .. } => {}
             // Opcode::SUBQ { .. } => {}
             // Opcode::SUBX { .. } => {}
-            // Opcode::TRAP { .. } => {}
-            // Opcode::TRAPV => {}
         }
     }
 
