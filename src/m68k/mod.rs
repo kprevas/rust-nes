@@ -14,6 +14,7 @@ const CPU_TICKS_PER_SECOND: f64 = 7_670_454.0;
 
 trait DataSize: TryFrom<u32> + PrimInt {
     fn address_size() -> u32;
+    fn bits() -> u8;
     fn word_aligned_address_size() -> u32;
     fn from_register_value(value: u32) -> Self;
     fn to_register_value(self) -> u32;
@@ -28,6 +29,7 @@ impl DataSize for u8 {
     fn address_size() -> u32 {
         1
     }
+    fn bits() -> u8 { 8 }
     fn word_aligned_address_size() -> u32 {
         2
     }
@@ -61,6 +63,7 @@ impl DataSize for i8 {
     fn address_size() -> u32 {
         1
     }
+    fn bits() -> u8 { 8 }
     fn word_aligned_address_size() -> u32 {
         2
     }
@@ -94,6 +97,7 @@ impl DataSize for u16 {
     fn address_size() -> u32 {
         2
     }
+    fn bits() -> u8 { 16 }
     fn word_aligned_address_size() -> u32 {
         2
     }
@@ -126,6 +130,7 @@ impl DataSize for u16 {
 
 impl DataSize for i16 {
     fn address_size() -> u32 { 2 }
+    fn bits() -> u8 { 16 }
     fn word_aligned_address_size() -> u32 { 2 }
 
     fn from_register_value(value: u32) -> Self {
@@ -158,6 +163,7 @@ impl DataSize for u32 {
     fn address_size() -> u32 {
         4
     }
+    fn bits() -> u8 { 32 }
     fn word_aligned_address_size() -> u32 {
         4
     }
@@ -193,6 +199,7 @@ impl DataSize for u32 {
 
 impl DataSize for i32 {
     fn address_size() -> u32 { 4 }
+    fn bits() -> u8 { 32 }
     fn word_aligned_address_size() -> u32 { 4 }
 
     fn from_register_value(value: u32) -> Self {
@@ -1161,6 +1168,79 @@ impl<'a> Cpu<'a> {
         self.set_flag(ZERO, result.is_zero());
     }
 
+
+    fn roxl_memory<Size: DataSize>(&mut self, mode: AddressingMode) {
+        self.read_write::<Size>(mode, &mut |cpu, val| {
+            let first_bit = val.is_negative();
+            let result = (val << 1) |
+                if cpu.flag(EXTEND) { Size::from(0b1).unwrap() } else { Size::from(0b0).unwrap() };
+            cpu.set_flag(EXTEND, first_bit);
+            cpu.set_flag(NEGATIVE, result.is_negative());
+            cpu.set_flag(ZERO, result.is_zero());
+            cpu.set_flag(OVERFLOW, false);
+            cpu.set_flag(CARRY, first_bit);
+            result
+        });
+    }
+
+    fn roxl_register<Size: DataSize>(&mut self, register: usize, count: u8) {
+        let val = Size::from_register_value(self.d[register]);
+        let result = if count > 0 {
+            let mut result = val;
+            for i in 0..count {
+                let first_bit = result.is_negative();
+                result = (result << 1) |
+                    if self.flag(EXTEND) { Size::from(0b1).unwrap() } else { Size::from(0b0).unwrap() };
+                self.set_flag(EXTEND, first_bit);
+                self.set_flag(CARRY, first_bit);
+            }
+            result
+        } else {
+            self.set_flag(CARRY, self.flag(EXTEND));
+            val
+        };
+        self.d[register] = result.apply_to_register(self.d[register]);
+        self.set_flag(OVERFLOW, false);
+        self.set_flag(NEGATIVE, result.is_negative());
+        self.set_flag(ZERO, result.is_zero());
+    }
+
+    fn roxr_memory<Size: DataSize>(&mut self, mode: AddressingMode) {
+        self.read_write::<Size>(mode, &mut |cpu, val| {
+            let last_bit = !(val & Size::from(0b1).unwrap()).is_zero();
+            let result = (val >> 1) |
+                if cpu.flag(EXTEND) { Size::from(0b1 << (Size::bits() - 1)).unwrap() } else { Size::from(0b0).unwrap() };
+            cpu.set_flag(EXTEND, last_bit);
+            cpu.set_flag(NEGATIVE, result.is_negative());
+            cpu.set_flag(ZERO, result.is_zero());
+            cpu.set_flag(OVERFLOW, false);
+            cpu.set_flag(CARRY, last_bit);
+            result
+        });
+    }
+
+    fn roxr_register<Size: DataSize>(&mut self, register: usize, count: u8) {
+        let val = Size::from_register_value(self.d[register]);
+        let result = if count > 0 {
+            let mut result = val;
+            for i in 0..count {
+                let last_bit = !(val & Size::from(0b1).unwrap()).is_zero();
+                result = (val >> 1) |
+                    if self.flag(EXTEND) { Size::from(0b1 << (Size::bits() - 1)).unwrap() } else { Size::from(0b0).unwrap() };
+                self.set_flag(EXTEND, last_bit);
+                self.set_flag(CARRY, last_bit);
+            }
+            result
+        } else {
+            self.set_flag(CARRY, self.flag(EXTEND));
+            val
+        };
+        self.d[register] = result.apply_to_register(self.d[register]);
+        self.set_flag(OVERFLOW, false);
+        self.set_flag(NEGATIVE, result.is_negative());
+        self.set_flag(ZERO, result.is_zero());
+    }
+
     fn sub<Size: DataSize + WrappingSub>(&mut self,
                                          mode: AddressingMode,
                                          register: usize,
@@ -1920,6 +2000,64 @@ impl<'a> Cpu<'a> {
                     }
                 }
             }
+            Opcode::ROXL { mode, size, register, shift_count, shift_register } => {
+                if let Some(register) = register {
+                    if let Some(count) = shift_count {
+                        match size {
+                            Size::Byte => self.roxl_register::<u8>(register, count),
+                            Size::Word => self.roxl_register::<u16>(register, count),
+                            Size::Long => self.roxl_register::<u32>(register, count),
+                            Size::Illegal => panic!()
+                        }
+                    } else if let Some(shift_register) = shift_register {
+                        let count = (self.d[shift_register] % 64) as u8;
+                        match size {
+                            Size::Byte => self.roxl_register::<u8>(register, count),
+                            Size::Word => self.roxl_register::<u16>(register, count),
+                            Size::Long => self.roxl_register::<u32>(register, count),
+                            Size::Illegal => panic!()
+                        }
+                    } else {
+                        panic!()
+                    }
+                } else {
+                    match size {
+                        Size::Byte => self.roxl_memory::<u8>(mode),
+                        Size::Word => self.roxl_memory::<u16>(mode),
+                        Size::Long => self.roxl_memory::<u32>(mode),
+                        Size::Illegal => panic!()
+                    }
+                }
+            }
+            Opcode::ROXR { mode, size, register, shift_count, shift_register } => {
+                if let Some(register) = register {
+                    if let Some(count) = shift_count {
+                        match size {
+                            Size::Byte => self.roxr_register::<u8>(register, count),
+                            Size::Word => self.roxr_register::<u16>(register, count),
+                            Size::Long => self.roxr_register::<u32>(register, count),
+                            Size::Illegal => panic!()
+                        }
+                    } else if let Some(shift_register) = shift_register {
+                        let count = (self.d[shift_register] % 64) as u8;
+                        match size {
+                            Size::Byte => self.roxr_register::<u8>(register, count),
+                            Size::Word => self.roxr_register::<u16>(register, count),
+                            Size::Long => self.roxr_register::<u32>(register, count),
+                            Size::Illegal => panic!()
+                        }
+                    } else {
+                        panic!()
+                    }
+                } else {
+                    match size {
+                        Size::Byte => self.roxr_memory::<u8>(mode),
+                        Size::Word => self.roxr_memory::<u16>(mode),
+                        Size::Long => self.roxr_memory::<u32>(mode),
+                        Size::Illegal => panic!()
+                    }
+                }
+            }
             Opcode::RTE => {
                 let new_status = self.pop();
                 self.set_status(new_status);
@@ -2012,9 +2150,6 @@ impl<'a> Cpu<'a> {
             }
             // Opcode::ABCD { .. } => {}
             // Opcode::NBCD { .. } => {}
-            // Opcode::ROR { .. } => {}
-            // Opcode::ROXL { .. } => {}
-            // Opcode::ROXR { .. } => {}
             // Opcode::SBCD { .. } => {}
         }
     }

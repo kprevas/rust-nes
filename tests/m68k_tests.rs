@@ -227,8 +227,6 @@ fn run_json_test(test_cases: JsonValue) {
         if let Opcode::ILLEGAL = cpu.peek_opcode() { continue; }
         if let
         Opcode::ABCD { .. }
-        | Opcode::ROXL { .. }
-        | Opcode::ROXR { .. }
         | Opcode::NBCD { .. }
         | Opcode::SBCD { .. }
         = cpu.peek_opcode() { continue; } // TODO
