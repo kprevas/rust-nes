@@ -20,6 +20,11 @@ fn opcode_decoding() {
 }
 
 #[test]
+fn abcd_sbcd() {
+    run_json_test(json::parse(include_str!("m68k/abcd_sbcd.json")).unwrap());
+}
+
+#[test]
 fn add_sub() {
     run_json_test(json::parse(include_str!("m68k/add_sub.json")).unwrap());
 }
@@ -219,17 +224,18 @@ fn run_json_test(test_cases: JsonValue) {
             }
             cpu.poke_ram(addr.as_usize().unwrap(), val.as_u8().unwrap());
         }
-        let sr_mask = if let Opcode::CHK { .. } = cpu.peek_opcode() {
-            0b1111111111111000
-        } else {
-            0b1111111111111111
+        let sr_mask = match cpu.peek_opcode() {
+            Opcode::CHK { .. } => {
+                0b1111111111111000
+            }
+            Opcode::ABCD { .. } | Opcode::NBCD { .. } | Opcode::SBCD { .. } => {
+                0b1111111111110101
+            }
+            _ => {
+                0b1111111111111111
+            }
         };
         if let Opcode::ILLEGAL = cpu.peek_opcode() { continue; }
-        if let
-        Opcode::ABCD { .. }
-        | Opcode::NBCD { .. }
-        | Opcode::SBCD { .. }
-        = cpu.peek_opcode() { continue; } // TODO
         println!("  {}", cpu.peek_opcode());
         cpu.next_operation(&[nes::input::player_1_nes(), nes::input::player_2_nes()]);
         let final_state = &test_case["final state"];

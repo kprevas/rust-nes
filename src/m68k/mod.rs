@@ -1187,7 +1187,7 @@ impl<'a> Cpu<'a> {
         let val = Size::from_register_value(self.d[register]);
         let result = if count > 0 {
             let mut result = val;
-            for i in 0..count {
+            for _ in 0..count {
                 let first_bit = result.is_negative();
                 result = (result << 1) |
                     if self.flag(EXTEND) { Size::from(0b1).unwrap() } else { Size::from(0b0).unwrap() };
@@ -1223,7 +1223,7 @@ impl<'a> Cpu<'a> {
         let val = Size::from_register_value(self.d[register]);
         let result = if count > 0 {
             let mut result = val;
-            for i in 0..count {
+            for _ in 0..count {
                 let last_bit = !(val & Size::from(0b1).unwrap()).is_zero();
                 result = (val >> 1) |
                     if self.flag(EXTEND) { Size::from(0b1 << (Size::bits() - 1)).unwrap() } else { Size::from(0b0).unwrap() };
@@ -1397,6 +1397,43 @@ impl<'a> Cpu<'a> {
         let opcode = opcode(opcode_hex);
 
         match opcode {
+            Opcode::ABCD { operand_mode, src_register, dest_register } => {
+                let abcd = |cpu: &mut Cpu, val: u8, operand: u8| {
+                    let binary_result = val.wrapping_add(operand)
+                        .wrapping_add(if cpu.flag(EXTEND) { 1 } else { 0 });
+                    let binary_carry = ((val & operand)
+                        | (val & !binary_result)
+                        | (operand & !binary_result))
+                        & 0x88;
+                    let decimal_carry = (((((binary_result as u16) + 0x66) ^ (binary_result as u16))
+                        & 0x110) >> 1) as u8;
+                    let correction_factor = (binary_carry | decimal_carry) - ((binary_carry | decimal_carry) >> 2);
+                    let result = binary_result.wrapping_add(correction_factor);
+                    let carry = binary_carry.is_negative()
+                        || (binary_result.is_negative() && !result.is_negative());
+                    cpu.set_flag(EXTEND, carry);
+                    cpu.set_flag(CARRY, carry);
+                    cpu.set_flag(OVERFLOW, !binary_result.is_negative() && result.is_negative());
+                    if result != 0 {
+                        cpu.set_flag(ZERO, false);
+                    }
+                    cpu.set_flag(NEGATIVE, result.is_negative());
+                    result
+                };
+                match operand_mode {
+                    OperandMode::RegisterToRegister => {
+                        let val = u8::from_register_value(self.d[dest_register]);
+                        let operand = u8::from_register_value(self.d[src_register]);
+                        let result = abcd(self, val, operand);
+                        self.d[dest_register] = result.apply_to_register(self.d[dest_register]);
+                    }
+                    OperandMode::MemoryToMemory => {
+                        let operand = self.read::<u8>(AddressingMode::AddressWithPredecrement(src_register));
+                        self.read_write::<u8>(AddressingMode::AddressWithPredecrement(dest_register),
+                                              &mut |cpu, val| abcd(cpu, val, operand));
+                    }
+                }
+            }
             Opcode::ADD { mode, size, operand_direction, register } => match size {
                 Size::Byte => self.add::<u8>(mode, register, operand_direction),
                 Size::Word => self.add::<u16>(mode, register, operand_direction),
@@ -1897,6 +1934,25 @@ impl<'a> Cpu<'a> {
                 self.set_flag(OVERFLOW, false);
                 self.set_flag(CARRY, false);
             }
+            Opcode::NBCD { mode } => {
+                self.read_write::<u8>(mode, &mut |cpu, val| {
+                    let binary_result = 0u8.wrapping_sub(val)
+                        .wrapping_sub(if cpu.flag(EXTEND) { 1 } else { 0 });
+                    let binary_carry = (val | binary_result) & 0x88;
+                    let correction_factor = binary_carry - (binary_carry >> 2);
+                    let result = binary_result.wrapping_sub(correction_factor);
+                    let carry = binary_carry.is_negative()
+                        || (!binary_result.is_negative() && result.is_negative());
+                    cpu.set_flag(EXTEND, carry);
+                    cpu.set_flag(CARRY, carry);
+                    cpu.set_flag(OVERFLOW, binary_result.is_negative() && !result.is_negative());
+                    if result != 0 {
+                        cpu.set_flag(ZERO, false);
+                    }
+                    cpu.set_flag(NEGATIVE, result.is_negative());
+                    result
+                });
+            }
             Opcode::NEG { mode, size } => match size {
                 Size::Byte => self.neg::<i8>(mode),
                 Size::Word => self.neg::<i16>(mode),
@@ -2071,6 +2127,41 @@ impl<'a> Cpu<'a> {
             Opcode::RTS => {
                 self.pc = self.pop();
             }
+            Opcode::SBCD { operand_mode, src_register, dest_register } => {
+                let abcd = |cpu: &mut Cpu, val: u8, operand: u8| {
+                    let binary_result = val.wrapping_sub(operand)
+                        .wrapping_sub(if cpu.flag(EXTEND) { 1 } else { 0 });
+                    let binary_carry = ((!val & operand)
+                        | (!val & binary_result)
+                        | (operand & binary_result))
+                        & 0x88;
+                    let correction_factor = binary_carry - (binary_carry >> 2);
+                    let result = binary_result.wrapping_sub(correction_factor);
+                    let carry = binary_carry.is_negative()
+                        || (!binary_result.is_negative() && result.is_negative());
+                    cpu.set_flag(EXTEND, carry);
+                    cpu.set_flag(CARRY, carry);
+                    cpu.set_flag(OVERFLOW, binary_result.is_negative() && !result.is_negative());
+                    if result != 0 {
+                        cpu.set_flag(ZERO, false);
+                    }
+                    cpu.set_flag(NEGATIVE, result.is_negative());
+                    result
+                };
+                match operand_mode {
+                    OperandMode::RegisterToRegister => {
+                        let val = u8::from_register_value(self.d[dest_register]);
+                        let operand = u8::from_register_value(self.d[src_register]);
+                        let result = abcd(self, val, operand);
+                        self.d[dest_register] = result.apply_to_register(self.d[dest_register]);
+                    }
+                    OperandMode::MemoryToMemory => {
+                        let operand = self.read::<u8>(AddressingMode::AddressWithPredecrement(src_register));
+                        self.read_write::<u8>(AddressingMode::AddressWithPredecrement(dest_register),
+                                              &mut |cpu, val| abcd(cpu, val, operand));
+                    }
+                }
+            }
             Opcode::Scc { mode, condition } => {
                 if self.check_condition(condition) {
                     self.write::<u8>(mode, 0xFF);
@@ -2145,12 +2236,6 @@ impl<'a> Cpu<'a> {
                 let val = self.pop();
                 self.set_addr_register(register, val);
             }
-            _ => {
-                unimplemented!("{:04X} {:?}", opcode_hex, opcode)
-            }
-            // Opcode::ABCD { .. } => {}
-            // Opcode::NBCD { .. } => {}
-            // Opcode::SBCD { .. } => {}
         }
     }
 
