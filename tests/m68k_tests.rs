@@ -187,7 +187,6 @@ fn tst() {
 fn run_json_test(test_cases: JsonValue) {
     for test_case in test_cases.members() {
         if !test_case.has_key("name") { continue; }
-        println!("{}", test_case["name"].as_str().unwrap());
         let mut cpu = nes::m68k::Cpu::boot(true);
         cpu.expand_ram(0x1000000);
         cpu.reset(false);
@@ -236,9 +235,9 @@ fn run_json_test(test_cases: JsonValue) {
             }
         };
         if let Opcode::ILLEGAL = cpu.peek_opcode() { continue; }
-        println!("  {}", cpu.peek_opcode());
         cpu.next_operation(&[nes::input::player_1_nes(), nes::input::player_2_nes()]);
         let final_state = &test_case["final state"];
+        let test_id = format!("{}  {}", test_case["name"].as_str().unwrap(), cpu.peek_opcode());
         cpu.verify_state(final_state["pc"].as_u32().unwrap(),
                          final_state["sr"].as_u16().unwrap(),
                          [
@@ -263,6 +262,7 @@ fn run_json_test(test_cases: JsonValue) {
                          ],
                          final_state["a7"].as_u32().unwrap(),
                          sr_mask,
+                         &test_id,
         );
         let final_memory: Tuples<Members, (&JsonValue, &JsonValue)> =
             test_case["final memory"].members().tuples();
@@ -270,7 +270,8 @@ fn run_json_test(test_cases: JsonValue) {
             if addr.as_i32().unwrap_or(-1) == -1 {
                 break;
             }
-            cpu.verify_ram(addr.as_usize().unwrap(), val.as_u8().unwrap());
+            cpu.verify_ram(addr.as_usize().unwrap(), val.as_u8().unwrap(),
+                           &test_id);
         }
     }
 }

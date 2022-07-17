@@ -2286,14 +2286,15 @@ pub mod testing {
         }
 
         pub fn verify_state(&self, pc: u32, sr: u16, d: [u32; 8], a: [u32; 8], ssp: u32,
-                            sr_mask: u16) {
-            assert_eq!(self.pc, pc, "PC");
-            assert_eq!(self.status & sr_mask, sr & sr_mask, "SR {:016b} {:016b}", self.status, sr);
+                            sr_mask: u16,
+                            test_id: &str) {
+            assert_eq!(self.pc, pc, "{}   PC", test_id);
+            assert_eq!(self.status & sr_mask, sr & sr_mask, "{}   SR {:016b} {:016b}", test_id, self.status, sr);
             for i in 0..8 {
-                assert_eq!(self.d[i], d[i], "D{}", i);
-                assert_eq!(self.a[i], a[i], "A{}", i);
+                assert_eq!(self.d[i], d[i], "{}   D{}", test_id, i);
+                assert_eq!(self.a[i], a[i], "{}   A{}", test_id, i);
             }
-            assert_eq!(self.ssp, ssp, "SSP");
+            assert_eq!(self.ssp, ssp, "{}   SSP", test_id);
         }
 
         pub fn poke_ram(&mut self, addr: usize, val: u8) {
@@ -2304,8 +2305,8 @@ pub mod testing {
             opcode(self.read_addr(self.pc))
         }
 
-        pub fn verify_ram(&self, addr: usize, val: u8) {
-            assert_eq!(self.internal_ram[addr & 0xFFFFFF], val, "{:06X}", addr);
+        pub fn verify_ram(&self, addr: usize, val: u8, test_id: &str) {
+            assert_eq!(self.internal_ram[addr & 0xFFFFFF], val, "{}   {:06X}", test_id, addr);
         }
     }
 }
