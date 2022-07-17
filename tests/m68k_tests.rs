@@ -15,7 +15,13 @@ fn opcode_decoding() {
         let expected = expected_val.as_str().unwrap();
         let opcode_hex = u16::from_str_radix(opcode_str, 16).unwrap();
         let opcode = nes::m68k::opcodes::opcode(opcode_hex);
-        assert_eq!(format!("{}", opcode), expected, "{:04X} {:016b}", opcode_hex, opcode_hex);
+        assert_eq!(
+            format!("{}", opcode),
+            expected,
+            "{:04X} {:016b}",
+            opcode_hex,
+            opcode_hex
+        );
     }
 }
 
@@ -186,34 +192,37 @@ fn tst() {
 
 fn run_json_test(test_cases: JsonValue) {
     for test_case in test_cases.members() {
-        if !test_case.has_key("name") { continue; }
+        if !test_case.has_key("name") {
+            continue;
+        }
         let mut cpu = nes::m68k::Cpu::boot(true);
         cpu.expand_ram(0x1000000);
         cpu.reset(false);
         let initial_state = &test_case["initial state"];
-        cpu.init_state(initial_state["pc"].as_u32().unwrap(),
-                       initial_state["sr"].as_u16().unwrap(),
-                       [
-                           initial_state["d0"].as_u32().unwrap(),
-                           initial_state["d1"].as_u32().unwrap(),
-                           initial_state["d2"].as_u32().unwrap(),
-                           initial_state["d3"].as_u32().unwrap(),
-                           initial_state["d4"].as_u32().unwrap(),
-                           initial_state["d5"].as_u32().unwrap(),
-                           initial_state["d6"].as_u32().unwrap(),
-                           initial_state["d7"].as_u32().unwrap(),
-                       ],
-                       [
-                           initial_state["a0"].as_u32().unwrap(),
-                           initial_state["a1"].as_u32().unwrap(),
-                           initial_state["a2"].as_u32().unwrap(),
-                           initial_state["a3"].as_u32().unwrap(),
-                           initial_state["a4"].as_u32().unwrap(),
-                           initial_state["a5"].as_u32().unwrap(),
-                           initial_state["a6"].as_u32().unwrap(),
-                           initial_state["usp"].as_u32().unwrap(),
-                       ],
-                       initial_state["a7"].as_u32().unwrap(),
+        cpu.init_state(
+            initial_state["pc"].as_u32().unwrap(),
+            initial_state["sr"].as_u16().unwrap(),
+            [
+                initial_state["d0"].as_u32().unwrap(),
+                initial_state["d1"].as_u32().unwrap(),
+                initial_state["d2"].as_u32().unwrap(),
+                initial_state["d3"].as_u32().unwrap(),
+                initial_state["d4"].as_u32().unwrap(),
+                initial_state["d5"].as_u32().unwrap(),
+                initial_state["d6"].as_u32().unwrap(),
+                initial_state["d7"].as_u32().unwrap(),
+            ],
+            [
+                initial_state["a0"].as_u32().unwrap(),
+                initial_state["a1"].as_u32().unwrap(),
+                initial_state["a2"].as_u32().unwrap(),
+                initial_state["a3"].as_u32().unwrap(),
+                initial_state["a4"].as_u32().unwrap(),
+                initial_state["a5"].as_u32().unwrap(),
+                initial_state["a6"].as_u32().unwrap(),
+                initial_state["usp"].as_u32().unwrap(),
+            ],
+            initial_state["a7"].as_u32().unwrap(),
         );
         let initial_memory: Tuples<Members, (&JsonValue, &JsonValue)> =
             test_case["initial memory"].members().tuples();
@@ -224,45 +233,46 @@ fn run_json_test(test_cases: JsonValue) {
             cpu.poke_ram(addr.as_usize().unwrap(), val.as_u8().unwrap());
         }
         let sr_mask = match cpu.peek_opcode() {
-            Opcode::CHK { .. } => {
-                0b1111111111111000
-            }
-            Opcode::ABCD { .. } | Opcode::NBCD { .. } | Opcode::SBCD { .. } => {
-                0b1111111111110101
-            }
-            _ => {
-                0b1111111111111111
-            }
+            Opcode::CHK { .. } => 0b1111111111111000,
+            Opcode::ABCD { .. } | Opcode::NBCD { .. } | Opcode::SBCD { .. } => 0b1111111111110101,
+            _ => 0b1111111111111111,
         };
-        if let Opcode::ILLEGAL = cpu.peek_opcode() { continue; }
+        if let Opcode::ILLEGAL = cpu.peek_opcode() {
+            continue;
+        }
         cpu.next_operation(&[nes::input::player_1_nes(), nes::input::player_2_nes()]);
         let final_state = &test_case["final state"];
-        let test_id = format!("{}  {}", test_case["name"].as_str().unwrap(), cpu.peek_opcode());
-        cpu.verify_state(final_state["pc"].as_u32().unwrap(),
-                         final_state["sr"].as_u16().unwrap(),
-                         [
-                             final_state["d0"].as_u32().unwrap(),
-                             final_state["d1"].as_u32().unwrap(),
-                             final_state["d2"].as_u32().unwrap(),
-                             final_state["d3"].as_u32().unwrap(),
-                             final_state["d4"].as_u32().unwrap(),
-                             final_state["d5"].as_u32().unwrap(),
-                             final_state["d6"].as_u32().unwrap(),
-                             final_state["d7"].as_u32().unwrap(),
-                         ],
-                         [
-                             final_state["a0"].as_u32().unwrap(),
-                             final_state["a1"].as_u32().unwrap(),
-                             final_state["a2"].as_u32().unwrap(),
-                             final_state["a3"].as_u32().unwrap(),
-                             final_state["a4"].as_u32().unwrap(),
-                             final_state["a5"].as_u32().unwrap(),
-                             final_state["a6"].as_u32().unwrap(),
-                             final_state["usp"].as_u32().unwrap(),
-                         ],
-                         final_state["a7"].as_u32().unwrap(),
-                         sr_mask,
-                         &test_id,
+        let test_id = format!(
+            "{}  {}",
+            test_case["name"].as_str().unwrap(),
+            cpu.peek_opcode()
+        );
+        cpu.verify_state(
+            final_state["pc"].as_u32().unwrap(),
+            final_state["sr"].as_u16().unwrap(),
+            [
+                final_state["d0"].as_u32().unwrap(),
+                final_state["d1"].as_u32().unwrap(),
+                final_state["d2"].as_u32().unwrap(),
+                final_state["d3"].as_u32().unwrap(),
+                final_state["d4"].as_u32().unwrap(),
+                final_state["d5"].as_u32().unwrap(),
+                final_state["d6"].as_u32().unwrap(),
+                final_state["d7"].as_u32().unwrap(),
+            ],
+            [
+                final_state["a0"].as_u32().unwrap(),
+                final_state["a1"].as_u32().unwrap(),
+                final_state["a2"].as_u32().unwrap(),
+                final_state["a3"].as_u32().unwrap(),
+                final_state["a4"].as_u32().unwrap(),
+                final_state["a5"].as_u32().unwrap(),
+                final_state["a6"].as_u32().unwrap(),
+                final_state["usp"].as_u32().unwrap(),
+            ],
+            final_state["a7"].as_u32().unwrap(),
+            sr_mask,
+            &test_id,
         );
         let final_memory: Tuples<Members, (&JsonValue, &JsonValue)> =
             test_case["final memory"].members().tuples();
@@ -270,8 +280,7 @@ fn run_json_test(test_cases: JsonValue) {
             if addr.as_i32().unwrap_or(-1) == -1 {
                 break;
             }
-            cpu.verify_ram(addr.as_usize().unwrap(), val.as_u8().unwrap(),
-                           &test_id);
+            cpu.verify_ram(addr.as_usize().unwrap(), val.as_u8().unwrap(), &test_id);
         }
     }
 }

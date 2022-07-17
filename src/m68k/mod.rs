@@ -6,7 +6,10 @@ use num_integer::Integer;
 use num_traits::{PrimInt, Signed, WrappingAdd, WrappingSub};
 
 use input::ControllerState;
-use m68k::opcodes::{AddressingMode, BitNum, brief_extension_word, Condition, Direction, ExchangeMode, opcode, Opcode, OperandDirection, OperandMode, Size};
+use m68k::opcodes::{
+    AddressingMode, BitNum, brief_extension_word, Condition, Direction, ExchangeMode, opcode,
+    Opcode, OperandDirection, OperandMode, Size,
+};
 
 pub mod opcodes;
 
@@ -29,7 +32,9 @@ impl DataSize for u8 {
     fn address_size() -> u32 {
         1
     }
-    fn bits() -> u8 { 8 }
+    fn bits() -> u8 {
+        8
+    }
     fn word_aligned_address_size() -> u32 {
         2
     }
@@ -54,16 +59,22 @@ impl DataSize for u8 {
         (register_val & !0xFF) + (self as u32)
     }
 
-    fn is_negative(self) -> bool { self >> 7 == 1 }
+    fn is_negative(self) -> bool {
+        self >> 7 == 1
+    }
 
-    fn is_zero(self) -> bool { self == 0 }
+    fn is_zero(self) -> bool {
+        self == 0
+    }
 }
 
 impl DataSize for i8 {
     fn address_size() -> u32 {
         1
     }
-    fn bits() -> u8 { 8 }
+    fn bits() -> u8 {
+        8
+    }
     fn word_aligned_address_size() -> u32 {
         2
     }
@@ -88,16 +99,22 @@ impl DataSize for i8 {
         (register_val & !0xFF) + ((self as u8) as u32)
     }
 
-    fn is_negative(self) -> bool { self < 0 }
+    fn is_negative(self) -> bool {
+        self < 0
+    }
 
-    fn is_zero(self) -> bool { self == 0 }
+    fn is_zero(self) -> bool {
+        self == 0
+    }
 }
 
 impl DataSize for u16 {
     fn address_size() -> u32 {
         2
     }
-    fn bits() -> u8 { 16 }
+    fn bits() -> u8 {
+        16
+    }
     fn word_aligned_address_size() -> u32 {
         2
     }
@@ -123,15 +140,25 @@ impl DataSize for u16 {
         (register_val & !0xFFFF) + (self as u32)
     }
 
-    fn is_negative(self) -> bool { self >> 15 == 1 }
+    fn is_negative(self) -> bool {
+        self >> 15 == 1
+    }
 
-    fn is_zero(self) -> bool { self == 0 }
+    fn is_zero(self) -> bool {
+        self == 0
+    }
 }
 
 impl DataSize for i16 {
-    fn address_size() -> u32 { 2 }
-    fn bits() -> u8 { 16 }
-    fn word_aligned_address_size() -> u32 { 2 }
+    fn address_size() -> u32 {
+        2
+    }
+    fn bits() -> u8 {
+        16
+    }
+    fn word_aligned_address_size() -> u32 {
+        2
+    }
 
     fn from_register_value(value: u32) -> Self {
         (value & 0xFFFF) as Self
@@ -154,16 +181,22 @@ impl DataSize for i16 {
         (register_val & !0xFFFF) + ((self as u16) as u32)
     }
 
-    fn is_negative(self) -> bool { self < 0 }
+    fn is_negative(self) -> bool {
+        self < 0
+    }
 
-    fn is_zero(self) -> bool { self == 0 }
+    fn is_zero(self) -> bool {
+        self == 0
+    }
 }
 
 impl DataSize for u32 {
     fn address_size() -> u32 {
         4
     }
-    fn bits() -> u8 { 32 }
+    fn bits() -> u8 {
+        32
+    }
     fn word_aligned_address_size() -> u32 {
         4
     }
@@ -177,8 +210,10 @@ impl DataSize for u32 {
     }
 
     fn from_memory_bytes(bytes: &[u8]) -> Self {
-        ((bytes[0] as u32) << 24) | ((bytes[1] as u32) << 16)
-            | ((bytes[2] as u32) << 8) | (bytes[3] as u32)
+        ((bytes[0] as u32) << 24)
+            | ((bytes[1] as u32) << 16)
+            | ((bytes[2] as u32) << 8)
+            | (bytes[3] as u32)
     }
 
     fn set_memory_bytes(self, bytes: &mut [u8]) {
@@ -192,15 +227,25 @@ impl DataSize for u32 {
         self
     }
 
-    fn is_negative(self) -> bool { self >> 31 == 1 }
+    fn is_negative(self) -> bool {
+        self >> 31 == 1
+    }
 
-    fn is_zero(self) -> bool { self == 0 }
+    fn is_zero(self) -> bool {
+        self == 0
+    }
 }
 
 impl DataSize for i32 {
-    fn address_size() -> u32 { 4 }
-    fn bits() -> u8 { 32 }
-    fn word_aligned_address_size() -> u32 { 4 }
+    fn address_size() -> u32 {
+        4
+    }
+    fn bits() -> u8 {
+        32
+    }
+    fn word_aligned_address_size() -> u32 {
+        4
+    }
 
     fn from_register_value(value: u32) -> Self {
         value as Self
@@ -211,8 +256,10 @@ impl DataSize for i32 {
     }
 
     fn from_memory_bytes(bytes: &[u8]) -> Self {
-        (((bytes[0] as u32) << 24) | ((bytes[1] as u32) << 16)
-            | ((bytes[2] as u32) << 8) | (bytes[3] as u32)) as i32
+        (((bytes[0] as u32) << 24)
+            | ((bytes[1] as u32) << 16)
+            | ((bytes[2] as u32) << 8)
+            | (bytes[3] as u32)) as i32
     }
 
     fn set_memory_bytes(self, bytes: &mut [u8]) {
@@ -226,9 +273,13 @@ impl DataSize for i32 {
         self as u32
     }
 
-    fn is_negative(self) -> bool { self < 0 }
+    fn is_negative(self) -> bool {
+        self < 0
+    }
 
-    fn is_zero(self) -> bool { self == 0 }
+    fn is_zero(self) -> bool {
+        self == 0
+    }
 }
 
 pub struct Cpu<'a> {
@@ -313,9 +364,13 @@ impl<'a> Cpu<'a> {
             Condition::Minus => self.flag(NEGATIVE),
             Condition::GreaterOrEqual => self.flag(NEGATIVE) == self.flag(OVERFLOW),
             Condition::LessThan => self.flag(NEGATIVE) != self.flag(OVERFLOW),
-            Condition::GreaterThan => !self.flag(ZERO) && (self.flag(NEGATIVE) == self.flag(OVERFLOW)),
-            Condition::LessOrEqual => self.flag(ZERO) || (self.flag(NEGATIVE) != self.flag(OVERFLOW)),
-            Condition::Illegal => panic!()
+            Condition::GreaterThan => {
+                !self.flag(ZERO) && (self.flag(NEGATIVE) == self.flag(OVERFLOW))
+            }
+            Condition::LessOrEqual => {
+                self.flag(ZERO) || (self.flag(NEGATIVE) != self.flag(OVERFLOW))
+            }
+            Condition::Illegal => panic!(),
         }
     }
 
@@ -334,16 +389,18 @@ impl<'a> Cpu<'a> {
 
     fn read_addr_no_tick<Size: DataSize>(&mut self, addr: u32) -> Size {
         let addr = addr & 0xFFFFFF;
-        Size::from_memory_bytes(&self.internal_ram[
-            (addr as usize)..((addr + Size::address_size()) as usize)])
+        Size::from_memory_bytes(
+            &self.internal_ram[(addr as usize)..((addr + Size::address_size()) as usize)],
+        )
     }
 
     fn read_addr_word_aligned_no_tick<Size: DataSize>(&mut self, addr: u32) -> Size {
         let addr = addr & 0xFFFFFF;
         let addr_size = Size::word_aligned_address_size();
         let addr_offset = Size::word_aligned_address_size() - Size::address_size();
-        Size::from_memory_bytes(&self.internal_ram[
-            ((addr + addr_offset) as usize)..((addr + addr_size) as usize)])
+        Size::from_memory_bytes(
+            &self.internal_ram[((addr + addr_offset) as usize)..((addr + addr_size) as usize)],
+        )
     }
 
     fn write_addr<Size: DataSize>(&mut self, addr: u32, val: Size) {
@@ -356,16 +413,18 @@ impl<'a> Cpu<'a> {
 
     fn write_addr_no_tick<Size: DataSize>(&mut self, addr: u32, val: Size) {
         let addr = addr & 0xFFFFFF;
-        val.set_memory_bytes(&mut self.internal_ram[
-            (addr as usize)..((addr + Size::address_size()) as usize)])
+        val.set_memory_bytes(
+            &mut self.internal_ram[(addr as usize)..((addr + Size::address_size()) as usize)],
+        )
     }
 
     fn write_addr_word_aligned_no_tick<Size: DataSize>(&mut self, addr: u32, val: Size) {
         let addr = addr & 0xFFFFFF;
         let addr_size = Size::word_aligned_address_size();
         let addr_offset = Size::word_aligned_address_size() - Size::address_size();
-        val.set_memory_bytes(&mut self.internal_ram[
-            ((addr + addr_offset) as usize)..((addr + addr_size) as usize)])
+        val.set_memory_bytes(
+            &mut self.internal_ram[((addr + addr_offset) as usize)..((addr + addr_size) as usize)],
+        )
     }
 
     fn addr_register(&self, register: usize) -> u32 {
@@ -385,7 +444,11 @@ impl<'a> Cpu<'a> {
     }
 
     fn inc_addr_register<Size: DataSize>(&mut self, register: usize) {
-        let val = if register == 7 { Size::word_aligned_address_size() } else { Size::address_size() };
+        let val = if register == 7 {
+            Size::word_aligned_address_size()
+        } else {
+            Size::address_size()
+        };
         if register == 7 && self.flag(SUPERVISOR_MODE) {
             self.ssp += val;
         } else {
@@ -394,7 +457,11 @@ impl<'a> Cpu<'a> {
     }
 
     fn dec_addr_register<Size: DataSize>(&mut self, register: usize) {
-        let val = if register == 7 { Size::word_aligned_address_size() } else { Size::address_size() };
+        let val = if register == 7 {
+            Size::word_aligned_address_size()
+        } else {
+            Size::address_size()
+        };
         if register == 7 && self.flag(SUPERVISOR_MODE) {
             self.ssp -= val;
         } else {
@@ -423,7 +490,8 @@ impl<'a> Cpu<'a> {
             AddressingMode::AddressWithDisplacement(register) => {
                 let displacement: i16 = self.read_addr::<u16>(self.pc) as i16;
                 self.pc += 2;
-                self.addr_register(register).wrapping_add_signed(displacement as i32)
+                self.addr_register(register)
+                    .wrapping_add_signed(displacement as i32)
             }
             AddressingMode::AddressWithIndex(register) => {
                 let extension = self.read_addr::<u16>(self.pc);
@@ -473,22 +541,23 @@ impl<'a> Cpu<'a> {
                 self.pc += 4;
                 addr
             }
-            _ => panic!()
+            _ => panic!(),
         }
     }
 
     fn read<Size: DataSize>(&mut self, mode: AddressingMode) -> Size {
         match mode {
             AddressingMode::DataRegister(register) => Size::from_register_value(self.d[register]),
-            AddressingMode::AddressRegister(register) => Size::from_register_value(self.addr_register(register)),
+            AddressingMode::AddressRegister(register) => {
+                Size::from_register_value(self.addr_register(register))
+            }
             AddressingMode::Address(_)
             | AddressingMode::AddressWithDisplacement(_)
             | AddressingMode::AddressWithIndex(_)
             | AddressingMode::ProgramCounterWithDisplacement
             | AddressingMode::ProgramCounterWithIndex
             | AddressingMode::AbsoluteShort
-            | AddressingMode::AbsoluteLong
-            => {
+            | AddressingMode::AbsoluteLong => {
                 let addr = self.effective_addr(mode);
                 self.read_addr(addr)
             }
@@ -522,7 +591,10 @@ impl<'a> Cpu<'a> {
                 self.d[register] = val.apply_to_register(self.d[register])
             }
             AddressingMode::AddressRegister(register) => {
-                self.set_addr_register(register, val.apply_to_register(self.addr_register(register)));
+                self.set_addr_register(
+                    register,
+                    val.apply_to_register(self.addr_register(register)),
+                );
             }
             AddressingMode::Address(_)
             | AddressingMode::AddressWithDisplacement(_)
@@ -530,8 +602,7 @@ impl<'a> Cpu<'a> {
             | AddressingMode::ProgramCounterWithDisplacement
             | AddressingMode::ProgramCounterWithIndex
             | AddressingMode::AbsoluteShort
-            | AddressingMode::AbsoluteLong
-            => {
+            | AddressingMode::AbsoluteLong => {
                 let addr = self.effective_addr(mode);
                 self.write_addr(addr, val);
             }
@@ -548,7 +619,11 @@ impl<'a> Cpu<'a> {
         }
     }
 
-    fn read_write<Size: DataSize>(&mut self, mode: AddressingMode, op: &mut dyn FnMut(&mut Self, Size) -> Size) {
+    fn read_write<Size: DataSize>(
+        &mut self,
+        mode: AddressingMode,
+        op: &mut dyn FnMut(&mut Self, Size) -> Size,
+    ) {
         match mode {
             AddressingMode::DataRegister(register) => {
                 let val = Size::from_register_value(self.d[register]);
@@ -558,7 +633,10 @@ impl<'a> Cpu<'a> {
             AddressingMode::AddressRegister(register) => {
                 let val = Size::from_register_value(self.addr_register(register));
                 let new_val = op(self, val);
-                self.set_addr_register(register, new_val.apply_to_register(self.addr_register(register)));
+                self.set_addr_register(
+                    register,
+                    new_val.apply_to_register(self.addr_register(register)),
+                );
             }
             AddressingMode::Address(_)
             | AddressingMode::AddressWithDisplacement(_)
@@ -566,8 +644,7 @@ impl<'a> Cpu<'a> {
             | AddressingMode::ProgramCounterWithDisplacement
             | AddressingMode::ProgramCounterWithIndex
             | AddressingMode::AbsoluteShort
-            | AddressingMode::AbsoluteLong
-            => {
+            | AddressingMode::AbsoluteLong => {
                 let addr = self.effective_addr(mode);
                 let val = self.read_addr(addr);
                 let new_val = op(self, val);
@@ -598,10 +675,12 @@ impl<'a> Cpu<'a> {
         self.set_flag(SUPERVISOR_MODE, true);
     }
 
-    fn add<Size: DataSize + WrappingAdd>(&mut self,
-                                         mode: AddressingMode,
-                                         register: usize,
-                                         operand_direction: OperandDirection) {
+    fn add<Size: DataSize + WrappingAdd>(
+        &mut self,
+        mode: AddressingMode,
+        register: usize,
+        operand_direction: OperandDirection,
+    ) {
         let operand = Size::from_register_value(self.d[register]);
         match operand_direction {
             OperandDirection::ToRegister => {
@@ -683,10 +762,12 @@ impl<'a> Cpu<'a> {
         }
     }
 
-    fn addx<Size: DataSize + WrappingAdd + AddAssign<Size>>(&mut self,
-                                                            operand_mode: OperandMode,
-                                                            src_register: usize,
-                                                            dest_register: usize) {
+    fn addx<Size: DataSize + WrappingAdd + AddAssign<Size>>(
+        &mut self,
+        operand_mode: OperandMode,
+        src_register: usize,
+        dest_register: usize,
+    ) {
         let addx = &mut |cpu: &mut Cpu, val: Size, operand: Size| {
             let (mut carry, mut result) = match val.checked_add(&operand) {
                 Some(result) => (false, result),
@@ -720,14 +801,20 @@ impl<'a> Cpu<'a> {
             }
             OperandMode::MemoryToMemory => {
                 let operand = self.read(AddressingMode::AddressWithPredecrement(src_register));
-                self.read_write(AddressingMode::AddressWithPredecrement(dest_register), &mut |cpu, val| {
-                    addx(cpu, val, operand)
-                });
+                self.read_write(
+                    AddressingMode::AddressWithPredecrement(dest_register),
+                    &mut |cpu, val| addx(cpu, val, operand),
+                );
             }
         }
     }
 
-    fn and<Size: DataSize>(&mut self, mode: AddressingMode, register: usize, operand_direction: OperandDirection) {
+    fn and<Size: DataSize>(
+        &mut self,
+        mode: AddressingMode,
+        register: usize,
+        operand_direction: OperandDirection,
+    ) {
         let operand = Size::from_register_value(self.d[register]);
         match operand_direction {
             OperandDirection::ToRegister => {
@@ -777,7 +864,11 @@ impl<'a> Cpu<'a> {
         });
     }
 
-    fn asl_register<Size: DataSize + Shl<u8, Output=Size>>(&mut self, register: usize, count: u8) {
+    fn asl_register<Size: DataSize + Shl<u8, Output=Size>>(
+        &mut self,
+        register: usize,
+        count: u8,
+    ) {
         let val = Size::from_register_value(self.d[register]);
         let result = if count > 0 {
             let result = val << count;
@@ -810,7 +901,11 @@ impl<'a> Cpu<'a> {
         });
     }
 
-    fn asr_lsr_register<Size: DataSize + Shr<u8, Output=Size>>(&mut self, register: usize, count: u8) {
+    fn asr_lsr_register<Size: DataSize + Shr<u8, Output=Size>>(
+        &mut self,
+        register: usize,
+        count: u8,
+    ) {
         let val = Size::from_register_value(self.d[register]);
         let result = if count > 0 {
             let result = val >> count;
@@ -878,7 +973,12 @@ impl<'a> Cpu<'a> {
         self.do_cmp(operand, val);
     }
 
-    fn eor<Size: DataSize>(&mut self, mode: AddressingMode, register: usize, operand_direction: OperandDirection) {
+    fn eor<Size: DataSize>(
+        &mut self,
+        mode: AddressingMode,
+        register: usize,
+        operand_direction: OperandDirection,
+    ) {
         let operand = Size::from_register_value(self.d[register]);
         match operand_direction {
             OperandDirection::ToRegister => {
@@ -935,7 +1035,11 @@ impl<'a> Cpu<'a> {
         });
     }
 
-    fn lsl_register<Size: DataSize + Shl<u8, Output=Size>>(&mut self, register: usize, count: u8) {
+    fn lsl_register<Size: DataSize + Shl<u8, Output=Size>>(
+        &mut self,
+        register: usize,
+        count: u8,
+    ) {
         let val = Size::from_register_value(self.d[register]);
         let result = if count > 0 {
             let result = val << count;
@@ -965,8 +1069,11 @@ impl<'a> Cpu<'a> {
 
     fn movem<Size: DataSize>(&mut self, mode: AddressingMode, direction: Direction) {
         let register_list_mask = self.read_extension::<u16>();
-        let mask_reversed =
-            if let AddressingMode::AddressWithPredecrement(_) = mode { true } else { false };
+        let mask_reversed = if let AddressingMode::AddressWithPredecrement(_) = mode {
+            true
+        } else {
+            false
+        };
         let mut stored_addr_register_val = 0;
         let mut addr = match mode {
             AddressingMode::AddressWithPredecrement(register) => {
@@ -974,7 +1081,7 @@ impl<'a> Cpu<'a> {
                 self.addr_register(register)
             }
             AddressingMode::AddressWithPostincrement(register) => self.addr_register(register),
-            _ => self.effective_addr(mode)
+            _ => self.effective_addr(mode),
         };
         for i in 0usize..16 {
             if (register_list_mask >> i) & 0b1 == 0b1 {
@@ -991,20 +1098,24 @@ impl<'a> Cpu<'a> {
                 }
                 match direction {
                     Direction::RegisterToMemory => {
-                        let val = Size::from_register_value(
-                            if mask_reversed {
-                                if i < 8 {
-                                    match mode {
-                                        AddressingMode::AddressWithPredecrement(n) if 7 - n == i =>
-                                            stored_addr_register_val,
-                                        _ => self.addr_register(7 - i)
+                        let val = Size::from_register_value(if mask_reversed {
+                            if i < 8 {
+                                match mode {
+                                    AddressingMode::AddressWithPredecrement(n) if 7 - n == i => {
+                                        stored_addr_register_val
                                     }
-                                } else {
-                                    self.d[15 - i]
+                                    _ => self.addr_register(7 - i),
                                 }
                             } else {
-                                if i < 8 { self.d[i] } else { self.addr_register(i - 8) }
-                            });
+                                self.d[15 - i]
+                            }
+                        } else {
+                            if i < 8 {
+                                self.d[i]
+                            } else {
+                                self.addr_register(i - 8)
+                            }
+                        });
                         self.write_addr(addr, val)
                     }
                     Direction::MemoryToRegister => {
@@ -1014,7 +1125,7 @@ impl<'a> Cpu<'a> {
                         } else {
                             match mode {
                                 AddressingMode::AddressWithPostincrement(n) if n == i - 8 => {}
-                                _ => self.set_addr_register(i - 8, val)
+                                _ => self.set_addr_register(i - 8, val),
                             }
                         }
                     }
@@ -1022,7 +1133,7 @@ impl<'a> Cpu<'a> {
                 addr = match mode {
                     AddressingMode::AddressWithPredecrement(_)
                     | AddressingMode::AddressWithPostincrement(_) => addr,
-                    _ => addr + Size::address_size()
+                    _ => addr + Size::address_size(),
                 };
             }
         }
@@ -1043,8 +1154,8 @@ impl<'a> Cpu<'a> {
 
     fn negx<Size: DataSize + Signed>(&mut self, mode: AddressingMode) {
         self.read_write::<Size>(mode, &mut |cpu, val| {
-            let overflow = val == Size::min_value()
-                || (val == Size::max_value() && cpu.flag(EXTEND));
+            let overflow =
+                val == Size::min_value() || (val == Size::max_value() && cpu.flag(EXTEND));
             let result = if overflow {
                 val
             } else if cpu.flag(EXTEND) {
@@ -1072,7 +1183,12 @@ impl<'a> Cpu<'a> {
         });
     }
 
-    fn or<Size: DataSize>(&mut self, mode: AddressingMode, register: usize, operand_direction: OperandDirection) {
+    fn or<Size: DataSize>(
+        &mut self,
+        mode: AddressingMode,
+        register: usize,
+        operand_direction: OperandDirection,
+    ) {
         let operand = Size::from_register_value(self.d[register]);
         match operand_direction {
             OperandDirection::ToRegister => {
@@ -1168,12 +1284,15 @@ impl<'a> Cpu<'a> {
         self.set_flag(ZERO, result.is_zero());
     }
 
-
     fn roxl_memory<Size: DataSize>(&mut self, mode: AddressingMode) {
         self.read_write::<Size>(mode, &mut |cpu, val| {
             let first_bit = val.is_negative();
-            let result = (val << 1) |
-                if cpu.flag(EXTEND) { Size::from(0b1).unwrap() } else { Size::from(0b0).unwrap() };
+            let result = (val << 1)
+                | if cpu.flag(EXTEND) {
+                Size::from(0b1).unwrap()
+            } else {
+                Size::from(0b0).unwrap()
+            };
             cpu.set_flag(EXTEND, first_bit);
             cpu.set_flag(NEGATIVE, result.is_negative());
             cpu.set_flag(ZERO, result.is_zero());
@@ -1189,8 +1308,12 @@ impl<'a> Cpu<'a> {
             let mut result = val;
             for _ in 0..count {
                 let first_bit = result.is_negative();
-                result = (result << 1) |
-                    if self.flag(EXTEND) { Size::from(0b1).unwrap() } else { Size::from(0b0).unwrap() };
+                result = (result << 1)
+                    | if self.flag(EXTEND) {
+                    Size::from(0b1).unwrap()
+                } else {
+                    Size::from(0b0).unwrap()
+                };
                 self.set_flag(EXTEND, first_bit);
                 self.set_flag(CARRY, first_bit);
             }
@@ -1208,8 +1331,12 @@ impl<'a> Cpu<'a> {
     fn roxr_memory<Size: DataSize>(&mut self, mode: AddressingMode) {
         self.read_write::<Size>(mode, &mut |cpu, val| {
             let last_bit = !(val & Size::from(0b1).unwrap()).is_zero();
-            let result = (val >> 1) |
-                if cpu.flag(EXTEND) { Size::from(0b1 << (Size::bits() - 1)).unwrap() } else { Size::from(0b0).unwrap() };
+            let result = (val >> 1)
+                | if cpu.flag(EXTEND) {
+                Size::from(0b1 << (Size::bits() - 1)).unwrap()
+            } else {
+                Size::from(0b0).unwrap()
+            };
             cpu.set_flag(EXTEND, last_bit);
             cpu.set_flag(NEGATIVE, result.is_negative());
             cpu.set_flag(ZERO, result.is_zero());
@@ -1225,8 +1352,12 @@ impl<'a> Cpu<'a> {
             let mut result = val;
             for _ in 0..count {
                 let last_bit = !(val & Size::from(0b1).unwrap()).is_zero();
-                result = (val >> 1) |
-                    if self.flag(EXTEND) { Size::from(0b1 << (Size::bits() - 1)).unwrap() } else { Size::from(0b0).unwrap() };
+                result = (val >> 1)
+                    | if self.flag(EXTEND) {
+                    Size::from(0b1 << (Size::bits() - 1)).unwrap()
+                } else {
+                    Size::from(0b0).unwrap()
+                };
                 self.set_flag(EXTEND, last_bit);
                 self.set_flag(CARRY, last_bit);
             }
@@ -1241,10 +1372,12 @@ impl<'a> Cpu<'a> {
         self.set_flag(ZERO, result.is_zero());
     }
 
-    fn sub<Size: DataSize + WrappingSub>(&mut self,
-                                         mode: AddressingMode,
-                                         register: usize,
-                                         operand_direction: OperandDirection) {
+    fn sub<Size: DataSize + WrappingSub>(
+        &mut self,
+        mode: AddressingMode,
+        register: usize,
+        operand_direction: OperandDirection,
+    ) {
         match operand_direction {
             OperandDirection::ToRegister => {
                 let operand: Size = self.read(mode);
@@ -1327,10 +1460,12 @@ impl<'a> Cpu<'a> {
         }
     }
 
-    fn subx<Size: DataSize + WrappingSub + SubAssign<Size>>(&mut self,
-                                                            operand_mode: OperandMode,
-                                                            src_register: usize,
-                                                            dest_register: usize) {
+    fn subx<Size: DataSize + WrappingSub + SubAssign<Size>>(
+        &mut self,
+        operand_mode: OperandMode,
+        src_register: usize,
+        dest_register: usize,
+    ) {
         let subx = &mut |cpu: &mut Cpu, val: Size, operand: Size| {
             let (mut carry, mut result) = match val.checked_sub(&operand) {
                 Some(result) => (false, result),
@@ -1364,9 +1499,10 @@ impl<'a> Cpu<'a> {
             }
             OperandMode::MemoryToMemory => {
                 let operand = self.read(AddressingMode::AddressWithPredecrement(src_register));
-                self.read_write(AddressingMode::AddressWithPredecrement(dest_register), &mut |cpu, val| {
-                    subx(cpu, val, operand)
-                });
+                self.read_write(
+                    AddressingMode::AddressWithPredecrement(dest_register),
+                    &mut |cpu, val| subx(cpu, val, operand),
+                );
             }
         }
     }
@@ -1397,23 +1533,32 @@ impl<'a> Cpu<'a> {
         let opcode = opcode(opcode_hex);
 
         match opcode {
-            Opcode::ABCD { operand_mode, src_register, dest_register } => {
+            Opcode::ABCD {
+                operand_mode,
+                src_register,
+                dest_register,
+            } => {
                 let abcd = |cpu: &mut Cpu, val: u8, operand: u8| {
-                    let binary_result = val.wrapping_add(operand)
+                    let binary_result = val
+                        .wrapping_add(operand)
                         .wrapping_add(if cpu.flag(EXTEND) { 1 } else { 0 });
-                    let binary_carry = ((val & operand)
-                        | (val & !binary_result)
-                        | (operand & !binary_result))
-                        & 0x88;
-                    let decimal_carry = (((((binary_result as u16) + 0x66) ^ (binary_result as u16))
-                        & 0x110) >> 1) as u8;
-                    let correction_factor = (binary_carry | decimal_carry) - ((binary_carry | decimal_carry) >> 2);
+                    let binary_carry =
+                        ((val & operand) | (val & !binary_result) | (operand & !binary_result))
+                            & 0x88;
+                    let decimal_carry =
+                        (((((binary_result as u16) + 0x66) ^ (binary_result as u16)) & 0x110) >> 1)
+                            as u8;
+                    let correction_factor =
+                        (binary_carry | decimal_carry) - ((binary_carry | decimal_carry) >> 2);
                     let result = binary_result.wrapping_add(correction_factor);
                     let carry = binary_carry.is_negative()
                         || (binary_result.is_negative() && !result.is_negative());
                     cpu.set_flag(EXTEND, carry);
                     cpu.set_flag(CARRY, carry);
-                    cpu.set_flag(OVERFLOW, !binary_result.is_negative() && result.is_negative());
+                    cpu.set_flag(
+                        OVERFLOW,
+                        !binary_result.is_negative() && result.is_negative(),
+                    );
                     if result != 0 {
                         cpu.set_flag(ZERO, false);
                     }
@@ -1428,23 +1573,35 @@ impl<'a> Cpu<'a> {
                         self.d[dest_register] = result.apply_to_register(self.d[dest_register]);
                     }
                     OperandMode::MemoryToMemory => {
-                        let operand = self.read::<u8>(AddressingMode::AddressWithPredecrement(src_register));
-                        self.read_write::<u8>(AddressingMode::AddressWithPredecrement(dest_register),
-                                              &mut |cpu, val| abcd(cpu, val, operand));
+                        let operand =
+                            self.read::<u8>(AddressingMode::AddressWithPredecrement(src_register));
+                        self.read_write::<u8>(
+                            AddressingMode::AddressWithPredecrement(dest_register),
+                            &mut |cpu, val| abcd(cpu, val, operand),
+                        );
                     }
                 }
             }
-            Opcode::ADD { mode, size, operand_direction, register } => match size {
+            Opcode::ADD {
+                mode,
+                size,
+                operand_direction,
+                register,
+            } => match size {
                 Size::Byte => self.add::<u8>(mode, register, operand_direction),
                 Size::Word => self.add::<u16>(mode, register, operand_direction),
                 Size::Long => self.add::<u32>(mode, register, operand_direction),
-                Size::Illegal => panic!()
-            }
-            Opcode::ADDA { mode, size, register } => {
+                Size::Illegal => panic!(),
+            },
+            Opcode::ADDA {
+                mode,
+                size,
+                register,
+            } => {
                 let operand = match size {
                     Size::Word => self.read::<i16>(mode) as i32,
                     Size::Long => self.read(mode),
-                    Size::Byte | Size::Illegal => panic!()
+                    Size::Byte | Size::Illegal => panic!(),
                 };
                 let result = self.addr_register(register).wrapping_add_signed(operand);
                 self.set_addr_register(register, result);
@@ -1453,31 +1610,41 @@ impl<'a> Cpu<'a> {
                 Size::Byte => self.addi::<u8>(mode),
                 Size::Word => self.addi::<u16>(mode),
                 Size::Long => self.addi::<u32>(mode),
-                Size::Illegal => panic!()
-            }
+                Size::Illegal => panic!(),
+            },
             Opcode::ADDQ { mode, size, data } => match size {
                 Size::Byte => self.addq::<u8>(mode, data),
                 Size::Word => self.addq::<u16>(mode, data),
                 Size::Long => self.addq::<u32>(mode, data),
-                Size::Illegal => panic!()
-            }
-            Opcode::ADDX { operand_mode, size, src_register, dest_register } => match size {
+                Size::Illegal => panic!(),
+            },
+            Opcode::ADDX {
+                operand_mode,
+                size,
+                src_register,
+                dest_register,
+            } => match size {
                 Size::Byte => self.addx::<u8>(operand_mode, src_register, dest_register),
                 Size::Word => self.addx::<u16>(operand_mode, src_register, dest_register),
                 Size::Long => self.addx::<u32>(operand_mode, src_register, dest_register),
-                Size::Illegal => panic!()
-            }
-            Opcode::AND { mode, size, operand_direction, register } => match size {
+                Size::Illegal => panic!(),
+            },
+            Opcode::AND {
+                mode,
+                size,
+                operand_direction,
+                register,
+            } => match size {
                 Size::Byte => self.and::<u8>(mode, register, operand_direction),
                 Size::Word => self.and::<u16>(mode, register, operand_direction),
                 Size::Long => self.and::<u32>(mode, register, operand_direction),
-                Size::Illegal => panic!()
-            }
+                Size::Illegal => panic!(),
+            },
             Opcode::ANDI { mode, size } => match size {
                 Size::Byte => self.andi::<u8>(mode),
                 Size::Word => self.andi::<u16>(mode),
                 Size::Long => self.andi::<u32>(mode),
-                Size::Illegal => panic!()
+                Size::Illegal => panic!(),
             },
             Opcode::ANDI_to_CCR => {
                 let new_status = (self.status & 0xFF00)
@@ -1488,14 +1655,20 @@ impl<'a> Cpu<'a> {
                 let new_status = self.status & self.read_extension::<u16>();
                 self.set_status(new_status);
             }
-            Opcode::ASL { mode, size, register, shift_count, shift_register } => {
+            Opcode::ASL {
+                mode,
+                size,
+                register,
+                shift_count,
+                shift_register,
+            } => {
                 if let Some(register) = register {
                     if let Some(count) = shift_count {
                         match size {
                             Size::Byte => self.asl_register::<i8>(register, count),
                             Size::Word => self.asl_register::<i16>(register, count),
                             Size::Long => self.asl_register::<i32>(register, count),
-                            Size::Illegal => panic!()
+                            Size::Illegal => panic!(),
                         }
                     } else if let Some(shift_register) = shift_register {
                         let count = (self.d[shift_register] % 64) as u8;
@@ -1503,7 +1676,7 @@ impl<'a> Cpu<'a> {
                             Size::Byte => self.asl_register::<i8>(register, count),
                             Size::Word => self.asl_register::<i16>(register, count),
                             Size::Long => self.asl_register::<i32>(register, count),
-                            Size::Illegal => panic!()
+                            Size::Illegal => panic!(),
                         }
                     } else {
                         panic!()
@@ -1513,18 +1686,24 @@ impl<'a> Cpu<'a> {
                         Size::Byte => self.asl_memory::<i8>(mode),
                         Size::Word => self.asl_memory::<i16>(mode),
                         Size::Long => self.asl_memory::<i32>(mode),
-                        Size::Illegal => panic!()
+                        Size::Illegal => panic!(),
                     }
                 }
             }
-            Opcode::ASR { mode, size, register, shift_count, shift_register } => {
+            Opcode::ASR {
+                mode,
+                size,
+                register,
+                shift_count,
+                shift_register,
+            } => {
                 if let Some(register) = register {
                     if let Some(count) = shift_count {
                         match size {
                             Size::Byte => self.asr_lsr_register::<i8>(register, count),
                             Size::Word => self.asr_lsr_register::<i16>(register, count),
                             Size::Long => self.asr_lsr_register::<i32>(register, count),
-                            Size::Illegal => panic!()
+                            Size::Illegal => panic!(),
                         }
                     } else if let Some(shift_register) = shift_register {
                         let count = (self.d[shift_register] % 64) as u8;
@@ -1532,7 +1711,7 @@ impl<'a> Cpu<'a> {
                             Size::Byte => self.asr_lsr_register::<i8>(register, count),
                             Size::Word => self.asr_lsr_register::<i16>(register, count),
                             Size::Long => self.asr_lsr_register::<i32>(register, count),
-                            Size::Illegal => panic!()
+                            Size::Illegal => panic!(),
                         }
                     } else {
                         panic!()
@@ -1542,7 +1721,7 @@ impl<'a> Cpu<'a> {
                         Size::Byte => self.asr_lsr_memory::<i8>(mode),
                         Size::Word => self.asr_lsr_memory::<i16>(mode),
                         Size::Long => self.asr_lsr_memory::<i32>(mode),
-                        Size::Illegal => panic!()
+                        Size::Illegal => panic!(),
                     }
                 }
             }
@@ -1560,7 +1739,7 @@ impl<'a> Cpu<'a> {
                         self.pc += 2;
                         extension as u32
                     }
-                    BitNum::DataRegister(register) => self.d[register]
+                    BitNum::DataRegister(register) => self.d[register],
                 } % bit_mod;
                 if let Opcode::BTST { .. } = opcode {
                     match mode {
@@ -1577,16 +1756,18 @@ impl<'a> Cpu<'a> {
                     };
                 } else {
                     match mode {
-                        AddressingMode::DataRegister(_) => self.read_write::<u32>(mode, &mut |cpu, val| {
-                            let bit_val = (val >> bit) & 0b1;
-                            cpu.set_flag(ZERO, bit_val == 0);
-                            match opcode {
-                                Opcode::BCHG { .. } => val ^ (1 << bit),
-                                Opcode::BCLR { .. } => val & !(1 << bit),
-                                Opcode::BSET { .. } => val | (1 << bit),
-                                _ => panic!()
-                            }
-                        }),
+                        AddressingMode::DataRegister(_) => {
+                            self.read_write::<u32>(mode, &mut |cpu, val| {
+                                let bit_val = (val >> bit) & 0b1;
+                                cpu.set_flag(ZERO, bit_val == 0);
+                                match opcode {
+                                    Opcode::BCHG { .. } => val ^ (1 << bit),
+                                    Opcode::BCLR { .. } => val & !(1 << bit),
+                                    Opcode::BSET { .. } => val | (1 << bit),
+                                    _ => panic!(),
+                                }
+                            })
+                        }
                         _ => self.read_write::<u8>(mode, &mut |cpu, val| {
                             let bit_val = (val >> bit) & 0b1;
                             cpu.set_flag(ZERO, bit_val == 0);
@@ -1594,7 +1775,7 @@ impl<'a> Cpu<'a> {
                                 Opcode::BCHG { .. } => val ^ (1 << bit),
                                 Opcode::BCLR { .. } => val & !(1 << bit),
                                 Opcode::BSET { .. } => val | (1 << bit),
-                                _ => panic!()
+                                _ => panic!(),
                             }
                         }),
                     };
@@ -1607,7 +1788,10 @@ impl<'a> Cpu<'a> {
                 self.push(self.pc + if displacement == 0 { 2 } else { 0 });
                 self.branch(displacement, true);
             }
-            Opcode::Bcc { displacement, condition } => {
+            Opcode::Bcc {
+                displacement,
+                condition,
+            } => {
                 self.branch(displacement, self.check_condition(condition));
             }
             Opcode::CHK { register, mode } => {
@@ -1636,31 +1820,46 @@ impl<'a> Cpu<'a> {
                 self.set_flag(OVERFLOW, false);
                 self.set_flag(CARRY, false);
             }
-            Opcode::CMP { mode, size, register } => match size {
+            Opcode::CMP {
+                mode,
+                size,
+                register,
+            } => match size {
                 Size::Byte => self.cmp::<u8>(mode, register),
                 Size::Word => self.cmp::<u16>(mode, register),
                 Size::Long => self.cmp::<u32>(mode, register),
-                Size::Illegal => panic!()
-            }
-            Opcode::CMPA { mode, size, register } => match size {
+                Size::Illegal => panic!(),
+            },
+            Opcode::CMPA {
+                mode,
+                size,
+                register,
+            } => match size {
                 Size::Byte => self.cmpa::<u8>(mode, register),
                 Size::Word => self.cmpa::<u16>(mode, register),
                 Size::Long => self.cmpa::<u32>(mode, register),
-                Size::Illegal => panic!()
-            }
+                Size::Illegal => panic!(),
+            },
             Opcode::CMPI { mode, size } => match size {
                 Size::Byte => self.cmpi::<u8>(mode),
                 Size::Word => self.cmpi::<u16>(mode),
                 Size::Long => self.cmpi::<u32>(mode),
-                Size::Illegal => panic!()
-            }
-            Opcode::CMPM { size, src_register, dest_register } => match size {
+                Size::Illegal => panic!(),
+            },
+            Opcode::CMPM {
+                size,
+                src_register,
+                dest_register,
+            } => match size {
                 Size::Byte => self.cmpm::<u8>(src_register, dest_register),
                 Size::Word => self.cmpm::<u16>(src_register, dest_register),
                 Size::Long => self.cmpm::<u32>(src_register, dest_register),
-                Size::Illegal => panic!()
-            }
-            Opcode::DBcc { condition, register } => {
+                Size::Illegal => panic!(),
+            },
+            Opcode::DBcc {
+                condition,
+                register,
+            } => {
                 let displacement = self.read_extension::<i16>();
                 if !self.check_condition(condition) {
                     let dec_value = (self.d[register] & 0xFFFF) as i16 - 1;
@@ -1686,7 +1885,8 @@ impl<'a> Cpu<'a> {
                         self.set_flag(OVERFLOW, false);
                         self.set_flag(NEGATIVE, (quotient as i16).is_negative());
                         self.set_flag(ZERO, quotient.is_zero());
-                        self.d[register] = ((remainder as u32) << 16) | ((quotient as u32) & 0xFFFF);
+                        self.d[register] =
+                            ((remainder as u32) << 16) | ((quotient as u32) & 0xFFFF);
                     }
                 }
             }
@@ -1709,17 +1909,22 @@ impl<'a> Cpu<'a> {
                     }
                 }
             }
-            Opcode::EOR { mode, size, operand_direction, register } => match size {
+            Opcode::EOR {
+                mode,
+                size,
+                operand_direction,
+                register,
+            } => match size {
                 Size::Byte => self.eor::<u8>(mode, register, operand_direction),
                 Size::Word => self.eor::<u16>(mode, register, operand_direction),
                 Size::Long => self.eor::<u32>(mode, register, operand_direction),
-                Size::Illegal => panic!()
+                Size::Illegal => panic!(),
             },
             Opcode::EORI { mode, size } => match size {
                 Size::Byte => self.eori::<u8>(mode),
                 Size::Word => self.eori::<u16>(mode),
                 Size::Long => self.eori::<u32>(mode),
-                Size::Illegal => panic!()
+                Size::Illegal => panic!(),
             },
             Opcode::EORI_to_CCR => {
                 let new_status = (self.status & 0xFF00)
@@ -1730,7 +1935,11 @@ impl<'a> Cpu<'a> {
                 let new_status = self.status ^ self.read_extension::<u16>();
                 self.set_status(new_status);
             }
-            Opcode::EXG { mode, src_register, dest_register } => {
+            Opcode::EXG {
+                mode,
+                src_register,
+                dest_register,
+            } => {
                 match mode {
                     ExchangeMode::DataRegisters => {
                         let tmp = self.d[src_register];
@@ -1747,7 +1956,7 @@ impl<'a> Cpu<'a> {
                         self.d[src_register] = self.addr_register(dest_register);
                         self.set_addr_register(dest_register, tmp);
                     }
-                    ExchangeMode::Illegal => panic!()
+                    ExchangeMode::Illegal => panic!(),
                 };
             }
             Opcode::EXT { register, size } => {
@@ -1774,17 +1983,26 @@ impl<'a> Cpu<'a> {
                 self.push(self.addr_register(register) - if register == 7 { 4 } else { 0 });
                 self.set_addr_register(register, self.addr_register(7));
                 let displacement = self.read_extension::<i16>();
-                self.set_addr_register(7,
-                                       self.addr_register(7).wrapping_add_signed(displacement as i32));
+                self.set_addr_register(
+                    7,
+                    self.addr_register(7)
+                        .wrapping_add_signed(displacement as i32),
+                );
             }
-            Opcode::LSL { mode, size, register, shift_count, shift_register } => {
+            Opcode::LSL {
+                mode,
+                size,
+                register,
+                shift_count,
+                shift_register,
+            } => {
                 if let Some(register) = register {
                     if let Some(count) = shift_count {
                         match size {
                             Size::Byte => self.lsl_register::<u8>(register, count),
                             Size::Word => self.lsl_register::<u16>(register, count),
                             Size::Long => self.lsl_register::<u32>(register, count),
-                            Size::Illegal => panic!()
+                            Size::Illegal => panic!(),
                         }
                     } else if let Some(shift_register) = shift_register {
                         let count = (self.d[shift_register] % 64) as u8;
@@ -1792,7 +2010,7 @@ impl<'a> Cpu<'a> {
                             Size::Byte => self.lsl_register::<u8>(register, count),
                             Size::Word => self.lsl_register::<u16>(register, count),
                             Size::Long => self.lsl_register::<u32>(register, count),
-                            Size::Illegal => panic!()
+                            Size::Illegal => panic!(),
                         }
                     } else {
                         panic!()
@@ -1802,18 +2020,24 @@ impl<'a> Cpu<'a> {
                         Size::Byte => self.lsl_memory::<u8>(mode),
                         Size::Word => self.lsl_memory::<u16>(mode),
                         Size::Long => self.lsl_memory::<u32>(mode),
-                        Size::Illegal => panic!()
+                        Size::Illegal => panic!(),
                     }
                 }
             }
-            Opcode::LSR { mode, size, register, shift_count, shift_register } => {
+            Opcode::LSR {
+                mode,
+                size,
+                register,
+                shift_count,
+                shift_register,
+            } => {
                 if let Some(register) = register {
                     if let Some(count) = shift_count {
                         match size {
                             Size::Byte => self.asr_lsr_register::<u8>(register, count),
                             Size::Word => self.asr_lsr_register::<u16>(register, count),
                             Size::Long => self.asr_lsr_register::<u32>(register, count),
-                            Size::Illegal => panic!()
+                            Size::Illegal => panic!(),
                         }
                     } else if let Some(shift_register) = shift_register {
                         let count = (self.d[shift_register] % 64) as u8;
@@ -1821,7 +2045,7 @@ impl<'a> Cpu<'a> {
                             Size::Byte => self.asr_lsr_register::<u8>(register, count),
                             Size::Word => self.asr_lsr_register::<u16>(register, count),
                             Size::Long => self.asr_lsr_register::<u32>(register, count),
-                            Size::Illegal => panic!()
+                            Size::Illegal => panic!(),
                         }
                     } else {
                         panic!()
@@ -1831,28 +2055,46 @@ impl<'a> Cpu<'a> {
                         Size::Byte => self.asr_lsr_memory::<u8>(mode),
                         Size::Word => self.asr_lsr_memory::<u16>(mode),
                         Size::Long => self.asr_lsr_memory::<u32>(mode),
-                        Size::Illegal => panic!()
+                        Size::Illegal => panic!(),
                     }
                 }
             }
-            Opcode::MOVE { src_mode, dest_mode, size } => match size {
+            Opcode::MOVE {
+                src_mode,
+                dest_mode,
+                size,
+            } => match size {
                 Size::Byte => self.move_::<i8>(src_mode, dest_mode),
                 Size::Word => self.move_::<i16>(src_mode, dest_mode),
                 Size::Long => self.move_::<i32>(src_mode, dest_mode),
-                Size::Illegal => panic!()
+                Size::Illegal => panic!(),
             },
-            Opcode::MOVEA { src_mode, dest_mode, size } => match size {
+            Opcode::MOVEA {
+                src_mode,
+                dest_mode,
+                size,
+            } => match size {
                 Size::Word => self.move_::<i16>(src_mode, dest_mode),
                 Size::Long => self.move_::<i32>(src_mode, dest_mode),
-                Size::Byte | Size::Illegal => panic!()
-            }
-            Opcode::MOVEM { mode, size, direction } => match size {
+                Size::Byte | Size::Illegal => panic!(),
+            },
+            Opcode::MOVEM {
+                mode,
+                size,
+                direction,
+            } => match size {
                 Size::Word => self.movem::<u16>(mode, direction),
                 Size::Long => self.movem::<u32>(mode, direction),
-                Size::Byte | Size::Illegal => panic!()
-            }
-            Opcode::MOVEP { data_register, address_register, direction, size } => {
-                let addr = self.effective_addr(AddressingMode::AddressWithDisplacement(address_register));
+                Size::Byte | Size::Illegal => panic!(),
+            },
+            Opcode::MOVEP {
+                data_register,
+                address_register,
+                direction,
+                size,
+            } => {
+                let addr =
+                    self.effective_addr(AddressingMode::AddressWithDisplacement(address_register));
                 match direction {
                     Direction::RegisterToMemory => {
                         let val = self.d[data_register];
@@ -1867,28 +2109,26 @@ impl<'a> Cpu<'a> {
                                 self.write_addr(addr + 4, ((val >> 8) & 0xFF) as u8);
                                 self.write_addr(addr + 6, (val & 0xFF) as u8);
                             }
-                            _ => panic!()
+                            _ => panic!(),
                         }
                     }
-                    Direction::MemoryToRegister => {
-                        match size {
-                            Size::Word => {
-                                let mut val = 0;
-                                val += (self.read_addr::<u8>(addr) as u16) << 8;
-                                val += self.read_addr::<u8>(addr + 2) as u16;
-                                self.d[data_register] = val.apply_to_register(self.d[data_register]);
-                            }
-                            Size::Long => {
-                                let mut val = 0;
-                                val += (self.read_addr::<u8>(addr) as u32) << 24;
-                                val += (self.read_addr::<u8>(addr + 2) as u32) << 16;
-                                val += (self.read_addr::<u8>(addr + 4) as u32) << 8;
-                                val += self.read_addr::<u8>(addr + 6) as u32;
-                                self.d[data_register] = val.apply_to_register(self.d[data_register]);
-                            }
-                            _ => panic!()
+                    Direction::MemoryToRegister => match size {
+                        Size::Word => {
+                            let mut val = 0;
+                            val += (self.read_addr::<u8>(addr) as u16) << 8;
+                            val += self.read_addr::<u8>(addr + 2) as u16;
+                            self.d[data_register] = val.apply_to_register(self.d[data_register]);
                         }
-                    }
+                        Size::Long => {
+                            let mut val = 0;
+                            val += (self.read_addr::<u8>(addr) as u32) << 24;
+                            val += (self.read_addr::<u8>(addr + 2) as u32) << 16;
+                            val += (self.read_addr::<u8>(addr + 4) as u32) << 8;
+                            val += self.read_addr::<u8>(addr + 6) as u32;
+                            self.d[data_register] = val.apply_to_register(self.d[data_register]);
+                        }
+                        _ => panic!(),
+                    },
                 }
             }
             Opcode::MOVEQ { register, data } => {
@@ -1910,10 +2150,13 @@ impl<'a> Cpu<'a> {
             Opcode::MOVE_from_SR { mode } => {
                 self.write(mode, self.status);
             }
-            Opcode::MOVE_USP { register, direction } => match direction {
+            Opcode::MOVE_USP {
+                register,
+                direction,
+            } => match direction {
                 Direction::RegisterToMemory => self.set_addr_register(register, self.a[7]),
                 Direction::MemoryToRegister => self.a[7] = self.addr_register(register),
-            }
+            },
             Opcode::MULS { mode, register } => {
                 let val = self.read::<i16>(mode) as i32;
                 let operand = i16::from_register_value(self.d[register]) as i32;
@@ -1936,8 +2179,9 @@ impl<'a> Cpu<'a> {
             }
             Opcode::NBCD { mode } => {
                 self.read_write::<u8>(mode, &mut |cpu, val| {
-                    let binary_result = 0u8.wrapping_sub(val)
-                        .wrapping_sub(if cpu.flag(EXTEND) { 1 } else { 0 });
+                    let binary_result =
+                        0u8.wrapping_sub(val)
+                            .wrapping_sub(if cpu.flag(EXTEND) { 1 } else { 0 });
                     let binary_carry = (val | binary_result) & 0x88;
                     let correction_factor = binary_carry - (binary_carry >> 2);
                     let result = binary_result.wrapping_sub(correction_factor);
@@ -1945,7 +2189,10 @@ impl<'a> Cpu<'a> {
                         || (!binary_result.is_negative() && result.is_negative());
                     cpu.set_flag(EXTEND, carry);
                     cpu.set_flag(CARRY, carry);
-                    cpu.set_flag(OVERFLOW, binary_result.is_negative() && !result.is_negative());
+                    cpu.set_flag(
+                        OVERFLOW,
+                        binary_result.is_negative() && !result.is_negative(),
+                    );
                     if result != 0 {
                         cpu.set_flag(ZERO, false);
                     }
@@ -1957,32 +2204,37 @@ impl<'a> Cpu<'a> {
                 Size::Byte => self.neg::<i8>(mode),
                 Size::Word => self.neg::<i16>(mode),
                 Size::Long => self.neg::<i32>(mode),
-                Size::Illegal => panic!()
-            }
+                Size::Illegal => panic!(),
+            },
             Opcode::NEGX { mode, size } => match size {
                 Size::Byte => self.negx::<i8>(mode),
                 Size::Word => self.negx::<i16>(mode),
                 Size::Long => self.negx::<i32>(mode),
-                Size::Illegal => panic!()
-            }
+                Size::Illegal => panic!(),
+            },
             Opcode::NOP => {}
             Opcode::NOT { mode, size } => match size {
                 Size::Byte => self.not::<u8>(mode),
                 Size::Word => self.not::<u16>(mode),
                 Size::Long => self.not::<u32>(mode),
-                Size::Illegal => panic!()
+                Size::Illegal => panic!(),
             },
-            Opcode::OR { mode, size, operand_direction, register } => match size {
+            Opcode::OR {
+                mode,
+                size,
+                operand_direction,
+                register,
+            } => match size {
                 Size::Byte => self.or::<u8>(mode, register, operand_direction),
                 Size::Word => self.or::<u16>(mode, register, operand_direction),
                 Size::Long => self.or::<u32>(mode, register, operand_direction),
-                Size::Illegal => panic!()
+                Size::Illegal => panic!(),
             },
             Opcode::ORI { mode, size } => match size {
                 Size::Byte => self.ori::<u8>(mode),
                 Size::Word => self.ori::<u16>(mode),
                 Size::Long => self.ori::<u32>(mode),
-                Size::Illegal => panic!()
+                Size::Illegal => panic!(),
             },
             Opcode::ORI_to_CCR => {
                 let new_status = (self.status & 0xFF00)
@@ -1998,14 +2250,20 @@ impl<'a> Cpu<'a> {
                 self.push(val);
             }
             Opcode::RESET => {}
-            Opcode::ROL { mode, size, register, shift_count, shift_register } => {
+            Opcode::ROL {
+                mode,
+                size,
+                register,
+                shift_count,
+                shift_register,
+            } => {
                 if let Some(register) = register {
                     if let Some(count) = shift_count {
                         match size {
                             Size::Byte => self.rol_register::<i8>(register, count),
                             Size::Word => self.rol_register::<i16>(register, count),
                             Size::Long => self.rol_register::<i32>(register, count),
-                            Size::Illegal => panic!()
+                            Size::Illegal => panic!(),
                         }
                     } else if let Some(shift_register) = shift_register {
                         let count = (self.d[shift_register] % 64) as u8;
@@ -2013,7 +2271,7 @@ impl<'a> Cpu<'a> {
                             Size::Byte => self.rol_register::<i8>(register, count),
                             Size::Word => self.rol_register::<i16>(register, count),
                             Size::Long => self.rol_register::<i32>(register, count),
-                            Size::Illegal => panic!()
+                            Size::Illegal => panic!(),
                         }
                     } else {
                         panic!()
@@ -2023,18 +2281,24 @@ impl<'a> Cpu<'a> {
                         Size::Byte => self.rol_memory::<i8>(mode),
                         Size::Word => self.rol_memory::<i16>(mode),
                         Size::Long => self.rol_memory::<i32>(mode),
-                        Size::Illegal => panic!()
+                        Size::Illegal => panic!(),
                     }
                 }
             }
-            Opcode::ROR { mode, size, register, shift_count, shift_register } => {
+            Opcode::ROR {
+                mode,
+                size,
+                register,
+                shift_count,
+                shift_register,
+            } => {
                 if let Some(register) = register {
                     if let Some(count) = shift_count {
                         match size {
                             Size::Byte => self.ror_register::<i8>(register, count),
                             Size::Word => self.ror_register::<i16>(register, count),
                             Size::Long => self.ror_register::<i32>(register, count),
-                            Size::Illegal => panic!()
+                            Size::Illegal => panic!(),
                         }
                     } else if let Some(shift_register) = shift_register {
                         let count = (self.d[shift_register] % 64) as u8;
@@ -2042,7 +2306,7 @@ impl<'a> Cpu<'a> {
                             Size::Byte => self.ror_register::<i8>(register, count),
                             Size::Word => self.ror_register::<i16>(register, count),
                             Size::Long => self.ror_register::<i32>(register, count),
-                            Size::Illegal => panic!()
+                            Size::Illegal => panic!(),
                         }
                     } else {
                         panic!()
@@ -2052,18 +2316,24 @@ impl<'a> Cpu<'a> {
                         Size::Byte => self.ror_memory::<i8>(mode),
                         Size::Word => self.ror_memory::<i16>(mode),
                         Size::Long => self.ror_memory::<i32>(mode),
-                        Size::Illegal => panic!()
+                        Size::Illegal => panic!(),
                     }
                 }
             }
-            Opcode::ROXL { mode, size, register, shift_count, shift_register } => {
+            Opcode::ROXL {
+                mode,
+                size,
+                register,
+                shift_count,
+                shift_register,
+            } => {
                 if let Some(register) = register {
                     if let Some(count) = shift_count {
                         match size {
                             Size::Byte => self.roxl_register::<u8>(register, count),
                             Size::Word => self.roxl_register::<u16>(register, count),
                             Size::Long => self.roxl_register::<u32>(register, count),
-                            Size::Illegal => panic!()
+                            Size::Illegal => panic!(),
                         }
                     } else if let Some(shift_register) = shift_register {
                         let count = (self.d[shift_register] % 64) as u8;
@@ -2071,7 +2341,7 @@ impl<'a> Cpu<'a> {
                             Size::Byte => self.roxl_register::<u8>(register, count),
                             Size::Word => self.roxl_register::<u16>(register, count),
                             Size::Long => self.roxl_register::<u32>(register, count),
-                            Size::Illegal => panic!()
+                            Size::Illegal => panic!(),
                         }
                     } else {
                         panic!()
@@ -2081,18 +2351,24 @@ impl<'a> Cpu<'a> {
                         Size::Byte => self.roxl_memory::<u8>(mode),
                         Size::Word => self.roxl_memory::<u16>(mode),
                         Size::Long => self.roxl_memory::<u32>(mode),
-                        Size::Illegal => panic!()
+                        Size::Illegal => panic!(),
                     }
                 }
             }
-            Opcode::ROXR { mode, size, register, shift_count, shift_register } => {
+            Opcode::ROXR {
+                mode,
+                size,
+                register,
+                shift_count,
+                shift_register,
+            } => {
                 if let Some(register) = register {
                     if let Some(count) = shift_count {
                         match size {
                             Size::Byte => self.roxr_register::<u8>(register, count),
                             Size::Word => self.roxr_register::<u16>(register, count),
                             Size::Long => self.roxr_register::<u32>(register, count),
-                            Size::Illegal => panic!()
+                            Size::Illegal => panic!(),
                         }
                     } else if let Some(shift_register) = shift_register {
                         let count = (self.d[shift_register] % 64) as u8;
@@ -2100,7 +2376,7 @@ impl<'a> Cpu<'a> {
                             Size::Byte => self.roxr_register::<u8>(register, count),
                             Size::Word => self.roxr_register::<u16>(register, count),
                             Size::Long => self.roxr_register::<u32>(register, count),
-                            Size::Illegal => panic!()
+                            Size::Illegal => panic!(),
                         }
                     } else {
                         panic!()
@@ -2110,7 +2386,7 @@ impl<'a> Cpu<'a> {
                         Size::Byte => self.roxr_memory::<u8>(mode),
                         Size::Word => self.roxr_memory::<u16>(mode),
                         Size::Long => self.roxr_memory::<u32>(mode),
-                        Size::Illegal => panic!()
+                        Size::Illegal => panic!(),
                     }
                 }
             }
@@ -2127,21 +2403,28 @@ impl<'a> Cpu<'a> {
             Opcode::RTS => {
                 self.pc = self.pop();
             }
-            Opcode::SBCD { operand_mode, src_register, dest_register } => {
+            Opcode::SBCD {
+                operand_mode,
+                src_register,
+                dest_register,
+            } => {
                 let abcd = |cpu: &mut Cpu, val: u8, operand: u8| {
-                    let binary_result = val.wrapping_sub(operand)
+                    let binary_result = val
+                        .wrapping_sub(operand)
                         .wrapping_sub(if cpu.flag(EXTEND) { 1 } else { 0 });
-                    let binary_carry = ((!val & operand)
-                        | (!val & binary_result)
-                        | (operand & binary_result))
-                        & 0x88;
+                    let binary_carry =
+                        ((!val & operand) | (!val & binary_result) | (operand & binary_result))
+                            & 0x88;
                     let correction_factor = binary_carry - (binary_carry >> 2);
                     let result = binary_result.wrapping_sub(correction_factor);
                     let carry = binary_carry.is_negative()
                         || (!binary_result.is_negative() && result.is_negative());
                     cpu.set_flag(EXTEND, carry);
                     cpu.set_flag(CARRY, carry);
-                    cpu.set_flag(OVERFLOW, binary_result.is_negative() && !result.is_negative());
+                    cpu.set_flag(
+                        OVERFLOW,
+                        binary_result.is_negative() && !result.is_negative(),
+                    );
                     if result != 0 {
                         cpu.set_flag(ZERO, false);
                     }
@@ -2156,9 +2439,12 @@ impl<'a> Cpu<'a> {
                         self.d[dest_register] = result.apply_to_register(self.d[dest_register]);
                     }
                     OperandMode::MemoryToMemory => {
-                        let operand = self.read::<u8>(AddressingMode::AddressWithPredecrement(src_register));
-                        self.read_write::<u8>(AddressingMode::AddressWithPredecrement(dest_register),
-                                              &mut |cpu, val| abcd(cpu, val, operand));
+                        let operand =
+                            self.read::<u8>(AddressingMode::AddressWithPredecrement(src_register));
+                        self.read_write::<u8>(
+                            AddressingMode::AddressWithPredecrement(dest_register),
+                            &mut |cpu, val| abcd(cpu, val, operand),
+                        );
                     }
                 }
             }
@@ -2174,17 +2460,26 @@ impl<'a> Cpu<'a> {
                 self.set_status(new_status);
                 self.stopped = true;
             }
-            Opcode::SUB { mode, size, operand_direction, register } => match size {
+            Opcode::SUB {
+                mode,
+                size,
+                operand_direction,
+                register,
+            } => match size {
                 Size::Byte => self.sub::<u8>(mode, register, operand_direction),
                 Size::Word => self.sub::<u16>(mode, register, operand_direction),
                 Size::Long => self.sub::<u32>(mode, register, operand_direction),
-                Size::Illegal => panic!()
-            }
-            Opcode::SUBA { mode, size, register } => {
+                Size::Illegal => panic!(),
+            },
+            Opcode::SUBA {
+                mode,
+                size,
+                register,
+            } => {
                 let operand = match size {
                     Size::Word => self.read::<i16>(mode) as i32,
                     Size::Long => self.read(mode),
-                    Size::Byte | Size::Illegal => panic!()
+                    Size::Byte | Size::Illegal => panic!(),
                 };
                 let result = self.addr_register(register).wrapping_add_signed(-operand);
                 self.set_addr_register(register, result);
@@ -2193,20 +2488,25 @@ impl<'a> Cpu<'a> {
                 Size::Byte => self.subi::<u8>(mode),
                 Size::Word => self.subi::<u16>(mode),
                 Size::Long => self.subi::<u32>(mode),
-                Size::Illegal => panic!()
-            }
+                Size::Illegal => panic!(),
+            },
             Opcode::SUBQ { mode, size, data } => match size {
                 Size::Byte => self.subq::<u8>(mode, data),
                 Size::Word => self.subq::<u16>(mode, data),
                 Size::Long => self.subq::<u32>(mode, data),
-                Size::Illegal => panic!()
-            }
-            Opcode::SUBX { operand_mode, size, src_register, dest_register } => match size {
+                Size::Illegal => panic!(),
+            },
+            Opcode::SUBX {
+                operand_mode,
+                size,
+                src_register,
+                dest_register,
+            } => match size {
                 Size::Byte => self.subx::<u8>(operand_mode, src_register, dest_register),
                 Size::Word => self.subx::<u16>(operand_mode, src_register, dest_register),
                 Size::Long => self.subx::<u32>(operand_mode, src_register, dest_register),
-                Size::Illegal => panic!()
-            }
+                Size::Illegal => panic!(),
+            },
             Opcode::SWAP { register } => {
                 let val = self.d[register];
                 let result = (val << 16) | (val >> 16);
@@ -2229,8 +2529,8 @@ impl<'a> Cpu<'a> {
                 Size::Byte => self.tst::<i8>(mode),
                 Size::Word => self.tst::<i16>(mode),
                 Size::Long => self.tst::<i32>(mode),
-                Size::Illegal => panic!()
-            }
+                Size::Illegal => panic!(),
+            },
             Opcode::UNLK { register } => {
                 self.set_addr_register(7, self.addr_register(register));
                 let val = self.pop();
@@ -2270,7 +2570,7 @@ impl<'a> Cpu<'a> {
 #[allow(dead_code)]
 pub mod testing {
     use m68k::Cpu;
-    use m68k::opcodes::{Opcode, opcode};
+    use m68k::opcodes::{opcode, Opcode};
 
     impl Cpu<'_> {
         pub fn expand_ram(&mut self, amount: usize) {
@@ -2285,11 +2585,25 @@ pub mod testing {
             self.ssp = ssp;
         }
 
-        pub fn verify_state(&self, pc: u32, sr: u16, d: [u32; 8], a: [u32; 8], ssp: u32,
-                            sr_mask: u16,
-                            test_id: &str) {
+        pub fn verify_state(
+            &self,
+            pc: u32,
+            sr: u16,
+            d: [u32; 8],
+            a: [u32; 8],
+            ssp: u32,
+            sr_mask: u16,
+            test_id: &str,
+        ) {
             assert_eq!(self.pc, pc, "{}   PC", test_id);
-            assert_eq!(self.status & sr_mask, sr & sr_mask, "{}   SR {:016b} {:016b}", test_id, self.status, sr);
+            assert_eq!(
+                self.status & sr_mask,
+                sr & sr_mask,
+                "{}   SR {:016b} {:016b}",
+                test_id,
+                self.status,
+                sr
+            );
             for i in 0..8 {
                 assert_eq!(self.d[i], d[i], "{}   D{}", test_id, i);
                 assert_eq!(self.a[i], a[i], "{}   A{}", test_id, i);
@@ -2306,7 +2620,13 @@ pub mod testing {
         }
 
         pub fn verify_ram(&self, addr: usize, val: u8, test_id: &str) {
-            assert_eq!(self.internal_ram[addr & 0xFFFFFF], val, "{}   {:06X}", test_id, addr);
+            assert_eq!(
+                self.internal_ram[addr & 0xFFFFFF],
+                val,
+                "{}   {:06X}",
+                test_id,
+                addr
+            );
         }
     }
 }

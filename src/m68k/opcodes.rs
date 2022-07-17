@@ -1194,14 +1194,16 @@ pub fn opcode(opcode_hex: u16) -> Opcode {
                             AddressingMode::DataRegister(_)
                             | AddressingMode::AddressRegister(_) => {
                                 let exg_mode = ExchangeMode::from_opcode(opcode_hex);
-                                if let ExchangeMode::Illegal = exg_mode { ILLEGAL } else {
+                                if let ExchangeMode::Illegal = exg_mode {
+                                    ILLEGAL
+                                } else {
                                     EXG {
                                         mode: exg_mode,
                                         src_register: register,
                                         dest_register: src_register,
                                     }
                                 }
-                            },
+                            }
                             _ if mode.is_memory_alterable() => AND {
                                 size,
                                 mode,
@@ -1697,7 +1699,9 @@ impl Display for Opcode {
                 }
                 ExchangeMode::Illegal => f.write_str("ILLEGAL"),
             },
-            Opcode::EXT { register, size } => f.write_fmt(format_args!("EXT{} D{}", size, register)),
+            Opcode::EXT { register, size } => {
+                f.write_fmt(format_args!("EXT{} D{}", size, register))
+            }
             Opcode::ILLEGAL => f.write_str("ILLEGAL"),
             Opcode::JMP { mode } => f.write_fmt(format_args!("JMP {}", mode)),
             Opcode::JSR { mode } => f.write_fmt(format_args!("JSR {}", mode)),
