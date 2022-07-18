@@ -334,7 +334,12 @@ impl<'a> Cpu<'a> {
         cpu
     }
 
-    fn tick(&mut self) {}
+    fn tick(&mut self, cycle_count: u8) {
+        for _ in 0..cycle_count {
+            self.ticks -= 1.0;
+            self.cycle_count = self.cycle_count.wrapping_add(1);
+        }
+    }
 
     fn flag(&self, flag: u16) -> bool {
         self.status & flag > 0
@@ -886,6 +891,7 @@ impl<'a> Cpu<'a> {
         self.d[register] = result.apply_to_register(self.d[register]);
         self.set_flag(NEGATIVE, result.is_negative());
         self.set_flag(ZERO, result.is_zero());
+        self.tick(2 * count);
     }
 
     fn asr_lsr_memory<Size: DataSize + Shr>(&mut self, mode: AddressingMode) {
@@ -922,17 +928,22 @@ impl<'a> Cpu<'a> {
         self.set_flag(NEGATIVE, result.is_negative());
         self.set_flag(ZERO, result.is_zero());
         self.set_flag(OVERFLOW, false);
+        self.tick(2 * count);
     }
 
     fn branch(&mut self, displacement: i8, do_branch: bool) {
         let pc = self.pc;
-        let displacement = if displacement == 0 {
+        let word_displacement = displacement == 0;
+        let displacement = if word_displacement {
             self.read_extension::<i16>() as i32
         } else {
             displacement as i32
         };
         if do_branch {
             self.pc = pc.wrapping_add_signed(displacement);
+            self.tick(2);
+        } else if word_displacement {
+            self.tick(4);
         }
     }
 
@@ -1056,6 +1067,7 @@ impl<'a> Cpu<'a> {
         self.set_flag(NEGATIVE, result.is_negative());
         self.set_flag(OVERFLOW, false);
         self.set_flag(ZERO, result.is_zero());
+        self.tick(2 * count);
     }
 
     fn move_<Size: DataSize>(&mut self, src_mode: AddressingMode, dest_mode: AddressingMode) {
@@ -1067,7 +1079,7 @@ impl<'a> Cpu<'a> {
         self.write(dest_mode, val);
     }
 
-    fn movem<Size: DataSize>(&mut self, mode: AddressingMode, direction: Direction) {
+    fn movem<Size: DataSize>(&mut self, mode: AddressingMode, direction: Direction, cycle_count_per_move: u8) {
         let register_list_mask = self.read_extension::<u16>();
         let mask_reversed = if let AddressingMode::AddressWithPredecrement(_) = mode {
             true
@@ -1135,6 +1147,7 @@ impl<'a> Cpu<'a> {
                     | AddressingMode::AddressWithPostincrement(_) => addr,
                     _ => addr + Size::address_size(),
                 };
+                self.tick(cycle_count_per_move);
             }
         }
     }
@@ -1253,6 +1266,7 @@ impl<'a> Cpu<'a> {
         self.set_flag(OVERFLOW, false);
         self.set_flag(NEGATIVE, result.is_negative());
         self.set_flag(ZERO, result.is_zero());
+        self.tick(2 * count);
     }
 
     fn ror_memory<Size: DataSize>(&mut self, mode: AddressingMode) {
@@ -1282,6 +1296,7 @@ impl<'a> Cpu<'a> {
         self.set_flag(OVERFLOW, false);
         self.set_flag(NEGATIVE, result.is_negative());
         self.set_flag(ZERO, result.is_zero());
+        self.tick(2 * count);
     }
 
     fn roxl_memory<Size: DataSize>(&mut self, mode: AddressingMode) {
@@ -1326,6 +1341,7 @@ impl<'a> Cpu<'a> {
         self.set_flag(OVERFLOW, false);
         self.set_flag(NEGATIVE, result.is_negative());
         self.set_flag(ZERO, result.is_zero());
+        self.tick(2 * count);
     }
 
     fn roxr_memory<Size: DataSize>(&mut self, mode: AddressingMode) {
@@ -1370,6 +1386,7 @@ impl<'a> Cpu<'a> {
         self.set_flag(OVERFLOW, false);
         self.set_flag(NEGATIVE, result.is_negative());
         self.set_flag(ZERO, result.is_zero());
+        self.tick(2 * count);
     }
 
     fn sub<Size: DataSize + WrappingSub>(
@@ -1866,7 +1883,11 @@ impl<'a> Cpu<'a> {
                     self.d[register] = dec_value.apply_to_register(self.d[register]);
                     if dec_value != -1 {
                         self.pc = self.pc.wrapping_add_signed((displacement - 2) as i32);
+                    } else {
+                        self.tick(4);
                     }
+                } else {
+                    self.tick(2);
                 }
             }
             Opcode::DIVS { mode, register } => {
@@ -2083,8 +2104,8 @@ impl<'a> Cpu<'a> {
                 size,
                 direction,
             } => match size {
-                Size::Word => self.movem::<u16>(mode, direction),
-                Size::Long => self.movem::<u32>(mode, direction),
+                Size::Word => self.movem::<u16>(mode, direction, 4),
+                Size::Long => self.movem::<u32>(mode, direction, 8),
                 Size::Byte | Size::Illegal => panic!(),
             },
             Opcode::MOVEP {
@@ -2451,6 +2472,7 @@ impl<'a> Cpu<'a> {
             Opcode::Scc { mode, condition } => {
                 if self.check_condition(condition) {
                     self.write::<u8>(mode, 0xFF);
+                    self.tick(2);
                 } else {
                     self.write::<u8>(mode, 0x00);
                 }
@@ -2537,6 +2559,7 @@ impl<'a> Cpu<'a> {
                 self.set_addr_register(register, val);
             }
         }
+        self.tick(opcode.cycle_count());
     }
 
     pub fn next_operation(&mut self, _inputs: &[ControllerState<8>; 2]) {

@@ -1990,3 +1990,880 @@ impl Display for Opcode {
         }
     }
 }
+
+impl Opcode {
+    pub fn cycle_count(&self) -> u8 {
+        match self {
+            Opcode::ADDI { mode, size, .. }
+            | Opcode::ANDI { mode, size, .. }
+            | Opcode::EORI { mode, size, .. }
+            | Opcode::ORI { mode, size, .. }
+            | Opcode::SUBI { mode, size, .. } => match size {
+                Size::Byte | Size::Word => match mode {
+                    AddressingMode::DataRegister(_) => 8,
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 16,
+                    AddressingMode::AddressWithPredecrement(_) => 18,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 20,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 22,
+                    AddressingMode::AbsoluteLong => 24,
+                    _ => panic!(),
+                },
+                Size::Long => match mode {
+                    AddressingMode::DataRegister(_) => 16,
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 28,
+                    AddressingMode::AddressWithPredecrement(_) => 30,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 32,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 34,
+                    AddressingMode::AbsoluteLong => 36,
+                    _ => panic!(),
+                },
+                Size::Illegal => panic!(),
+            },
+            Opcode::ANDI_to_CCR
+            | Opcode::EORI_to_CCR
+            | Opcode::ORI_to_CCR
+            | Opcode::ANDI_to_SR
+            | Opcode::EORI_to_SR
+            | Opcode::ORI_to_SR => 20,
+            Opcode::CMPI { mode, size } => match size {
+                Size::Byte | Size::Word => match mode {
+                    AddressingMode::DataRegister(_) => 8,
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 12,
+                    AddressingMode::AddressWithPredecrement(_) => 14,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 16,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 18,
+                    AddressingMode::AbsoluteLong => 20,
+                    _ => panic!(),
+                },
+                Size::Long => match mode {
+                    AddressingMode::DataRegister(_) => 14,
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 20,
+                    AddressingMode::AddressWithPredecrement(_) => 22,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 24,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 26,
+                    AddressingMode::AbsoluteLong => 28,
+                    _ => panic!(),
+                },
+                Size::Illegal => panic!(),
+            },
+            Opcode::BCHG { mode, bit_num } | Opcode::BSET { mode, bit_num } => match bit_num {
+                BitNum::Immediate => match mode {
+                    AddressingMode::DataRegister(_) => 12, // TODO: 10 if value < 16
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 16,
+                    AddressingMode::AddressWithPredecrement(_) => 18,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 20,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 22,
+                    AddressingMode::AbsoluteLong => 24,
+                    _ => panic!(),
+                },
+                BitNum::DataRegister(_) => match mode {
+                    AddressingMode::DataRegister(_) => 8, // TODO: 6 if value < 16
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 12,
+                    AddressingMode::AddressWithPredecrement(_) => 14,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 16,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 18,
+                    AddressingMode::AbsoluteLong => 20,
+                    _ => panic!(),
+                },
+            },
+            Opcode::BCLR { mode, bit_num } => match bit_num {
+                BitNum::Immediate => match mode {
+                    AddressingMode::DataRegister(_) => 14, // TODO: 12 if value < 16
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 16,
+                    AddressingMode::AddressWithPredecrement(_) => 18,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 20,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 22,
+                    AddressingMode::AbsoluteLong => 24,
+                    _ => panic!(),
+                },
+                BitNum::DataRegister(_) => match mode {
+                    AddressingMode::DataRegister(_) => 10, // TODO: 8 if value < 16
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 12,
+                    AddressingMode::AddressWithPredecrement(_) => 14,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 16,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 18,
+                    AddressingMode::AbsoluteLong => 20,
+                    _ => panic!(),
+                },
+            },
+            Opcode::BTST { mode, bit_num } => match bit_num {
+                BitNum::Immediate => match mode {
+                    AddressingMode::DataRegister(_) => 10,
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 12,
+                    AddressingMode::AddressWithPredecrement(_) => 14,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 16,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 18,
+                    AddressingMode::AbsoluteLong => 20,
+                    _ => panic!(),
+                },
+                BitNum::DataRegister(_) => match mode {
+                    AddressingMode::DataRegister(_) => 6,
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 8,
+                    AddressingMode::AddressWithPredecrement(_) => 10,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 12,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 14,
+                    AddressingMode::AbsoluteLong => 16,
+                    AddressingMode::Immediate => 10,
+                    _ => panic!(),
+                },
+            },
+            Opcode::MOVEP { size, .. } => match size {
+                Size::Word => 16,
+                Size::Long => 24,
+                _ => panic!(),
+            },
+            Opcode::MOVE {
+                size,
+                src_mode,
+                dest_mode,
+            } => match dest_mode {
+                AddressingMode::DataRegister(_) => match size {
+                    Size::Byte | Size::Word => match src_mode {
+                        AddressingMode::DataRegister(_) | AddressingMode::AddressRegister(_) => 4,
+                        AddressingMode::Address(_)
+                        | AddressingMode::AddressWithPostincrement(_) => 8,
+                        AddressingMode::AddressWithPredecrement(_) => 10,
+                        AddressingMode::AddressWithDisplacement(_)
+                        | AddressingMode::ProgramCounterWithDisplacement
+                        | AddressingMode::AbsoluteShort => 12,
+                        AddressingMode::AddressWithIndex(_)
+                        | AddressingMode::ProgramCounterWithIndex => 14,
+                        AddressingMode::AbsoluteLong => 16,
+                        AddressingMode::Immediate => 8,
+                        _ => panic!(),
+                    },
+                    Size::Long => match src_mode {
+                        AddressingMode::DataRegister(_) | AddressingMode::AddressRegister(_) => 4,
+                        AddressingMode::Address(_)
+                        | AddressingMode::AddressWithPostincrement(_) => 12,
+                        AddressingMode::AddressWithPredecrement(_) => 14,
+                        AddressingMode::AddressWithDisplacement(_)
+                        | AddressingMode::ProgramCounterWithDisplacement
+                        | AddressingMode::AbsoluteShort => 16,
+                        AddressingMode::AddressWithIndex(_)
+                        | AddressingMode::ProgramCounterWithIndex => 18,
+                        AddressingMode::AbsoluteLong => 20,
+                        AddressingMode::Immediate => 12,
+                        _ => panic!(),
+                    },
+                    Size::Illegal => panic!(),
+                },
+                AddressingMode::Address(_)
+                | AddressingMode::AddressWithPostincrement(_)
+                | AddressingMode::AddressWithPredecrement(_) => match size {
+                    Size::Byte | Size::Word => match src_mode {
+                        AddressingMode::DataRegister(_) | AddressingMode::AddressRegister(_) => 8,
+                        AddressingMode::Address(_)
+                        | AddressingMode::AddressWithPostincrement(_) => 12,
+                        AddressingMode::AddressWithPredecrement(_) => 14,
+                        AddressingMode::AddressWithDisplacement(_)
+                        | AddressingMode::ProgramCounterWithDisplacement
+                        | AddressingMode::AbsoluteShort => 16,
+                        AddressingMode::AddressWithIndex(_)
+                        | AddressingMode::ProgramCounterWithIndex => 18,
+                        AddressingMode::AbsoluteLong => 20,
+                        AddressingMode::Immediate => 12,
+                        _ => panic!(),
+                    },
+                    Size::Long => match src_mode {
+                        AddressingMode::DataRegister(_) | AddressingMode::AddressRegister(_) => 12,
+                        AddressingMode::Address(_)
+                        | AddressingMode::AddressWithPostincrement(_) => 20,
+                        AddressingMode::AddressWithPredecrement(_) => 22,
+                        AddressingMode::AddressWithDisplacement(_)
+                        | AddressingMode::ProgramCounterWithDisplacement
+                        | AddressingMode::AbsoluteShort => 24,
+                        AddressingMode::AddressWithIndex(_)
+                        | AddressingMode::ProgramCounterWithIndex => 26,
+                        AddressingMode::AbsoluteLong => 28,
+                        AddressingMode::Immediate => 20,
+                        _ => panic!(),
+                    },
+                    Size::Illegal => panic!(),
+                },
+                AddressingMode::AddressWithDisplacement(_)
+                | AddressingMode::ProgramCounterWithDisplacement
+                | AddressingMode::AbsoluteShort => match size {
+                    Size::Byte | Size::Word => match src_mode {
+                        AddressingMode::DataRegister(_) | AddressingMode::AddressRegister(_) => 12,
+                        AddressingMode::Address(_)
+                        | AddressingMode::AddressWithPostincrement(_) => 16,
+                        AddressingMode::AddressWithPredecrement(_) => 18,
+                        AddressingMode::AddressWithDisplacement(_)
+                        | AddressingMode::ProgramCounterWithDisplacement
+                        | AddressingMode::AbsoluteShort => 20,
+                        AddressingMode::AddressWithIndex(_)
+                        | AddressingMode::ProgramCounterWithIndex => 22,
+                        AddressingMode::AbsoluteLong => 24,
+                        AddressingMode::Immediate => 16,
+                        _ => panic!(),
+                    },
+                    Size::Long => match src_mode {
+                        AddressingMode::DataRegister(_) | AddressingMode::AddressRegister(_) => 16,
+                        AddressingMode::Address(_)
+                        | AddressingMode::AddressWithPostincrement(_) => 24,
+                        AddressingMode::AddressWithPredecrement(_) => 26,
+                        AddressingMode::AddressWithDisplacement(_)
+                        | AddressingMode::ProgramCounterWithDisplacement
+                        | AddressingMode::AbsoluteShort => 28,
+                        AddressingMode::AddressWithIndex(_)
+                        | AddressingMode::ProgramCounterWithIndex => 30,
+                        AddressingMode::AbsoluteLong => 32,
+                        AddressingMode::Immediate => 24,
+                        _ => panic!(),
+                    },
+                    Size::Illegal => panic!(),
+                },
+                AddressingMode::AddressWithIndex(_) | AddressingMode::ProgramCounterWithIndex => {
+                    match size {
+                        Size::Byte | Size::Word => match src_mode {
+                            AddressingMode::DataRegister(_)
+                            | AddressingMode::AddressRegister(_) => 14,
+                            AddressingMode::Address(_)
+                            | AddressingMode::AddressWithPostincrement(_) => 18,
+                            AddressingMode::AddressWithPredecrement(_) => 20,
+                            AddressingMode::AddressWithDisplacement(_)
+                            | AddressingMode::ProgramCounterWithDisplacement
+                            | AddressingMode::AbsoluteShort => 22,
+                            AddressingMode::AddressWithIndex(_)
+                            | AddressingMode::ProgramCounterWithIndex => 24,
+                            AddressingMode::AbsoluteLong => 26,
+                            AddressingMode::Immediate => 18,
+                            _ => panic!(),
+                        },
+                        Size::Long => match src_mode {
+                            AddressingMode::DataRegister(_)
+                            | AddressingMode::AddressRegister(_) => 18,
+                            AddressingMode::Address(_)
+                            | AddressingMode::AddressWithPostincrement(_) => 26,
+                            AddressingMode::AddressWithPredecrement(_) => 28,
+                            AddressingMode::AddressWithDisplacement(_)
+                            | AddressingMode::AbsoluteShort => 30,
+                            AddressingMode::AddressWithIndex(_)
+                            | AddressingMode::ProgramCounterWithIndex => 32,
+                            AddressingMode::AbsoluteLong => 34,
+                            AddressingMode::Immediate => 26,
+                            _ => panic!(),
+                        },
+                        Size::Illegal => panic!(),
+                    }
+                }
+                AddressingMode::AbsoluteLong => match size {
+                    Size::Byte | Size::Word => match src_mode {
+                        AddressingMode::DataRegister(_) | AddressingMode::AddressRegister(_) => 16,
+                        AddressingMode::Address(_)
+                        | AddressingMode::AddressWithPostincrement(_) => 20,
+                        AddressingMode::AddressWithPredecrement(_) => 22,
+                        AddressingMode::AddressWithDisplacement(_)
+                        | AddressingMode::ProgramCounterWithDisplacement
+                        | AddressingMode::AbsoluteShort => 24,
+                        AddressingMode::AddressWithIndex(_)
+                        | AddressingMode::ProgramCounterWithIndex => 26,
+                        AddressingMode::AbsoluteLong => 28,
+                        AddressingMode::Immediate => 20,
+                        _ => panic!(),
+                    },
+                    Size::Long => match src_mode {
+                        AddressingMode::DataRegister(_) | AddressingMode::AddressRegister(_) => 20,
+                        AddressingMode::Address(_)
+                        | AddressingMode::AddressWithPostincrement(_) => 28,
+                        AddressingMode::AddressWithPredecrement(_) => 30,
+                        AddressingMode::AddressWithDisplacement(_)
+                        | AddressingMode::ProgramCounterWithDisplacement
+                        | AddressingMode::AbsoluteShort => 32,
+                        AddressingMode::AddressWithIndex(_)
+                        | AddressingMode::ProgramCounterWithIndex => 34,
+                        AddressingMode::AbsoluteLong => 36,
+                        AddressingMode::Immediate => 28,
+                        _ => panic!(),
+                    },
+                    Size::Illegal => panic!(),
+                },
+                _ => panic!(),
+            },
+            Opcode::MOVEA { size, src_mode, .. } => match size {
+                Size::Byte | Size::Word => match src_mode {
+                    AddressingMode::DataRegister(_) | AddressingMode::AddressRegister(_) => 4,
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 8,
+                    AddressingMode::AddressWithPredecrement(_) => 10,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 12,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 14,
+                    AddressingMode::AbsoluteLong => 16,
+                    AddressingMode::Immediate => 8,
+                    _ => panic!(),
+                },
+                Size::Long => match src_mode {
+                    AddressingMode::DataRegister(_) | AddressingMode::AddressRegister(_) => 4,
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 12,
+                    AddressingMode::AddressWithPredecrement(_) => 14,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 16,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 18,
+                    AddressingMode::AbsoluteLong => 20,
+                    AddressingMode::Immediate => 12,
+                    _ => panic!(),
+                },
+                Size::Illegal => panic!(),
+            },
+            Opcode::CLR { size, mode }
+            | Opcode::NEGX { size, mode }
+            | Opcode::NEG { size, mode }
+            | Opcode::NOT { size, mode } => match size {
+                Size::Byte | Size::Word => match mode {
+                    AddressingMode::DataRegister(_) => 4,
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 12,
+                    AddressingMode::AddressWithPredecrement(_) => 14,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 16,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 18,
+                    AddressingMode::AbsoluteLong => 20,
+                    _ => panic!(),
+                },
+                Size::Long => match mode {
+                    AddressingMode::DataRegister(_) => 6,
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 20,
+                    AddressingMode::AddressWithPredecrement(_) => 22,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 24,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 26,
+                    AddressingMode::AbsoluteLong => 28,
+                    _ => panic!(),
+                },
+                Size::Illegal => panic!(),
+            },
+            Opcode::MOVE_from_SR { mode } => match mode {
+                AddressingMode::DataRegister(_) => 6,
+                AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 12,
+                AddressingMode::AddressWithPredecrement(_) => 14,
+                AddressingMode::AddressWithDisplacement(_)
+                | AddressingMode::ProgramCounterWithDisplacement
+                | AddressingMode::AbsoluteShort => 16,
+                AddressingMode::AddressWithIndex(_) | AddressingMode::ProgramCounterWithIndex => 18,
+                AddressingMode::AbsoluteLong => 20,
+                _ => panic!(),
+            },
+            Opcode::MOVE_to_CCR { mode } | Opcode::MOVE_to_SR { mode } => match mode {
+                AddressingMode::DataRegister(_) => 12,
+                AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 16,
+                AddressingMode::AddressWithPredecrement(_) => 18,
+                AddressingMode::AddressWithDisplacement(_)
+                | AddressingMode::ProgramCounterWithDisplacement
+                | AddressingMode::AbsoluteShort => 20,
+                AddressingMode::AddressWithIndex(_) | AddressingMode::ProgramCounterWithIndex => 22,
+                AddressingMode::AbsoluteLong => 24,
+                AddressingMode::Immediate => 16,
+                _ => panic!(),
+            },
+            Opcode::NBCD { mode } => match mode {
+                AddressingMode::DataRegister(_) => 6,
+                AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 12,
+                AddressingMode::AddressWithPredecrement(_) => 14,
+                AddressingMode::AddressWithDisplacement(_)
+                | AddressingMode::ProgramCounterWithDisplacement
+                | AddressingMode::AbsoluteShort => 16,
+                AddressingMode::AddressWithIndex(_) | AddressingMode::ProgramCounterWithIndex => 18,
+                AddressingMode::AbsoluteLong => 20,
+                _ => panic!(),
+            },
+            Opcode::PEA { mode } => match mode {
+                AddressingMode::Address(_) => 12,
+                AddressingMode::AddressWithDisplacement(_)
+                | AddressingMode::ProgramCounterWithDisplacement
+                | AddressingMode::AbsoluteShort => 16,
+                AddressingMode::AddressWithIndex(_)
+                | AddressingMode::ProgramCounterWithIndex
+                | AddressingMode::AbsoluteLong => 20,
+                _ => panic!(),
+            },
+            Opcode::SWAP { .. }
+            | Opcode::EXT { .. }
+            | Opcode::MOVE_USP { .. }
+            | Opcode::NOP
+            | Opcode::STOP
+            | Opcode::TRAP { .. }
+            | Opcode::TRAPV
+            | Opcode::ILLEGAL
+            | Opcode::MOVEQ { .. } => 4,
+            Opcode::MOVEM {
+                mode, direction, ..
+            } => match direction {
+                Direction::RegisterToMemory => match mode {
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPredecrement(_) => 8,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 12,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 14,
+                    AddressingMode::AbsoluteLong => 16,
+                    _ => panic!(),
+                },
+                Direction::MemoryToRegister => match mode {
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 12,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 16,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 18,
+                    AddressingMode::AbsoluteLong => 20,
+                    _ => panic!(),
+                },
+            },
+            Opcode::TST { mode, size } => match size {
+                Size::Byte | Size::Word => match mode {
+                    AddressingMode::DataRegister(_) => 4,
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 8,
+                    AddressingMode::AddressWithPredecrement(_) => 10,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 12,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 14,
+                    AddressingMode::AbsoluteLong => 16,
+                    _ => panic!(),
+                },
+                Size::Long => match mode {
+                    AddressingMode::DataRegister(_) => 4,
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 12,
+                    AddressingMode::AddressWithPredecrement(_) => 14,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 16,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 18,
+                    AddressingMode::AbsoluteLong => 20,
+                    _ => panic!(),
+                },
+                Size::Illegal => panic!(),
+            },
+            Opcode::TAS { mode } => match mode {
+                AddressingMode::DataRegister(_) => 4,
+                AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 8,
+                AddressingMode::AddressWithPredecrement(_) => 10,
+                AddressingMode::AddressWithDisplacement(_)
+                | AddressingMode::ProgramCounterWithDisplacement
+                | AddressingMode::AbsoluteShort => 12,
+                AddressingMode::AddressWithIndex(_) | AddressingMode::ProgramCounterWithIndex => 14,
+                AddressingMode::AbsoluteLong => 16,
+                _ => panic!(),
+            },
+            Opcode::CHK { mode, .. } => match mode {
+                AddressingMode::DataRegister(_) => 10,
+                AddressingMode::Address(_)
+                | AddressingMode::AddressWithPostincrement(_)
+                | AddressingMode::Immediate => 14,
+                AddressingMode::AddressWithPredecrement(_) => 16,
+                AddressingMode::AddressWithDisplacement(_)
+                | AddressingMode::ProgramCounterWithDisplacement
+                | AddressingMode::AbsoluteShort => 18,
+                AddressingMode::AddressWithIndex(_)
+                | AddressingMode::ProgramCounterWithIndex
+                | AddressingMode::AbsoluteLong => 20,
+                _ => panic!(),
+            },
+            Opcode::LEA { mode, .. } => match mode {
+                AddressingMode::Address(_) => 4,
+                AddressingMode::AddressWithDisplacement(_)
+                | AddressingMode::ProgramCounterWithDisplacement
+                | AddressingMode::AbsoluteShort => 8,
+                AddressingMode::AddressWithIndex(_)
+                | AddressingMode::ProgramCounterWithIndex
+                | AddressingMode::AbsoluteLong => 12,
+                _ => panic!(),
+            },
+            Opcode::JSR { mode, .. } => match mode {
+                AddressingMode::Address(_) => 16,
+                AddressingMode::AddressWithDisplacement(_)
+                | AddressingMode::ProgramCounterWithDisplacement
+                | AddressingMode::AbsoluteShort => 18,
+                AddressingMode::AddressWithIndex(_) | AddressingMode::ProgramCounterWithIndex => 22,
+                AddressingMode::AbsoluteLong => 20,
+                _ => panic!(),
+            },
+            Opcode::JMP { mode, .. } => match mode {
+                AddressingMode::Address(_) => 8,
+                AddressingMode::AddressWithDisplacement(_)
+                | AddressingMode::ProgramCounterWithDisplacement
+                | AddressingMode::AbsoluteShort => 10,
+                AddressingMode::AddressWithIndex(_) | AddressingMode::ProgramCounterWithIndex => 14,
+                AddressingMode::AbsoluteLong => 12,
+                _ => panic!(),
+            },
+            Opcode::RESET => 132,
+            Opcode::RTE | Opcode::RTR => 20,
+            Opcode::RTS | Opcode::LINK { .. } => 16,
+            Opcode::UNLK { .. } => 12,
+            Opcode::ADDQ { mode, size, .. } | Opcode::SUBQ { mode, size, .. } => match size {
+                Size::Byte | Size::Word => match mode {
+                    AddressingMode::DataRegister(_) => 4,
+                    AddressingMode::AddressRegister(_) => 8,
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 12,
+                    AddressingMode::AddressWithPredecrement(_) => 14,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 16,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 18,
+                    AddressingMode::AbsoluteLong => 20,
+                    _ => panic!(),
+                },
+                Size::Long => match mode {
+                    AddressingMode::DataRegister(_) => 8,
+                    AddressingMode::AddressRegister(_) => 8,
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 20,
+                    AddressingMode::AddressWithPredecrement(_) => 22,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 24,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 26,
+                    AddressingMode::AbsoluteLong => 28,
+                    _ => panic!(),
+                },
+                Size::Illegal => panic!(),
+            },
+            Opcode::DBcc { .. } => 10,
+            Opcode::Scc { mode, .. } => match mode {
+                AddressingMode::DataRegister(_) => 4,
+                AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 12,
+                AddressingMode::AddressWithPredecrement(_) => 14,
+                AddressingMode::AddressWithDisplacement(_)
+                | AddressingMode::ProgramCounterWithDisplacement
+                | AddressingMode::AbsoluteShort => 16,
+                AddressingMode::AddressWithIndex(_) | AddressingMode::ProgramCounterWithIndex => 18,
+                AddressingMode::AbsoluteLong => 20,
+                _ => panic!(),
+            },
+            Opcode::BRA { .. } | Opcode::Bcc { .. } => 8,
+            Opcode::BSR { .. } => 16,
+            Opcode::ABCD { operand_mode, .. } | Opcode::SBCD { operand_mode, .. } => {
+                match operand_mode {
+                    OperandMode::RegisterToRegister => 6,
+                    OperandMode::MemoryToMemory => 18,
+                }
+            }
+            Opcode::AND {
+                mode,
+                size,
+                operand_direction,
+                ..
+            }
+            | Opcode::OR {
+                mode,
+                size,
+                operand_direction,
+                ..
+            }
+            | Opcode::ADD {
+                mode,
+                size,
+                operand_direction,
+                ..
+            }
+            | Opcode::SUB {
+                mode,
+                size,
+                operand_direction,
+                ..
+            } => match operand_direction {
+                OperandDirection::ToRegister => match size {
+                    Size::Byte | Size::Word => match mode {
+                        AddressingMode::DataRegister(_) | AddressingMode::AddressRegister(_) => 4,
+                        AddressingMode::Address(_)
+                        | AddressingMode::AddressWithPostincrement(_) => 8,
+                        AddressingMode::AddressWithPredecrement(_) => 10,
+                        AddressingMode::AddressWithDisplacement(_)
+                        | AddressingMode::ProgramCounterWithDisplacement
+                        | AddressingMode::AbsoluteShort => 12,
+                        AddressingMode::AddressWithIndex(_)
+                        | AddressingMode::ProgramCounterWithIndex => 14,
+                        AddressingMode::AbsoluteLong => 16,
+                        AddressingMode::Immediate => 8,
+                        _ => panic!(),
+                    },
+                    Size::Long => match mode {
+                        AddressingMode::DataRegister(_) | AddressingMode::AddressRegister(_) => 8,
+                        AddressingMode::Address(_)
+                        | AddressingMode::AddressWithPostincrement(_) => 14,
+                        AddressingMode::AddressWithPredecrement(_) => 16,
+                        AddressingMode::AddressWithDisplacement(_)
+                        | AddressingMode::ProgramCounterWithDisplacement
+                        | AddressingMode::AbsoluteShort => 18,
+                        AddressingMode::AddressWithIndex(_)
+                        | AddressingMode::ProgramCounterWithIndex => 20,
+                        AddressingMode::AbsoluteLong => 22,
+                        AddressingMode::Immediate => 16,
+                        _ => panic!(),
+                    },
+                    Size::Illegal => panic!(),
+                },
+                OperandDirection::ToMemory => match size {
+                    Size::Byte | Size::Word => match mode {
+                        AddressingMode::Address(_)
+                        | AddressingMode::AddressWithPostincrement(_) => 12,
+                        AddressingMode::AddressWithPredecrement(_) => 14,
+                        AddressingMode::AddressWithDisplacement(_)
+                        | AddressingMode::ProgramCounterWithDisplacement
+                        | AddressingMode::AbsoluteShort => 16,
+                        AddressingMode::AddressWithIndex(_)
+                        | AddressingMode::ProgramCounterWithIndex => 18,
+                        AddressingMode::AbsoluteLong => 20,
+                        _ => panic!(),
+                    },
+                    Size::Long => match mode {
+                        AddressingMode::Address(_)
+                        | AddressingMode::AddressWithPostincrement(_) => 20,
+                        AddressingMode::AddressWithPredecrement(_) => 22,
+                        AddressingMode::AddressWithDisplacement(_)
+                        | AddressingMode::ProgramCounterWithDisplacement
+                        | AddressingMode::AbsoluteShort => 24,
+                        AddressingMode::AddressWithIndex(_)
+                        | AddressingMode::ProgramCounterWithIndex => 26,
+                        AddressingMode::AbsoluteLong => 28,
+                        _ => panic!(),
+                    },
+                    Size::Illegal => panic!(),
+                },
+            },
+            Opcode::DIVU { mode, .. } => match mode {
+                // TODO exact timings
+                AddressingMode::DataRegister(_) => 136,
+                AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 140,
+                AddressingMode::AddressWithPredecrement(_) => 142,
+                AddressingMode::AddressWithDisplacement(_)
+                | AddressingMode::ProgramCounterWithDisplacement
+                | AddressingMode::AbsoluteShort => 144,
+                AddressingMode::AddressWithIndex(_) | AddressingMode::ProgramCounterWithIndex => {
+                    146
+                }
+                AddressingMode::AbsoluteLong => 148,
+                AddressingMode::Immediate => 144,
+                _ => panic!(),
+            },
+            Opcode::DIVS { mode, .. } => match mode {
+                // TODO exact timings
+                AddressingMode::DataRegister(_) => 156,
+                AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 160,
+                AddressingMode::AddressWithPredecrement(_) => 162,
+                AddressingMode::AddressWithDisplacement(_)
+                | AddressingMode::ProgramCounterWithDisplacement
+                | AddressingMode::AbsoluteShort => 164,
+                AddressingMode::AddressWithIndex(_) | AddressingMode::ProgramCounterWithIndex => {
+                    166
+                }
+                AddressingMode::AbsoluteLong => 168,
+                AddressingMode::Immediate => 164,
+                _ => panic!(),
+            },
+            Opcode::EXG { .. } => 6,
+            Opcode::MULU { mode, .. } | Opcode::MULS { mode, .. } => match mode {
+                // TODO exact timings
+                AddressingMode::DataRegister(_) => 70,
+                AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 74,
+                AddressingMode::AddressWithPredecrement(_) => 76,
+                AddressingMode::AddressWithDisplacement(_)
+                | AddressingMode::ProgramCounterWithDisplacement
+                | AddressingMode::AbsoluteShort => 78,
+                AddressingMode::AddressWithIndex(_) | AddressingMode::ProgramCounterWithIndex => 80,
+                AddressingMode::AbsoluteLong => 82,
+                AddressingMode::Immediate => 78,
+                _ => panic!(),
+            },
+            Opcode::ADDA { mode, size, .. } | Opcode::SUBA { mode, size, .. } => match size {
+                Size::Byte | Size::Word => match mode {
+                    AddressingMode::DataRegister(_) | AddressingMode::AddressRegister(_) => 8,
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 12,
+                    AddressingMode::AddressWithPredecrement(_) => 14,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 16,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 18,
+                    AddressingMode::AbsoluteLong => 20,
+                    AddressingMode::Immediate => 12,
+                    _ => panic!(),
+                },
+                Size::Long => match mode {
+                    AddressingMode::DataRegister(_) | AddressingMode::AddressRegister(_) => 8,
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 14,
+                    AddressingMode::AddressWithPredecrement(_) => 16,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 18,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 20,
+                    AddressingMode::AbsoluteLong => 22,
+                    AddressingMode::Immediate => 16,
+                    _ => panic!(),
+                },
+                Size::Illegal => panic!(),
+            },
+            Opcode::ADDX {
+                operand_mode, size, ..
+            }
+            | Opcode::SUBX {
+                operand_mode, size, ..
+            } => match operand_mode {
+                OperandMode::RegisterToRegister => match size {
+                    Size::Byte | Size::Word => 4,
+                    Size::Long => 8,
+                    Size::Illegal => panic!(),
+                },
+                OperandMode::MemoryToMemory => match size {
+                    Size::Byte | Size::Word => 18,
+                    Size::Long => 30,
+                    Size::Illegal => panic!(),
+                },
+            },
+            Opcode::CMP { mode, size, .. } => match size {
+                Size::Byte | Size::Word => match mode {
+                    AddressingMode::DataRegister(_) | AddressingMode::AddressRegister(_) => 4,
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 8,
+                    AddressingMode::AddressWithPredecrement(_) => 10,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 12,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 14,
+                    AddressingMode::AbsoluteLong => 16,
+                    AddressingMode::Immediate => 8,
+                    _ => panic!(),
+                },
+                Size::Long => match mode {
+                    AddressingMode::DataRegister(_) | AddressingMode::AddressRegister(_) => 6,
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 14,
+                    AddressingMode::AddressWithPredecrement(_) => 16,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 18,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 20,
+                    AddressingMode::AbsoluteLong => 22,
+                    AddressingMode::Immediate => 14,
+                    _ => panic!(),
+                },
+                Size::Illegal => panic!(),
+            },
+            Opcode::CMPA { mode, size, .. } => match size {
+                Size::Byte | Size::Word => match mode {
+                    AddressingMode::DataRegister(_) | AddressingMode::AddressRegister(_) => 6,
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 10,
+                    AddressingMode::AddressWithPredecrement(_) => 12,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 14,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 16,
+                    AddressingMode::AbsoluteLong => 18,
+                    AddressingMode::Immediate => 10,
+                    _ => panic!(),
+                },
+                Size::Long => match mode {
+                    AddressingMode::DataRegister(_) | AddressingMode::AddressRegister(_) => 6,
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 14,
+                    AddressingMode::AddressWithPredecrement(_) => 16,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 18,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 20,
+                    AddressingMode::AbsoluteLong => 22,
+                    AddressingMode::Immediate => 14,
+                    _ => panic!(),
+                },
+                Size::Illegal => panic!(),
+            },
+            Opcode::CMPM { size, .. } => match size {
+                Size::Byte | Size::Word => 12,
+                Size::Long => 20,
+                Size::Illegal => panic!(),
+            },
+            Opcode::EOR { size, mode, .. } => match size {
+                Size::Byte | Size::Word => match mode {
+                    AddressingMode::DataRegister(_) => 4,
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 12,
+                    AddressingMode::AddressWithPredecrement(_) => 14,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 16,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 18,
+                    AddressingMode::AbsoluteLong => 20,
+                    _ => panic!(),
+                },
+                Size::Long => match mode {
+                    AddressingMode::DataRegister(_) => 8,
+                    AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 20,
+                    AddressingMode::AddressWithPredecrement(_) => 22,
+                    AddressingMode::AddressWithDisplacement(_)
+                    | AddressingMode::ProgramCounterWithDisplacement
+                    | AddressingMode::AbsoluteShort => 24,
+                    AddressingMode::AddressWithIndex(_)
+                    | AddressingMode::ProgramCounterWithIndex => 26,
+                    AddressingMode::AbsoluteLong => 28,
+                    _ => panic!(),
+                },
+                Size::Illegal => panic!(),
+            },
+            Opcode::ASL { mode, size, .. }
+            | Opcode::ASR { mode, size, .. }
+            | Opcode::LSL { mode, size, .. }
+            | Opcode::LSR { mode, size, .. }
+            | Opcode::ROL { mode, size, .. }
+            | Opcode::ROR { mode, size, .. }
+            | Opcode::ROXL { mode, size, .. }
+            | Opcode::ROXR { mode, size, .. } => match mode {
+                AddressingMode::Address(_) | AddressingMode::AddressWithPostincrement(_) => 12,
+                AddressingMode::AddressWithPredecrement(_) => 14,
+                AddressingMode::AddressWithDisplacement(_)
+                | AddressingMode::ProgramCounterWithDisplacement
+                | AddressingMode::AbsoluteShort => 16,
+                AddressingMode::AddressWithIndex(_) | AddressingMode::ProgramCounterWithIndex => 18,
+                AddressingMode::AbsoluteLong => 20,
+                _ => match size {
+                    Size::Byte | Size::Word => 6,
+                    Size::Long => 8,
+                    Size::Illegal => panic!(),
+                },
+            },
+        }
+    }
+}
