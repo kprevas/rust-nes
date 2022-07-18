@@ -1619,6 +1619,13 @@ impl<'a> Cpu<'a> {
 
         let opcode = opcode(opcode_hex);
 
+        if self.instrumented {
+            debug!(target: "cpu", "{:08X}\t{:04X}\t{}",
+            opcode_pc,
+            opcode_hex,
+            opcode);
+        }
+
         match opcode {
             Opcode::ABCD {
                 operand_mode,
