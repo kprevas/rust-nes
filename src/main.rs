@@ -21,6 +21,7 @@ fn main() {
         )
         (@subcommand m68k =>
             (about: "blast processing")
+            (@arg INPUT: "the input file to use")
             (@arg instrument_cpu: -c "instruments CPU")
             (@arg bench_mode: -b "runs in benchmark mode")
         )

@@ -43,6 +43,7 @@ pub mod m68k;
 pub mod menu;
 pub mod ppu;
 pub mod record;
+pub mod md_cartridge;
 
 pub fn run(matches: ArgMatches) {
     if let Some(matches) = matches.subcommand_matches("disassemble") {
@@ -209,7 +210,16 @@ pub fn run(matches: ArgMatches) {
         let mut inputs = [input::player_1_nes(), input::player_2_nes()];
 
         let instrument_cpu = matches.is_present("instrument_cpu");
-        let cartridge = vec![0u8; 0x400000].into_boxed_slice();
+
+        let mut cartridge;
+        let save_path;
+        if let Some((c, s)) = load_md_cartridge(matches) {
+            cartridge = c;
+            save_path = s;
+        } else {
+            return;
+        }
+
         let mut cpu = m68k::Cpu::boot(&cartridge, instrument_cpu);
 
         while let Some(e) = window.next() {
@@ -243,6 +253,42 @@ fn load_cartridge(matches: &ArgMatches) -> Option<(Cartridge, PathBuf)> {
                 .join(input_file.file_name().unwrap())
                 .with_extension("sav");
             match cartridge::read(
+                File::open(input_file).as_mut().unwrap(),
+                match File::open(save_path.as_path()) {
+                    Ok(ref mut file) => Some(file),
+                    Err(_) => None,
+                },
+            ) {
+                Ok(c) => break c,
+                Err(e) => {
+                    if matches.is_present("INPUT") {
+                        panic!("{}", e);
+                    }
+                }
+            };
+        } else {
+            return None;
+        }
+    };
+    Some((cartridge, save_path))
+}
+
+fn load_md_cartridge(matches: &ArgMatches) -> Option<(Box<[u8]>, PathBuf)> {
+    let mut save_path: PathBuf;
+    let cartridge: Box<[u8]> = loop {
+        let input_file = match matches.value_of("INPUT") {
+            Some(i) => Some(PathBuf::from(i)),
+            None => match nfd::open_file_dialog(None, None).unwrap() {
+                Response::Okay(p) => Some(PathBuf::from(p)),
+                Response::OkayMultiple(v) => Some(PathBuf::from(&v[0])),
+                Response::Cancel => None,
+            },
+        };
+        if let Some(input_file) = input_file {
+            save_path = PathBuf::from(".")
+                .join(input_file.file_name().unwrap())
+                .with_extension("sav");
+            match md_cartridge::read(
                 File::open(input_file).as_mut().unwrap(),
                 match File::open(save_path.as_path()) {
                     Ok(ref mut file) => Some(file),
