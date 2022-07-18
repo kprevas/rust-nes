@@ -678,6 +678,14 @@ impl<'a> Cpu<'a> {
         self.push(self.status);
         self.pc = self.read_addr(vector * 4);
         self.set_flag(SUPERVISOR_MODE, true);
+        self.tick(match vector {
+            2 | 3 => 50,
+            6 => 40,
+            4 | 7 | 8 | 32..48 => 34,
+            15..32 => 44,
+            5 => 38,
+            _ => 0,
+        })
     }
 
     fn add<Size: DataSize + WrappingAdd>(
