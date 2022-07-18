@@ -209,7 +209,8 @@ pub fn run(matches: ArgMatches) {
         let mut inputs = [input::player_1_nes(), input::player_2_nes()];
 
         let instrument_cpu = matches.is_present("instrument_cpu");
-        let mut cpu = m68k::Cpu::boot(instrument_cpu);
+        let cartridge = vec![0u8; 0x400000].into_boxed_slice();
+        let mut cpu = m68k::Cpu::boot(&cartridge, instrument_cpu);
 
         while let Some(e) = window.next() {
             if let Some(u) = e.update_args() {

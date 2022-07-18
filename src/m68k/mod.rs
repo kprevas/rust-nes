@@ -288,6 +288,7 @@ pub struct Cpu<'a> {
     d: [u32; 8],
     status: u16,
     pc: u32,
+    cartridge: &'a Box<[u8]>,
     internal_ram: Box<[u8]>,
     ticks: f64,
     instrumented: bool,
@@ -295,6 +296,8 @@ pub struct Cpu<'a> {
     stopped: bool,
 
     pub speed_adj: f64,
+
+    test_ram_only: bool,
 
     phantom: PhantomData<&'a u8>,
 }
@@ -313,19 +316,21 @@ const INTERRUPT_SHIFT: u16 = 8;
 const SR_MASK: u16 = 0b1010011100011111;
 
 impl<'a> Cpu<'a> {
-    pub fn boot<'b>(instrumented: bool) -> Cpu<'b> {
+    pub fn boot(cartridge: &Box<[u8]>, instrumented: bool) -> Cpu {
         let mut cpu = Cpu {
             a: [0, 0, 0, 0, 0, 0, 0, 0],
             ssp: 0,
             d: [0, 0, 0, 0, 0, 0, 0, 0],
             status: 0,
             pc: 0,
+            cartridge,
             internal_ram: vec![0; 0x10000].into_boxed_slice(),
             ticks: 0.0,
             instrumented,
             cycle_count: 0,
             stopped: false,
             speed_adj: 1.0,
+            test_ram_only: false,
             phantom: PhantomData,
         };
 
@@ -393,19 +398,42 @@ impl<'a> Cpu<'a> {
     }
 
     fn read_addr_no_tick<Size: DataSize>(&mut self, addr: u32) -> Size {
-        let addr = addr & 0xFFFFFF;
-        Size::from_memory_bytes(
-            &self.internal_ram[(addr as usize)..((addr + Size::address_size()) as usize)],
-        )
+        self.read_addr_offset_size(addr & 0xFFFFFF, 0, Size::word_aligned_address_size())
     }
 
     fn read_addr_word_aligned_no_tick<Size: DataSize>(&mut self, addr: u32) -> Size {
-        let addr = addr & 0xFFFFFF;
-        let addr_size = Size::word_aligned_address_size();
-        let addr_offset = Size::word_aligned_address_size() - Size::address_size();
-        Size::from_memory_bytes(
-            &self.internal_ram[((addr + addr_offset) as usize)..((addr + addr_size) as usize)],
+        self.read_addr_offset_size(
+            addr & 0xFFFFFF,
+            Size::word_aligned_address_size() - Size::address_size(),
+            Size::word_aligned_address_size(),
         )
+    }
+
+    fn read_addr_offset_size<Size: DataSize>(&mut self, addr: u32, offset: u32, size: u32) -> Size {
+        if self.test_ram_only {
+            Size::from_memory_bytes(
+                &self.internal_ram[((addr + offset) as usize)..((addr + size) as usize)],
+            )
+        } else {
+            match addr {
+                0x000000..=0x3FFFFF => Size::from_memory_bytes(
+                    &self.cartridge[((addr + offset) as usize)..((addr + size) as usize)],
+                ),
+                0x400000..=0x7FFFFF => Size::from(0).unwrap(), // Expansion port
+                0xA00000..=0xA0FFFF => Size::from(0).unwrap(), // Z80 Area
+                0xA10000..=0xA10FFF => Size::from(0).unwrap(), // IO Registers
+                0xA11000..=0xA11FFF => Size::from(0).unwrap(), // Z80 Control
+                0xC00000..=0xDFFFFF => Size::from(0).unwrap(), // VDP Ports
+                0xE00000..=0xFFFFFF => {
+                    let ram_addr = addr & 0xFFFF;
+                    Size::from_memory_bytes(
+                        &self.internal_ram
+                            [((ram_addr + offset) as usize)..((ram_addr + size) as usize)],
+                    )
+                }
+                _ => panic!(),
+            }
+        }
     }
 
     fn write_addr<Size: DataSize>(&mut self, addr: u32, val: Size) {
@@ -417,19 +445,48 @@ impl<'a> Cpu<'a> {
     }
 
     fn write_addr_no_tick<Size: DataSize>(&mut self, addr: u32, val: Size) {
-        let addr = addr & 0xFFFFFF;
-        val.set_memory_bytes(
-            &mut self.internal_ram[(addr as usize)..((addr + Size::address_size()) as usize)],
-        )
+        self.write_addr_offset_size(addr & 0xFFFFFF, 0, Size::address_size(), val);
     }
 
     fn write_addr_word_aligned_no_tick<Size: DataSize>(&mut self, addr: u32, val: Size) {
-        let addr = addr & 0xFFFFFF;
-        let addr_size = Size::word_aligned_address_size();
-        let addr_offset = Size::word_aligned_address_size() - Size::address_size();
-        val.set_memory_bytes(
-            &mut self.internal_ram[((addr + addr_offset) as usize)..((addr + addr_size) as usize)],
-        )
+        self.write_addr_offset_size(
+            addr & 0xFFFFFF,
+            Size::word_aligned_address_size() - Size::address_size(),
+            Size::word_aligned_address_size(),
+            val,
+        );
+    }
+
+    fn write_addr_offset_size<Size: DataSize>(
+        &mut self,
+        addr: u32,
+        offset: u32,
+        size: u32,
+        val: Size,
+    ) {
+        if self.test_ram_only {
+            val.set_memory_bytes(
+                &mut self.internal_ram
+                    [((addr + offset) as usize)..((addr + size) as usize)],
+            );
+        } else {
+            match addr {
+                0x000000..=0x3FFFFF => {} // Vector table, ROM Cartridge
+                0x400000..=0x7FFFFF => {} // Expansion port
+                0xA00000..=0xA0FFFF => {} // Z80 Area
+                0xA10000..=0xA10FFF => {} // IO Registers
+                0xA11000..=0xA11FFF => {} // Z80 Control
+                0xC00000..=0xDFFFFF => {} // VDP Ports
+                0xE00000..=0xFFFFFF => {
+                    let ram_addr = addr & 0xFFFF;
+                    val.set_memory_bytes(
+                        &mut self.internal_ram
+                            [((ram_addr + offset) as usize)..((ram_addr + size) as usize)],
+                    );
+                }
+                _ => panic!(),
+            }
+        }
     }
 
     fn addr_register(&self, register: usize) -> u32 {
@@ -681,8 +738,8 @@ impl<'a> Cpu<'a> {
         self.tick(match vector {
             2 | 3 => 50,
             6 => 40,
-            4 | 7 | 8 | 32..48 => 34,
-            15..32 => 44,
+            4 | 7 | 8 | 32..=47 => 34,
+            15..=31 => 44,
             5 => 38,
             _ => 0,
         })
@@ -1087,7 +1144,12 @@ impl<'a> Cpu<'a> {
         self.write(dest_mode, val);
     }
 
-    fn movem<Size: DataSize>(&mut self, mode: AddressingMode, direction: Direction, cycle_count_per_move: u8) {
+    fn movem<Size: DataSize>(
+        &mut self,
+        mode: AddressingMode,
+        direction: Direction,
+        cycle_count_per_move: u8,
+    ) {
         let register_list_mask = self.read_extension::<u16>();
         let mask_reversed = if let AddressingMode::AddressWithPredecrement(_) = mode {
             true
@@ -2606,6 +2668,7 @@ pub mod testing {
     impl Cpu<'_> {
         pub fn expand_ram(&mut self, amount: usize) {
             self.internal_ram = vec![0; amount].into_boxed_slice();
+            self.test_ram_only = true;
         }
 
         pub fn init_state(&mut self, pc: u32, sr: u16, d: [u32; 8], a: [u32; 8], ssp: u32) {
@@ -2642,17 +2705,17 @@ pub mod testing {
             assert_eq!(self.ssp, ssp, "{}   SSP", test_id);
         }
 
-        pub fn poke_ram(&mut self, addr: usize, val: u8) {
-            self.internal_ram[addr] = val;
+        pub fn poke_ram(&mut self, addr: u32, val: u8) {
+            self.write_addr(addr, val);
         }
 
         pub fn peek_opcode(&mut self) -> Opcode {
             opcode(self.read_addr(self.pc))
         }
 
-        pub fn verify_ram(&self, addr: usize, val: u8, test_id: &str) {
+        pub fn verify_ram(&mut self, addr: u32, val: u8, test_id: &str) {
             assert_eq!(
-                self.internal_ram[addr & 0xFFFFFF],
+                self.read_addr::<u8>(addr),
                 val,
                 "{}   {:06X}",
                 test_id,

@@ -195,7 +195,8 @@ fn run_json_test(test_cases: JsonValue) {
         if !test_case.has_key("name") {
             continue;
         }
-        let mut cpu = nes::m68k::Cpu::boot(true);
+        let cartridge = vec![0; 8].into_boxed_slice();
+        let mut cpu = nes::m68k::Cpu::boot(&cartridge, true);
         cpu.expand_ram(0x1000000);
         cpu.reset(false);
         let initial_state = &test_case["initial state"];
@@ -230,7 +231,7 @@ fn run_json_test(test_cases: JsonValue) {
             if addr.as_i32().unwrap_or(-1) == -1 {
                 break;
             }
-            cpu.poke_ram(addr.as_usize().unwrap(), val.as_u8().unwrap());
+            cpu.poke_ram(addr.as_u32().unwrap(), val.as_u8().unwrap());
         }
         let sr_mask = match cpu.peek_opcode() {
             Opcode::CHK { .. } => 0b1111111111111000,
@@ -280,7 +281,7 @@ fn run_json_test(test_cases: JsonValue) {
             if addr.as_i32().unwrap_or(-1) == -1 {
                 break;
             }
-            cpu.verify_ram(addr.as_usize().unwrap(), val.as_u8().unwrap(), &test_id);
+            cpu.verify_ram(addr.as_u32().unwrap(), val.as_u8().unwrap(), &test_id);
         }
     }
 }
