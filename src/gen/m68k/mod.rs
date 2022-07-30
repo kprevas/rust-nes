@@ -2057,7 +2057,7 @@ impl<'a> Cpu<'a> {
             Opcode::JMP { mode } => self.pc = self.effective_addr(mode),
             Opcode::JSR { mode } => {
                 let addr = self.effective_addr(mode);
-                self.write(AddressingMode::AddressWithPredecrement(7), self.pc);
+                self.push(self.pc);
                 self.pc = addr;
             }
             Opcode::LEA { register, mode } => {
@@ -2239,8 +2239,8 @@ impl<'a> Cpu<'a> {
                 register,
                 direction,
             } => match direction {
-                Direction::RegisterToMemory => self.set_addr_register(register, self.a[7]),
-                Direction::MemoryToRegister => self.a[7] = self.addr_register(register),
+                Direction::MemoryToRegister => self.set_addr_register(register, self.a[7]),
+                Direction::RegisterToMemory => self.a[7] = self.addr_register(register),
             },
             Opcode::MULS { mode, register } => {
                 let val = self.read::<i16>(mode) as i32;
@@ -2703,6 +2703,13 @@ pub mod testing {
             self.write_addr(addr, val);
         }
 
+        pub fn set_ram(&mut self, contents: &[u8]) {
+            let mut vec = contents.to_vec();
+            vec.resize(0x1000000, 0);
+            self.internal_ram = vec.into_boxed_slice();
+            self.test_ram_only = true;
+        }
+
         pub fn peek_opcode(&mut self) -> Opcode {
             opcode(self.read_addr(self.pc))
         }
@@ -2716,5 +2723,7 @@ pub mod testing {
                 addr
             );
         }
+
+        pub fn pc_for_test(&self) -> u32 { self.pc }
     }
 }
