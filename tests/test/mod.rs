@@ -4,13 +4,13 @@ extern crate piston_window;
 use std::cell::RefCell;
 use std::io::Read;
 
-use emu::apu::*;
-use emu::apu::bus::*;
-use emu::cartridge;
-use emu::cpu::*;
 use emu::input::{player_1_nes, player_2_nes};
-use emu::ppu::*;
-use emu::ppu::bus::*;
+use emu::nes::apu::*;
+use emu::nes::apu::bus::*;
+use emu::nes::cartridge;
+use emu::nes::cpu::*;
+use emu::nes::ppu::*;
+use emu::nes::ppu::bus::*;
 
 use self::piston_window::*;
 

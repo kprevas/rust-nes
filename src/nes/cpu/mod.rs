@@ -8,12 +8,12 @@ use bincode::{deserialize_from, serialize};
 use bytes::*;
 use piston_window::{Context, G2d, G2dTextureContext, Glyphs};
 
-use apu::*;
-use apu::bus::*;
-use cartridge::CartridgeBus;
 use input::ControllerState;
-use ppu::*;
-use ppu::bus::*;
+use nes::apu::*;
+use nes::apu::bus::*;
+use nes::cartridge::CartridgeBus;
+use nes::ppu::*;
+use nes::ppu::bus::*;
 
 use self::opcodes::AddressingMode;
 use self::opcodes::AddressingMode::*;

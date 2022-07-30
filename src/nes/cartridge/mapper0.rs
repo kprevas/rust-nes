@@ -4,11 +4,11 @@ use std::io::Result;
 
 use bytes::*;
 
-use cartridge::Cartridge;
-use cartridge::CartridgeBus;
-use cartridge::Header;
-use cartridge::NametableMirroring;
-use cartridge::NametableMirroring::*;
+use nes::cartridge::Cartridge;
+use nes::cartridge::CartridgeBus;
+use nes::cartridge::Header;
+use nes::cartridge::NametableMirroring;
+use nes::cartridge::NametableMirroring::*;
 
 struct Mapper0Cpu {
     prg_rom: Vec<u8>,

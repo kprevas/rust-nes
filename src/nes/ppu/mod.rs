@@ -10,7 +10,7 @@ use bytes::*;
 use image::{DynamicImage, GenericImage, Rgba};
 use piston_window::*;
 
-use cartridge::CartridgeBus;
+use nes::cartridge::CartridgeBus;
 
 use self::bus::*;
 use self::triple_buffer::TripleBuffer;

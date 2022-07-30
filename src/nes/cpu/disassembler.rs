@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::io::prelude::*;
 
-use cartridge::CartridgeBus;
+use nes::cartridge::CartridgeBus;
 
 pub fn disassemble(
     cartridge: Box<dyn CartridgeBus>,

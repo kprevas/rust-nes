@@ -8,7 +8,7 @@ use std::cell::RefCell;
 use bincode::{deserialize_from, serialize};
 use bytes::*;
 
-use cartridge::CartridgeBus;
+use nes::cartridge::CartridgeBus;
 
 use self::bus::*;
 use self::dmc::*;

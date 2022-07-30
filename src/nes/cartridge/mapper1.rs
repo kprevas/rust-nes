@@ -8,11 +8,11 @@ use std::rc::Rc;
 use bincode::{deserialize_from, serialize};
 use bytes::*;
 
-use cartridge::Cartridge;
-use cartridge::CartridgeBus;
-use cartridge::Header;
-use cartridge::NametableMirroring;
-use cartridge::NametableMirroring::*;
+use nes::cartridge::Cartridge;
+use nes::cartridge::CartridgeBus;
+use nes::cartridge::Header;
+use nes::cartridge::NametableMirroring;
+use nes::cartridge::NametableMirroring::*;
 
 #[derive(Serialize, Deserialize)]
 enum PrgBankMode {

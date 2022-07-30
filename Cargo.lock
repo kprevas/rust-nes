@@ -658,7 +658,7 @@ version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33cf9537e2d06891448799b96d5a8c8083e0e90522a7fdabe6ebf4f41d79d651"
 dependencies = [
-    "bitflags 1.3.2",
+ "bitflags 1.3.2",
 ]
 
 [[package]]
@@ -671,37 +671,37 @@ checksum = "3f107b87b6afc2a64fd13cac55fe06d6c8859f12d4b14cbcdd2c67d0976781be"
 name = "emu"
 version = "0.1.0"
 dependencies = [
-    "array-init",
-    "bincode",
-    "bitflags 1.3.2",
-    "byteorder",
-    "bytes",
-    "clap",
-    "dasp",
-    "env_logger",
-    "find_folder",
-    "hex-slice",
-    "image",
-    "itertools",
-    "json",
-    "log",
-    "nfd",
-    "num-integer",
-    "num-traits",
-    "piston",
-    "piston2d-graphics",
-    "piston2d-opengl_graphics",
-    "piston_window",
-    "pistoncore-sdl2_window",
-    "portaudio",
-    "rb",
-    "serde",
-    "serde_arrays",
-    "serde_derive",
-    "serde_with",
-    "simple-error",
-    "time",
-    "triple_buffer",
+ "array-init",
+ "bincode",
+ "bitflags 1.3.2",
+ "byteorder",
+ "bytes",
+ "clap",
+ "dasp",
+ "env_logger",
+ "find_folder",
+ "hex-slice",
+ "image",
+ "itertools",
+ "json",
+ "log",
+ "nfd",
+ "num-integer",
+ "num-traits",
+ "piston",
+ "piston2d-graphics",
+ "piston2d-opengl_graphics",
+ "piston_window",
+ "pistoncore-sdl2_window",
+ "portaudio",
+ "rb",
+ "serde",
+ "serde_arrays",
+ "serde_derive",
+ "serde_with",
+ "simple-error",
+ "time",
+ "triple_buffer",
 ]
 
 [[package]]
@@ -710,9 +710,9 @@ version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b2cf0344971ee6c64c31be0d530793fba457d322dfec2810c453d0ef228f9c3"
 dependencies = [
-    "atty",
-    "humantime",
-    "log",
+ "atty",
+ "humantime",
+ "log",
  "regex",
  "termcolor",
 ]

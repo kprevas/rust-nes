@@ -1,4 +1,4 @@
-use apu::*;
+use nes::apu::*;
 
 #[derive(Serialize, Deserialize)]
 pub struct Triangle {

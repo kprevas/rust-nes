@@ -1,4 +1,4 @@
-use apu::*;
+use nes::apu::*;
 
 const DUTY_CYCLES: [[bool; 8]; 4] = [
     [false, true, false, false, false, false, false, false],

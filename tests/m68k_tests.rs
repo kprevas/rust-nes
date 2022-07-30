@@ -6,7 +6,7 @@ use itertools::{Itertools, Tuples};
 use json::iterators::Members;
 use json::JsonValue;
 
-use emu::m68k::opcodes::Opcode;
+use emu::gen::m68k::opcodes::Opcode;
 
 #[test]
 fn opcode_decoding() {
@@ -14,7 +14,7 @@ fn opcode_decoding() {
     for (opcode_str, expected_val) in test_cases.unwrap().entries() {
         let expected = expected_val.as_str().unwrap();
         let opcode_hex = u16::from_str_radix(opcode_str, 16).unwrap();
-        let opcode = emu::m68k::opcodes::opcode(opcode_hex);
+        let opcode = emu::gen::m68k::opcodes::opcode(opcode_hex);
         assert_eq!(
             format!("{}", opcode),
             expected,
@@ -196,7 +196,7 @@ fn run_json_test(test_cases: JsonValue) {
             continue;
         }
         let cartridge = vec![0; 8].into_boxed_slice();
-        let mut cpu = emu::m68k::Cpu::boot(&cartridge, true);
+        let mut cpu = emu::gen::m68k::Cpu::boot(&cartridge, true);
         cpu.expand_ram(0x1000000);
         cpu.reset(false);
         let initial_state = &test_case["initial state"];

@@ -31,19 +31,15 @@ use nfd::Response;
 use piston_window::*;
 use portaudio::PortAudio;
 
-use cartridge::Cartridge;
 use menu::NES_CONTROLS;
+use nes::cartridge::Cartridge;
 
-pub mod apu;
-pub mod cartridge;
+pub mod nes;
 pub mod control;
-pub mod cpu;
 pub mod input;
-pub mod m68k;
+pub mod gen;
 pub mod menu;
-pub mod ppu;
 pub mod record;
-pub mod md_cartridge;
 
 pub fn run(matches: ArgMatches) {
     if let Some(matches) = matches.subcommand_matches("disassemble") {
@@ -57,7 +53,7 @@ pub fn run(matches: ArgMatches) {
         } else {
             return;
         };
-        cpu::disassembler::disassemble(cartridge.cpu_bus, 0x8000, &mut out).unwrap();
+        nes::cpu::disassembler::disassemble(cartridge.cpu_bus, 0x8000, &mut out).unwrap();
     } else if let Some(matches) = matches.subcommand_matches("run") {
         let window: PistonWindow<sdl2_window::Sdl2Window> =
             WindowSettings::new("nes", [293, 240]).build().unwrap();
@@ -86,18 +82,18 @@ pub fn run(matches: ArgMatches) {
         let record_path = save_path.with_extension("rcd");
         let mut recorder = record::Recorder::new(&record_path);
 
-        let ppu_bus = RefCell::new(ppu::bus::PpuBus::new());
-        let apu_bus = RefCell::new(apu::bus::ApuBus::new());
+        let ppu_bus = RefCell::new(nes::ppu::bus::PpuBus::new());
+        let apu_bus = RefCell::new(nes::apu::bus::ApuBus::new());
 
-        let ppu = ppu::Ppu::new(
+        let ppu = nes::ppu::Ppu::new(
             &mut cartridge.ppu_bus,
             &ppu_bus,
             Some(&mut window),
             instrument_ppu,
         );
-        let apu = apu::Apu::new(&apu_bus, Some(PortAudio::new().unwrap())).unwrap();
+        let apu = nes::apu::Apu::new(&apu_bus, Some(PortAudio::new().unwrap())).unwrap();
 
-        let mut cpu = cpu::Cpu::boot(
+        let mut cpu = nes::cpu::Cpu::boot(
             &mut cartridge.cpu_bus,
             ppu,
             &ppu_bus,
@@ -220,7 +216,7 @@ pub fn run(matches: ArgMatches) {
             return;
         }
 
-        let mut cpu = m68k::Cpu::boot(&cartridge, instrument_cpu);
+        let mut cpu = gen::m68k::Cpu::boot(&cartridge, instrument_cpu);
 
         while let Some(e) = window.next() {
             if let Some(u) = e.update_args() {
@@ -252,7 +248,7 @@ fn load_cartridge(matches: &ArgMatches) -> Option<(Cartridge, PathBuf)> {
             save_path = PathBuf::from(".")
                 .join(input_file.file_name().unwrap())
                 .with_extension("sav");
-            match cartridge::read(
+            match nes::cartridge::read(
                 File::open(input_file).as_mut().unwrap(),
                 match File::open(save_path.as_path()) {
                     Ok(ref mut file) => Some(file),
@@ -288,7 +284,7 @@ fn load_md_cartridge(matches: &ArgMatches) -> Option<(Box<[u8]>, PathBuf)> {
             save_path = PathBuf::from(".")
                 .join(input_file.file_name().unwrap())
                 .with_extension("sav");
-            match md_cartridge::read(
+            match gen::cartridge::read(
                 File::open(input_file).as_mut().unwrap(),
                 match File::open(save_path.as_path()) {
                     Ok(ref mut file) => Some(file),

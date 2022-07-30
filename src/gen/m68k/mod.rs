@@ -5,11 +5,11 @@ use std::ops::{AddAssign, Shl, Shr, Sub, SubAssign};
 use num_integer::Integer;
 use num_traits::{PrimInt, Signed, WrappingAdd, WrappingSub};
 
-use input::ControllerState;
-use m68k::opcodes::{
+use gen::m68k::opcodes::{
     AddressingMode, BitNum, brief_extension_word, Condition, Direction, ExchangeMode, opcode,
     Opcode, OperandDirection, OperandMode, Size,
 };
+use input::ControllerState;
 
 pub mod opcodes;
 
@@ -2656,8 +2656,8 @@ impl<'a> Cpu<'a> {
 #[cfg(feature = "test")]
 #[allow(dead_code)]
 pub mod testing {
-    use m68k::Cpu;
-    use m68k::opcodes::{opcode, Opcode};
+    use gen::m68k::Cpu;
+    use gen::m68k::opcodes::{opcode, Opcode};
 
     impl Cpu<'_> {
         pub fn expand_ram(&mut self, amount: usize) {

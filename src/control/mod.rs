@@ -41,7 +41,7 @@ impl<const B: usize> Control<B> {
     pub fn event(
         &mut self,
         event: &Event,
-        cpu: &mut super::cpu::Cpu,
+        cpu: &mut super::nes::cpu::Cpu,
         reset: &mut bool,
         input_overlay: &mut bool,
         recorder: &mut Recorder<B>,
