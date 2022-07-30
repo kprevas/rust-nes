@@ -1224,10 +1224,14 @@ impl<'a> Cpu<'a> {
 
     fn negx<Size: DataSize + Signed>(&mut self, mode: AddressingMode) {
         self.read_write::<Size>(mode, &mut |cpu, val| {
-            let overflow =
-                val == Size::min_value() || (val == Size::max_value() && cpu.flag(EXTEND));
-            let result = if overflow {
+            let mut overflow = false;
+            let result = if val == Size::min_value() && !cpu.flag(EXTEND) {
+                overflow = true;
                 val
+            } else if val == Size::max_value() && cpu.flag(EXTEND) {
+                Size::min_value()
+            } else if val == Size::min_value() && cpu.flag(EXTEND) {
+                Size::max_value()
             } else if cpu.flag(EXTEND) {
                 -val - Size::from(1).unwrap()
             } else {
@@ -1235,7 +1239,9 @@ impl<'a> Cpu<'a> {
             };
             cpu.set_flag(EXTEND, !result.is_zero());
             cpu.set_flag(NEGATIVE, result.is_negative());
-            cpu.set_flag(ZERO, result.is_zero());
+            if !result.is_zero() {
+                cpu.set_flag(ZERO, false);
+            }
             cpu.set_flag(OVERFLOW, overflow);
             cpu.set_flag(CARRY, !result.is_zero());
             result
