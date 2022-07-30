@@ -19,8 +19,8 @@ fn main() {
             (@arg instrument_ppu: -p "instruments PPU")
             (@arg bench_mode: -b "runs in benchmark mode")
         )
-        (@subcommand m68k =>
-            (about: "blast processing")
+        (@subcommand gen =>
+            (about: "run a .md file")
             (@arg INPUT: "the input file to use")
             (@arg instrument_cpu: -c "instruments CPU")
             (@arg bench_mode: -b "runs in benchmark mode")
