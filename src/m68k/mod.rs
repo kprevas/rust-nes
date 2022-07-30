@@ -440,21 +440,8 @@ impl<'a> Cpu<'a> {
         self.write_addr_no_tick(addr, val);
     }
 
-    fn write_addr_word_aligned<Size: DataSize>(&mut self, addr: u32, val: Size) {
-        self.write_addr_word_aligned_no_tick(addr, val);
-    }
-
     fn write_addr_no_tick<Size: DataSize>(&mut self, addr: u32, val: Size) {
         self.write_addr_offset_size(addr & 0xFFFFFF, 0, Size::address_size(), val);
-    }
-
-    fn write_addr_word_aligned_no_tick<Size: DataSize>(&mut self, addr: u32, val: Size) {
-        self.write_addr_offset_size(
-            addr & 0xFFFFFF,
-            Size::word_aligned_address_size() - Size::address_size(),
-            Size::word_aligned_address_size(),
-            val,
-        );
     }
 
     fn write_addr_offset_size<Size: DataSize>(

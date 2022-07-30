@@ -205,17 +205,17 @@ pub fn run(matches: ArgMatches) {
 
         let mut reset = false;
 
-        let mut frame_count = 0u32;
+        let mut _frame_count = 0u32;
 
-        let mut inputs = [input::player_1_nes(), input::player_2_nes()];
+        let mut _inputs = [input::player_1_nes(), input::player_2_nes()];
 
         let instrument_cpu = matches.is_present("instrument_cpu");
 
-        let mut cartridge;
-        let save_path;
+        let cartridge;
+        let _save_path;
         if let Some((c, s)) = load_md_cartridge(matches) {
             cartridge = c;
-            save_path = s;
+            _save_path = s;
         } else {
             return;
         }
@@ -228,8 +228,8 @@ pub fn run(matches: ArgMatches) {
                     reset = false;
                     cpu.reset(true);
                 }
-                cpu.do_frame(u.dt, &inputs);
-                frame_count += 1;
+                cpu.do_frame(u.dt, &_inputs);
+                _frame_count += 1;
             }
         }
 
