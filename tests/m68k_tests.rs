@@ -241,7 +241,7 @@ fn run_json_test(test_cases: JsonValue) {
         if let Opcode::ILLEGAL = cpu.peek_opcode() {
             continue;
         }
-        cpu.next_operation(&[nes::input::player_1_nes(), nes::input::player_2_nes()]);
+        cpu.next_operation(&[nes::input::player_1_gen(), nes::input::player_2_gen()]);
         let final_state = &test_case["final state"];
         let test_id = format!(
             "{}  {}",

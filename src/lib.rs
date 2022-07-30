@@ -207,7 +207,7 @@ pub fn run(matches: ArgMatches) {
 
         let mut _frame_count = 0u32;
 
-        let mut _inputs = [input::player_1_nes(), input::player_2_nes()];
+        let mut _inputs = [input::player_1_gen(), input::player_2_gen()];
 
         let instrument_cpu = matches.is_present("instrument_cpu");
 

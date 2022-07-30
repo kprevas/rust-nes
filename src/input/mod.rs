@@ -124,3 +124,29 @@ pub fn player_2_nes() -> ControllerState<8> {
         Button(Keyboard(Key::D)),
     ])
 }
+
+pub fn player_1_gen() -> ControllerState<8> {
+    ControllerState::new([
+        Button(Keyboard(Key::J)),
+        Button(Keyboard(Key::K)),
+        Button(Keyboard(Key::L)),
+        Button(Keyboard(Key::Return)),
+        Button(Keyboard(Key::Up)),
+        Button(Keyboard(Key::Down)),
+        Button(Keyboard(Key::Left)),
+        Button(Keyboard(Key::Right)),
+    ])
+}
+
+pub fn player_2_gen() -> ControllerState<8> {
+    ControllerState::new([
+        Button(Keyboard(Key::C)),
+        Button(Keyboard(Key::V)),
+        Button(Keyboard(Key::B)),
+        Button(Keyboard(Key::Tab)),
+        Button(Keyboard(Key::W)),
+        Button(Keyboard(Key::S)),
+        Button(Keyboard(Key::A)),
+        Button(Keyboard(Key::D)),
+    ])
+}
