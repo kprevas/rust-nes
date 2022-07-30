@@ -1,4 +1,4 @@
-extern crate nes;
+extern crate emu;
 
 use test::run_test_to_pc;
 use test::run_test_to_pc_and_check_accumulator;

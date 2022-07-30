@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate clap;
+extern crate emu;
 extern crate env_logger;
-extern crate nes;
 
 fn main() {
     env_logger::try_init().unwrap();
@@ -27,5 +27,5 @@ fn main() {
         )
     )
         .get_matches();
-    nes::run(matches);
+    emu::run(matches);
 }
