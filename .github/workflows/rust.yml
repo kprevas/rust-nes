@@ -16,8 +16,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+      - uses: hecrj/setup-rust-action@v1
+        with:
+          rust-version: nightly
       - name: Build
         run: cargo build --verbose --release
+      - name: Run integration tests
+        run: cargo test --package emu --features test --release
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v2.2.1
         with:
@@ -30,6 +35,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+      - uses: hecrj/setup-rust-action@v1
+        with:
+          rust-version: nightly
       - name: Build
         run: cargo build --verbose --release
       - name: Upload a Build Artifact
@@ -49,8 +57,6 @@ jobs:
           rust-version: nightly
       - name: Build
         run: cargo build --verbose --release
-      - name: Run integration tests
-        run: cargo test --package emu --features test --release
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v2.2.1
         with:
