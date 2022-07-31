@@ -57,6 +57,10 @@ jobs:
           Invoke-WebRequest -Uri "https://www.libsdl.org/release/SDL2-devel-2.0.20-VC.zip" -OutFile "SDL2-devel-2.0.20-VC.zip"
           7z x SDL2-devel-2.0.20-VC.zip
           Copy-Item "SDL2-2.0.20\lib\x64\SDL2*" "C:\Users\runneradmin\.rustup\toolchains\nightly-x86_64-pc-windows-msvc\lib\rustlib\x86_64-pc-windows-msvc\lib"
+      - name: Install portaudio
+        run: |
+          vcpkg install portaudio:x64-windows
+          cp C:\vcpkg\installed\x64-windows\lib\portaudio.lib "C:\Users\runneradmin\.rustup\toolchains\nightly-x86_64-pc-windows-msvc\lib\rustlib\x86_64-pc-windows-msvc\lib"
       - name: Build
         run: cargo build --verbose --release
       - name: Upload a Build Artifact
