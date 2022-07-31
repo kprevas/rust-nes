@@ -70,12 +70,115 @@ impl Status {
     }
 }
 
+struct Mode1 {
+    blank_leftmost_8: bool,
+    enable_horizontal_interrupt: bool,
+    use_high_color_bits: bool,
+    freeze_hv_on_level_2_interrupt: bool,
+    disable_display: bool,
+}
+
+impl Mode1 {
+    fn from_u8(val: u8) -> Mode1 {
+        Mode1 {
+            blank_leftmost_8: (val & 0b00100000) > 0,
+            enable_horizontal_interrupt: (val & 0b00010000) > 0,
+            use_high_color_bits: (val & 0b00000100) > 0,
+            freeze_hv_on_level_2_interrupt: (val & 0b00000010) > 0,
+            disable_display: (val & 0b00000001) > 0,
+        }
+    }
+}
+
+struct Mode2 {
+    use_128k_vram: bool,
+    enable_display: bool,
+    enable_vertical_interrupt: bool,
+    enable_dma: bool,
+    pal_mode: bool,
+    mode_5: bool,
+}
+
+impl Mode2 {
+    fn from_u8(val: u8) -> Mode2 {
+        Mode2 {
+            use_128k_vram: (val & 0b10000000) > 0,
+            enable_display: (val & 0b01000000) > 0,
+            enable_vertical_interrupt: (val & 0b00100000) > 0,
+            enable_dma: (val & 0b00010000) > 0,
+            pal_mode: (val & 0b00001000) > 0,
+            mode_5: (val & 0b00000100) > 0,
+        }
+    }
+}
+
+enum VerticalScrollingMode { Column16Pixels, FullScreen }
+
+enum HorizontalScrollingMode { Row1Pixel, Row8Pixel, FullScreen, Invalid }
+
+struct Mode3 {
+    enable_external_interrupt: bool,
+    vertical_scrolling_mode: VerticalScrollingMode,
+    horizontal_scrolling_mode: HorizontalScrollingMode,
+}
+
+impl Mode3 {
+    fn from_u8(val: u8) -> Mode3 {
+        Mode3 {
+            enable_external_interrupt: (val & 0b00001000) > 0,
+            vertical_scrolling_mode: if (val & 0b00000100) > 0 {
+                VerticalScrollingMode::Column16Pixels
+            } else {
+                VerticalScrollingMode::FullScreen
+            },
+            horizontal_scrolling_mode: match val & 0b00000011 {
+                0b00 => HorizontalScrollingMode::FullScreen,
+                0b01 => HorizontalScrollingMode::Invalid,
+                0b10 => HorizontalScrollingMode::Row8Pixel,
+                0b11 => HorizontalScrollingMode::Row1Pixel,
+                _ => panic!(),
+            },
+        }
+    }
+}
+
+enum InterlaceMode { NoInterlace, InterlaceNormal, InterlaceDouble }
+
+struct Mode4 {
+    wide_mode: bool,
+    freeze_hsync: bool,
+    pixel_clock_signal_on_vsync: bool,
+    enable_external_pixel_bus: bool,
+    enable_shadow_highlight: bool,
+    interlace_mode: InterlaceMode,
+}
+
+impl Mode4 {
+    fn from_u8(val: u8) -> Mode4 {
+        Mode4 {
+            wide_mode: (val & 0b10000000) > 0,
+            freeze_hsync: (val & 0b01000000) > 0,
+            pixel_clock_signal_on_vsync: (val & 0b00100000) > 0,
+            enable_external_pixel_bus: (val & 0b00010000) > 0,
+            enable_shadow_highlight: (val & 0b00001000) > 0,
+            interlace_mode: match (val & 0b00000110) >> 1 {
+                0b00 | 0b10 => InterlaceMode::NoInterlace,
+                0b01 => InterlaceMode::InterlaceNormal,
+                0b11 => InterlaceMode::InterlaceDouble,
+                _ => panic!()
+            },
+        }
+    }
+}
+
 pub struct VdpBus {
     status: Status,
     beam_vpos: u16,
     beam_hpos: u16,
-    interlace_mode: bool,
-    // TODO put in mode register
+    mode_1: Mode1,
+    mode_2: Mode2,
+    mode_3: Mode3,
+    mode_4: Mode4,
     addr: Addr,
 }
 
@@ -96,7 +199,34 @@ impl VdpBus {
             },
             beam_vpos: 0,
             beam_hpos: 0,
-            interlace_mode: false,
+            mode_1: Mode1 {
+                blank_leftmost_8: false,
+                enable_horizontal_interrupt: false,
+                use_high_color_bits: false,
+                freeze_hv_on_level_2_interrupt: false,
+                disable_display: false,
+            },
+            mode_2: Mode2 {
+                use_128k_vram: false,
+                enable_display: false,
+                enable_vertical_interrupt: false,
+                enable_dma: false,
+                pal_mode: false,
+                mode_5: false,
+            },
+            mode_3: Mode3 {
+                enable_external_interrupt: false,
+                vertical_scrolling_mode: VerticalScrollingMode::Column16Pixels,
+                horizontal_scrolling_mode: HorizontalScrollingMode::Row1Pixel,
+            },
+            mode_4: Mode4 {
+                wide_mode: false,
+                freeze_hsync: false,
+                pixel_clock_signal_on_vsync: false,
+                enable_external_pixel_bus: false,
+                enable_shadow_highlight: false,
+                interlace_mode: InterlaceMode::NoInterlace,
+            },
             addr: Addr {
                 mode: AddrMode::Read,
                 target: AddrTarget::VRAM,
@@ -149,10 +279,14 @@ impl VdpBus {
         }
     }
 
-    pub fn write_word(&mut self, addr: u32, _data: u16) {
+    pub fn write_word(&mut self, addr: u32, data: u16) {
         match addr {
-            0xC0004 => {
-                // TODO: set register
+            0xC0004 => match (data >> 8) | 0b11111 {
+                0x00 => self.mode_1 = Mode1::from_u8((data & 0xFF) as u8),
+                0x01 => self.mode_2 = Mode2::from_u8((data & 0xFF) as u8),
+                0x0B => self.mode_3 = Mode3::from_u8((data & 0xFF) as u8),
+                0x0C => self.mode_4 = Mode4::from_u8((data & 0xFF) as u8),
+                _ => panic!(),
             }
             0xC0011 | 0xC0013 | 0xC0015 | 0xC0017 => {} // TODO: PSG
             0xC001C | 0xC001E => {}                     // TODO: debug register
