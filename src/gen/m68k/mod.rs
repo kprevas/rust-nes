@@ -21,6 +21,7 @@ trait DataSize: TryFrom<u32> + PrimInt {
     fn word_aligned_address_size() -> u32;
     fn from_register_value(value: u32) -> Self;
     fn to_register_value(self) -> u32;
+    fn from_byte(byte: u8) -> Self;
     fn from_memory_bytes(bytes: &[u8]) -> Self;
     fn set_memory_bytes(self, bytes: &mut [u8]);
     fn apply_to_register(self, register_val: u32) -> u32;
@@ -45,6 +46,10 @@ impl DataSize for u8 {
 
     fn to_register_value(self) -> u32 {
         ((self as i8) as i32) as u32
+    }
+
+    fn from_byte(byte: u8) -> Self {
+        byte as Self
     }
 
     fn from_memory_bytes(bytes: &[u8]) -> Self {
@@ -87,6 +92,10 @@ impl DataSize for i8 {
         (self as i32) as u32
     }
 
+    fn from_byte(byte: u8) -> Self {
+        byte as Self
+    }
+
     fn from_memory_bytes(bytes: &[u8]) -> Self {
         bytes[0] as Self
     }
@@ -125,6 +134,10 @@ impl DataSize for u16 {
 
     fn to_register_value(self) -> u32 {
         ((self as i16) as i32) as u32
+    }
+
+    fn from_byte(byte: u8) -> Self {
+        byte as Self
     }
 
     fn from_memory_bytes(bytes: &[u8]) -> Self {
@@ -168,6 +181,10 @@ impl DataSize for i16 {
         (self as i32) as u32
     }
 
+    fn from_byte(byte: u8) -> Self {
+        byte as Self
+    }
+
     fn from_memory_bytes(bytes: &[u8]) -> Self {
         (((bytes[0] as u16) << 8) | (bytes[1] as u16)) as i16
     }
@@ -207,6 +224,10 @@ impl DataSize for u32 {
 
     fn to_register_value(self) -> u32 {
         self
+    }
+
+    fn from_byte(byte: u8) -> Self {
+        byte as Self
     }
 
     fn from_memory_bytes(bytes: &[u8]) -> Self {
@@ -253,6 +274,10 @@ impl DataSize for i32 {
 
     fn to_register_value(self) -> u32 {
         self as u32
+    }
+
+    fn from_byte(byte: u8) -> Self {
+        byte as Self
     }
 
     fn from_memory_bytes(bytes: &[u8]) -> Self {
@@ -421,6 +446,7 @@ impl<'a> Cpu<'a> {
                 ),
                 0x400000..=0x7FFFFF => Size::from(0).unwrap(), // Expansion port
                 0xA00000..=0xA0FFFF => Size::from(0).unwrap(), // Z80 Area
+                0xA10001 => Size::from_byte(0b10100000),
                 0xA10000..=0xA10FFF => Size::from(0).unwrap(), // IO Registers
                 0xA11000..=0xA11FFF => Size::from(0).unwrap(), // Z80 Control
                 0xC00000..=0xDFFFFF => Size::from(0).unwrap(), // VDP Ports
