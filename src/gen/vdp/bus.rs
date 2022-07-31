@@ -29,6 +29,9 @@ impl Status {
 
 pub struct VdpBus {
     status: Status,
+    beam_vpos: u16,
+    beam_hpos: u16,
+    interlace_mode: bool, // TODO put in mode register
 }
 
 impl VdpBus {
@@ -46,13 +49,18 @@ impl VdpBus {
                 dma: false,
                 pal: false,
             },
+            beam_vpos: 0,
+            beam_hpos: 0,
+            interlace_mode: false,
         }
     }
 
     pub fn read_byte(&mut self, addr: u32) -> u8 {
         match addr {
-            0xC004 | 0xC006 => (self.status.to_u16() >> 8) as u8,
-            0xC005 | 0xC007 => (self.status.to_u16() & 0xFF) as u8,
+            0xC004 | 0xC006 | 0xC008 | 0xC00A | 0xC00C | 0xC00E =>
+                (self.read_word(addr) >> 8) as u8,
+            0xC005 | 0xC007 | 0xC009 | 0xC00B | 0xC00D | 0xC00F =>
+                (self.read_word(addr - 1) & 0xFF) as u8,
             _ => panic!(),
         }
     }
@@ -60,6 +68,13 @@ impl VdpBus {
     pub fn read_word(&mut self, addr: u32) -> u16 {
         match addr {
             0xC004 | 0xC006 => self.status.to_u16(),
+            0xC008 | 0xC00A | 0xC00C | 0xC00E => if self.interlace_mode {
+                ((self.beam_vpos >> 1) << 9)
+                    | (self.beam_vpos & 0b100000000)
+                    | ((self.beam_hpos >> 1) & 0xFF)
+            } else {
+                (self.beam_vpos << 8) | ((self.beam_hpos >> 1) & 0xFF)
+            }
             _ => panic!(),
         }
     }
@@ -79,6 +94,8 @@ impl VdpBus {
 
     pub fn write_word(&mut self, addr: u32, _data: u16) {
         match addr {
+            0xC0011 | 0xC0013 | 0xC0015 | 0xC0017 => {}, // TODO: PSG
+            0xC001C | 0xC001E => {}, // TODO: debug register
             _ => panic!(),
         }
     }
