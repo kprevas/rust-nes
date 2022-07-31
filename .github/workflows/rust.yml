@@ -19,6 +19,12 @@ jobs:
       - uses: hecrj/setup-rust-action@v1
         with:
           rust-version: nightly
+      - name: Install gtk+
+        run: apt-get install gtk+-3.0
+      - name: Install glib
+        run: apt-get install glib-2.0
+      - name: Install SDL
+        run: curl -O http://www.libsdl.org/release/SDL2-2.0.6.tar.gz && tar -xzvf SDL2-2.0.6.tar.gz && cd SDL2-2.0.6 && ./configure && make && sudo make install
       - name: Build
         run: cargo build --verbose --release
       - name: Run integration tests
@@ -55,6 +61,12 @@ jobs:
       - uses: hecrj/setup-rust-action@v1
         with:
           rust-version: nightly
+      - name: Install portaudio
+        run: brew install portaudio
+      - name: Install pkg-config
+        run: brew install pkg-config
+      - name: Install sdl2
+        run: brew install sdl2
       - name: Build
         run: cargo build --verbose --release
       - name: Upload a Build Artifact
