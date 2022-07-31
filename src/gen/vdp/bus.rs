@@ -9,6 +9,7 @@ enum AddrTarget {
     VSRAM,
 }
 
+#[allow(dead_code)]
 struct Addr {
     mode: AddrMode,
     target: AddrTarget,
@@ -70,6 +71,7 @@ impl Status {
     }
 }
 
+#[allow(dead_code)]
 struct Mode1 {
     blank_leftmost_8: bool,
     enable_horizontal_interrupt: bool,
@@ -90,6 +92,7 @@ impl Mode1 {
     }
 }
 
+#[allow(dead_code)]
 struct Mode2 {
     use_128k_vram: bool,
     enable_display: bool,
@@ -112,10 +115,19 @@ impl Mode2 {
     }
 }
 
-enum VerticalScrollingMode { Column16Pixels, FullScreen }
+enum VerticalScrollingMode {
+    Column16Pixels,
+    FullScreen,
+}
 
-enum HorizontalScrollingMode { Row1Pixel, Row8Pixel, FullScreen, Invalid }
+enum HorizontalScrollingMode {
+    Row1Pixel,
+    Row8Pixel,
+    FullScreen,
+    Invalid,
+}
 
+#[allow(dead_code)]
 struct Mode3 {
     enable_external_interrupt: bool,
     vertical_scrolling_mode: VerticalScrollingMode,
@@ -142,8 +154,13 @@ impl Mode3 {
     }
 }
 
-enum InterlaceMode { NoInterlace, InterlaceNormal, InterlaceDouble }
+enum InterlaceMode {
+    NoInterlace,
+    InterlaceNormal,
+    InterlaceDouble,
+}
 
+#[allow(dead_code)]
 struct Mode4 {
     wide_mode: bool,
     freeze_hsync: bool,
@@ -165,10 +182,26 @@ impl Mode4 {
                 0b00 | 0b10 => InterlaceMode::NoInterlace,
                 0b01 => InterlaceMode::InterlaceNormal,
                 0b11 => InterlaceMode::InterlaceDouble,
-                _ => panic!()
+                _ => panic!(),
             },
         }
     }
+}
+
+enum WindowHPos {
+    DrawToRight(u8),
+    DrawToLeft(u8),
+}
+
+enum WindowVPos {
+    DrawToTop(u8),
+    DrawToBottom(u8),
+}
+
+enum DmaType {
+    RamToVram,
+    VramFill,
+    VramToVram,
 }
 
 pub struct VdpBus {
@@ -179,6 +212,22 @@ pub struct VdpBus {
     mode_2: Mode2,
     mode_3: Mode3,
     mode_4: Mode4,
+    plane_a_nametable_addr: u16,
+    plane_b_nametable_addr: u16,
+    window_nametable_addr: u16,
+    sprite_table_addr: u16,
+    bg_palette: u8,
+    bg_color: u8,
+    horizontal_interrupt_counter: u16,
+    horizontal_scroll_data_addr: u16,
+    auto_increment: u8,
+    plane_height: u16,
+    plane_width: u16,
+    window_h_pos: WindowHPos,
+    window_v_pos: WindowVPos,
+    dma_length_half: u16,
+    dma_source_addr_half: u32,
+    dma_type: DmaType,
     addr: Addr,
 }
 
@@ -227,6 +276,22 @@ impl VdpBus {
                 enable_shadow_highlight: false,
                 interlace_mode: InterlaceMode::NoInterlace,
             },
+            plane_a_nametable_addr: 0,
+            plane_b_nametable_addr: 0,
+            window_nametable_addr: 0,
+            sprite_table_addr: 0,
+            bg_palette: 0,
+            bg_color: 0,
+            horizontal_interrupt_counter: 0,
+            horizontal_scroll_data_addr: 0,
+            auto_increment: 0,
+            plane_height: 0,
+            plane_width: 0,
+            window_h_pos: WindowHPos::DrawToLeft(0),
+            window_v_pos: WindowVPos::DrawToTop(0),
+            dma_length_half: 0,
+            dma_source_addr_half: 0,
+            dma_type: DmaType::RamToVram,
             addr: Addr {
                 mode: AddrMode::Read,
                 target: AddrTarget::VRAM,
@@ -253,12 +318,12 @@ impl VdpBus {
         match addr {
             0xC004 | 0xC006 => self.status.to_u16(),
             0xC008 | 0xC00A | 0xC00C | 0xC00E => {
-                if self.interlace_mode {
+                if let InterlaceMode::NoInterlace = self.mode_4.interlace_mode {
+                    (self.beam_vpos << 8) | ((self.beam_hpos >> 1) & 0xFF)
+                } else {
                     ((self.beam_vpos >> 1) << 9)
                         | (self.beam_vpos & 0b100000000)
                         | ((self.beam_hpos >> 1) & 0xFF)
-                } else {
-                    (self.beam_vpos << 8) | ((self.beam_hpos >> 1) & 0xFF)
                 }
             }
             _ => panic!(),
@@ -280,14 +345,80 @@ impl VdpBus {
     }
 
     pub fn write_word(&mut self, addr: u32, data: u16) {
+        let (register_number, data) = ((data >> 8) | 0b11111, data & 0xFF);
         match addr {
-            0xC0004 => match (data >> 8) | 0b11111 {
-                0x00 => self.mode_1 = Mode1::from_u8((data & 0xFF) as u8),
-                0x01 => self.mode_2 = Mode2::from_u8((data & 0xFF) as u8),
-                0x0B => self.mode_3 = Mode3::from_u8((data & 0xFF) as u8),
-                0x0C => self.mode_4 = Mode4::from_u8((data & 0xFF) as u8),
+            0xC0004 => match register_number {
+                0x00 => self.mode_1 = Mode1::from_u8(data as u8),
+                0x01 => self.mode_2 = Mode2::from_u8(data as u8),
+                0x02 => self.plane_a_nametable_addr = data << 10,
+                // TODO ignore lsb in 320 pixel mode
+                0x03 => self.window_nametable_addr = data << 10,
+                0x04 => self.plane_b_nametable_addr = data << 13,
+                // TODO ignore lsb in 320 pixel mode
+                0x05 => self.sprite_table_addr = data << 9,
+                0x06 => {} // 128k mode sprite table
+                0x07 => {
+                    self.bg_palette = ((data >> 4) & 0b11) as u8;
+                    self.bg_color = (data & 0b1111) as u8;
+                }
+                0x08 => {} // Master System horizontal scroll
+                0x09 => {} // Master System vertical scroll
+                0x0A => self.horizontal_interrupt_counter = data,
+                0x0B => self.mode_3 = Mode3::from_u8(data as u8),
+                0x0C => self.mode_4 = Mode4::from_u8(data as u8),
+                0x0D => self.horizontal_scroll_data_addr = data << 10,
+                0x0E => {} // 128k mode plane nametables
+                0x0F => self.auto_increment = data as u8,
+                0x10 => {
+                    self.plane_height = match (data >> 4) & 0b11 {
+                        0b00 => 256,
+                        0b01 => 512,
+                        0b10 => 0,
+                        0b11 => 1024,
+                        _ => panic!(),
+                    };
+                    self.plane_width = match data & 0b11 {
+                        0b00 => 256,
+                        0b01 => 512,
+                        0b10 => 0,
+                        0b11 => 1024,
+                        _ => panic!(),
+                    };
+                }
+                0x11 => {
+                    self.window_h_pos = if (data & 0b10000000) > 0 {
+                        WindowHPos::DrawToRight((data & 0b11111) as u8)
+                    } else {
+                        WindowHPos::DrawToLeft((data & 0b11111) as u8)
+                    }
+                }
+                0x12 => {
+                    self.window_v_pos = if (data & 0b10000000) > 0 {
+                        WindowVPos::DrawToBottom((data & 0b11111) as u8)
+                    } else {
+                        WindowVPos::DrawToTop((data & 0b11111) as u8)
+                    }
+                }
+                0x13 => self.dma_length_half = (self.dma_length_half & 0xFF00) | data,
+                0x14 => self.dma_length_half = (self.dma_length_half & 0xFF) | (data << 8),
+                0x15 => {
+                    self.dma_source_addr_half = (self.dma_source_addr_half & 0xFFFF00) | data as u32
+                }
+                0x16 => {
+                    self.dma_source_addr_half = (self.dma_source_addr_half & 0xFF00FF) | data as u32
+                }
+                0x17 => {
+                    self.dma_type = match (data & 0b11000000) >> 6 {
+                        0b00 | 0b01 => DmaType::RamToVram,
+                        0b10 => DmaType::VramFill,
+                        0b11 => DmaType::VramToVram,
+                        _ => panic!(),
+                    };
+                    self.dma_source_addr_half =
+                        (self.dma_source_addr_half & 0x00FFFF) | (((data & 0b11111) as u32) << 16);
+                }
                 _ => panic!(),
-            }
+            },
             0xC0011 | 0xC0013 | 0xC0015 | 0xC0017 => {} // TODO: PSG
             0xC001C | 0xC001E => {}                     // TODO: debug register
             _ => panic!(),
