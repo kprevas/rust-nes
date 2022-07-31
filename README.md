@@ -1,4 +1,1 @@
-[![Build Status][build_badge]][build_status]
-
-[build_badge]: https://travis-ci.org/kprevas/rust-nes.svg?branch=master
-[build_status]: https://travis-ci.org/kprevas/rust-nes
+[![build](https://github.com/kprevas/rust-nes/workflows/Rust/badge.svg)](https://github.com/kprevas/rust-nes/actions)
