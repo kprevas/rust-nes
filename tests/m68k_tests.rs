@@ -285,3 +285,25 @@ fn run_json_test(test_cases: JsonValue) {
         }
     }
 }
+
+#[test]
+fn test_all_opcodes() {
+    let _ = env_logger::try_init();
+    let rom = include_bytes!("m68k/opcodes.bin");
+    let cartridge = vec![0; 8].into_boxed_slice();
+    let mut cpu = emu::gen::m68k::Cpu::boot(&cartridge, true);
+    cpu.set_ram(rom);
+    cpu.reset(false);
+    let mut last_pc = 0;
+    let mut loop_count = 0;
+    while loop_count < 5 {
+        cpu.next_operation(&[emu::input::player_1_gen(), emu::input::player_2_gen()]);
+        if last_pc == cpu.pc_for_test() {
+            loop_count += 1;
+        } else {
+            loop_count = 0;
+            last_pc = cpu.pc_for_test();
+        }
+    }
+    assert_eq!(0xF000, cpu.pc_for_test());
+}
