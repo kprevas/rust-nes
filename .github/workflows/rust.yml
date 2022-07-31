@@ -67,7 +67,7 @@ jobs:
         uses: actions/upload-artifact@v2.2.1
         with:
           name: emu-win.exe
-          path: target/release/emu-win.exe
+          path: target/release/emu.exe
 
   build-mac:
 
