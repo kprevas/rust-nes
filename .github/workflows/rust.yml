@@ -20,9 +20,9 @@ jobs:
         with:
           rust-version: nightly
       - name: Install gtk+
-        run: apt-get install gtk+-3.0
+        run: sudo apt-get install gtk+-3.0
       - name: Install glib
-        run: apt-get install glib-2.0
+        run: sudo apt-get install glib-2.0
       - name: Install SDL
         run: curl -O http://www.libsdl.org/release/SDL2-2.0.6.tar.gz && tar -xzvf SDL2-2.0.6.tar.gz && cd SDL2-2.0.6 && ./configure && make && sudo make install
       - name: Build
