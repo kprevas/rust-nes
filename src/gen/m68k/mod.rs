@@ -931,9 +931,10 @@ impl<'a> Cpu<'a> {
             let result = val << count;
             let result_with_last_bit = val << (count - 1);
             let carry = result_with_last_bit.is_negative();
-            let ones_diff = val.count_ones() - result.count_ones();
+            let sigs = val.unsigned_shr(Size::bits() as u32 - count as u32 - 1);
+            let sigs_ones = sigs.count_ones();
             self.set_flag(EXTEND, carry);
-            self.set_flag(OVERFLOW, ones_diff > 0 && ones_diff < (count as u32));
+            self.set_flag(OVERFLOW, sigs_ones > 0 && sigs_ones < (count as u32) + 1);
             self.set_flag(CARRY, carry);
             result
         } else {
