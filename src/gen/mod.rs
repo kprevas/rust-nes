@@ -7,6 +7,7 @@ use piston_window::*;
 
 pub mod cartridge;
 pub mod m68k;
+pub mod vdp;
 
 fn load_cartridge(matches: &ArgMatches) -> Option<(Box<[u8]>, PathBuf)> {
     let mut save_path: PathBuf;
