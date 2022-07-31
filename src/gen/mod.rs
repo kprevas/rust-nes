@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::fs::File;
 use std::path::PathBuf;
 
@@ -70,7 +71,10 @@ pub fn run(matches: &ArgMatches) {
         return;
     }
 
-    let mut cpu = m68k::Cpu::boot(&cartridge, instrument_cpu);
+    let vdp_bus = RefCell::new(vdp::bus::VdpBus::new());
+
+    let vdp = vdp::Vdp::new(&vdp_bus);
+    let mut cpu = m68k::Cpu::boot(&cartridge, vdp, &vdp_bus, instrument_cpu);
 
     while let Some(e) = window.next() {
         if let Some(u) = e.update_args() {

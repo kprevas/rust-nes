@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::convert::TryFrom;
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Shl, Shr, Sub, SubAssign};
@@ -9,6 +10,8 @@ use gen::m68k::opcodes::{
     AddressingMode, BitNum, brief_extension_word, Condition, Direction, ExchangeMode, opcode,
     Opcode, OperandDirection, OperandMode, Size,
 };
+use gen::vdp::bus::VdpBus;
+use gen::vdp::Vdp;
 use input::ControllerState;
 
 pub mod opcodes;
@@ -27,6 +30,8 @@ trait DataSize: TryFrom<u32> + PrimInt {
     fn apply_to_register(self, register_val: u32) -> u32;
     fn is_negative(self) -> bool;
     fn is_zero(self) -> bool;
+    fn read_from_vdp_bus(vdp_bus: &RefCell<VdpBus>, addr: u32) -> Self;
+    fn write_to_vdp_bus(vdp_bus: &RefCell<VdpBus>, addr: u32, val: Self);
 }
 
 impl DataSize for u8 {
@@ -71,6 +76,14 @@ impl DataSize for u8 {
     fn is_zero(self) -> bool {
         self == 0
     }
+
+    fn read_from_vdp_bus(vdp_bus: &RefCell<VdpBus>, addr: u32) -> Self {
+        vdp_bus.borrow_mut().read_byte(addr)
+    }
+
+    fn write_to_vdp_bus(vdp_bus: &RefCell<VdpBus>, addr: u32, val: Self) {
+        vdp_bus.borrow_mut().write_byte(addr, val);
+    }
 }
 
 impl DataSize for i8 {
@@ -114,6 +127,14 @@ impl DataSize for i8 {
 
     fn is_zero(self) -> bool {
         self == 0
+    }
+
+    fn read_from_vdp_bus(vdp_bus: &RefCell<VdpBus>, addr: u32) -> Self {
+        vdp_bus.borrow_mut().read_byte(addr) as Self
+    }
+
+    fn write_to_vdp_bus(vdp_bus: &RefCell<VdpBus>, addr: u32, val: Self) {
+        vdp_bus.borrow_mut().write_byte(addr, val as u8);
     }
 }
 
@@ -160,6 +181,14 @@ impl DataSize for u16 {
     fn is_zero(self) -> bool {
         self == 0
     }
+
+    fn read_from_vdp_bus(vdp_bus: &RefCell<VdpBus>, addr: u32) -> Self {
+        vdp_bus.borrow_mut().read_word(addr)
+    }
+
+    fn write_to_vdp_bus(vdp_bus: &RefCell<VdpBus>, addr: u32, val: Self) {
+        vdp_bus.borrow_mut().write_word(addr, val);
+    }
 }
 
 impl DataSize for i16 {
@@ -204,6 +233,14 @@ impl DataSize for i16 {
 
     fn is_zero(self) -> bool {
         self == 0
+    }
+
+    fn read_from_vdp_bus(vdp_bus: &RefCell<VdpBus>, addr: u32) -> Self {
+        vdp_bus.borrow_mut().read_word(addr) as Self
+    }
+
+    fn write_to_vdp_bus(vdp_bus: &RefCell<VdpBus>, addr: u32, val: Self) {
+        vdp_bus.borrow_mut().write_word(addr, val as u16);
     }
 }
 
@@ -255,6 +292,14 @@ impl DataSize for u32 {
     fn is_zero(self) -> bool {
         self == 0
     }
+
+    fn read_from_vdp_bus(vdp_bus: &RefCell<VdpBus>, addr: u32) -> Self {
+        vdp_bus.borrow_mut().read_long(addr)
+    }
+
+    fn write_to_vdp_bus(vdp_bus: &RefCell<VdpBus>, addr: u32, val: Self) {
+        vdp_bus.borrow_mut().write_long(addr, val);
+    }
 }
 
 impl DataSize for i32 {
@@ -305,6 +350,14 @@ impl DataSize for i32 {
     fn is_zero(self) -> bool {
         self == 0
     }
+
+    fn read_from_vdp_bus(vdp_bus: &RefCell<VdpBus>, addr: u32) -> Self {
+        vdp_bus.borrow_mut().read_long(addr) as Self
+    }
+
+    fn write_to_vdp_bus(vdp_bus: &RefCell<VdpBus>, addr: u32, val: Self) {
+        vdp_bus.borrow_mut().write_long(addr, val as u32);
+    }
 }
 
 pub struct Cpu<'a> {
@@ -321,6 +374,9 @@ pub struct Cpu<'a> {
     stopped: bool,
 
     pub speed_adj: f64,
+
+    vdp: Vdp<'a>,
+    vdp_bus: &'a RefCell<VdpBus>,
 
     test_ram_only: bool,
 
@@ -341,7 +397,10 @@ const INTERRUPT_SHIFT: u16 = 8;
 const SR_MASK: u16 = 0b1010011100011111;
 
 impl<'a> Cpu<'a> {
-    pub fn boot(cartridge: &Box<[u8]>, instrumented: bool) -> Cpu {
+    pub fn boot<'b>(cartridge: &'b Box<[u8]>,
+                    vdp: Vdp<'b>,
+                    vdp_bus: &'b RefCell<VdpBus>,
+                    instrumented: bool) -> Cpu<'b> {
         let mut cpu = Cpu {
             a: [0, 0, 0, 0, 0, 0, 0, 0],
             ssp: 0,
@@ -355,6 +414,8 @@ impl<'a> Cpu<'a> {
             cycle_count: 0,
             stopped: false,
             speed_adj: 1.0,
+            vdp,
+            vdp_bus,
             test_ram_only: false,
             phantom: PhantomData,
         };
@@ -366,6 +427,7 @@ impl<'a> Cpu<'a> {
 
     fn tick(&mut self, cycle_count: u8) {
         for _ in 0..cycle_count {
+            self.vdp.tick();
             self.ticks -= 1.0;
             self.cycle_count = self.cycle_count.wrapping_add(1);
         }
@@ -449,7 +511,7 @@ impl<'a> Cpu<'a> {
                 0xA10001 => Size::from_byte(0b10100000),
                 0xA10000..=0xA10FFF => Size::from(0).unwrap(), // IO Registers
                 0xA11000..=0xA11FFF => Size::from(0).unwrap(), // Z80 Control
-                0xC00000..=0xDFFFFF => Size::from(0).unwrap(), // VDP Ports
+                0xC00000..=0xDFFFFF => Size::read_from_vdp_bus(self.vdp_bus, addr),
                 0xE00000..=0xFFFFFF => {
                     let ram_addr = addr & 0xFFFF;
                     Size::from_memory_bytes(
@@ -489,7 +551,7 @@ impl<'a> Cpu<'a> {
                 0xA00000..=0xA0FFFF => {} // Z80 Area
                 0xA10000..=0xA10FFF => {} // IO Registers
                 0xA11000..=0xA11FFF => {} // Z80 Control
-                0xC00000..=0xDFFFFF => {} // VDP Ports
+                0xC00000..=0xDFFFFF => Size::write_to_vdp_bus(self.vdp_bus, addr, val),
                 0xE00000..=0xFFFFFF => {
                     let ram_addr = addr & 0xFFFF;
                     val.set_memory_bytes(
