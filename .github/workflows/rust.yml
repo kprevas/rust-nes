@@ -24,7 +24,12 @@ jobs:
       - name: Install glib
         run: sudo apt-get install glib-2.0
       - name: Install SDL
-        run: curl -O http://www.libsdl.org/release/SDL2-2.0.6.tar.gz && tar -xzvf SDL2-2.0.6.tar.gz && cd SDL2-2.0.6 && ./configure && make && sudo make install
+        run: |
+          curl -O http://www.libsdl.org/release/SDL2-2.0.6.tar.gz
+          tar -xzvf SDL2-2.0.6.tar.gz && cd SDL2-2.0.6
+          ./configure
+          make
+          sudo make install
       - name: Build
         run: cargo build --verbose --release
       - name: Run integration tests
@@ -46,6 +51,12 @@ jobs:
       - uses: hecrj/setup-rust-action@v1
         with:
           rust-version: nightly
+      - name: Install SDL2
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://www.libsdl.org/release/SDL2-devel-2.0.20-VC.zip" -OutFile "SDL2-devel-2.0.20-VC.zip"
+          7z x SDL2-devel-2.0.20-VC.zip
+          Copy-Item "SDL2-2.0.20\lib\x64\SDL2*" "C:\Users\runneradmin\.rustup\toolchains\nightly-x86_64-pc-windows-msvc\lib\rustlib\x86_64-pc-windows-msvc\lib"
       - name: Build
         run: cargo build --verbose --release
       - name: Upload a Build Artifact
