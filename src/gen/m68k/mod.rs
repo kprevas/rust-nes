@@ -17,7 +17,7 @@ const CPU_TICKS_PER_SECOND: f64 = 7_670_454.0;
 
 trait DataSize: TryFrom<u32> + PrimInt {
     fn address_size() -> u32;
-    fn bits() -> u8;
+    fn bits() -> usize;
     fn word_aligned_address_size() -> u32;
     fn from_register_value(value: u32) -> Self;
     fn to_register_value(self) -> u32;
@@ -32,7 +32,7 @@ impl DataSize for u8 {
     fn address_size() -> u32 {
         1
     }
-    fn bits() -> u8 {
+    fn bits() -> usize {
         8
     }
     fn word_aligned_address_size() -> u32 {
@@ -72,7 +72,7 @@ impl DataSize for i8 {
     fn address_size() -> u32 {
         1
     }
-    fn bits() -> u8 {
+    fn bits() -> usize {
         8
     }
     fn word_aligned_address_size() -> u32 {
@@ -112,7 +112,7 @@ impl DataSize for u16 {
     fn address_size() -> u32 {
         2
     }
-    fn bits() -> u8 {
+    fn bits() -> usize {
         16
     }
     fn word_aligned_address_size() -> u32 {
@@ -153,7 +153,7 @@ impl DataSize for i16 {
     fn address_size() -> u32 {
         2
     }
-    fn bits() -> u8 {
+    fn bits() -> usize {
         16
     }
     fn word_aligned_address_size() -> u32 {
@@ -194,7 +194,7 @@ impl DataSize for u32 {
     fn address_size() -> u32 {
         4
     }
-    fn bits() -> u8 {
+    fn bits() -> usize {
         32
     }
     fn word_aligned_address_size() -> u32 {
@@ -240,7 +240,7 @@ impl DataSize for i32 {
     fn address_size() -> u32 {
         4
     }
-    fn bits() -> u8 {
+    fn bits() -> usize {
         32
     }
     fn word_aligned_address_size() -> u32 {
@@ -1412,7 +1412,7 @@ impl<'a> Cpu<'a> {
             let last_bit = !(val & Size::from(0b1).unwrap()).is_zero();
             let result = (val >> 1)
                 | if cpu.flag(EXTEND) {
-                Size::from(0b1 << (Size::bits() - 1)).unwrap()
+                Size::from(Size::from(0b1).unwrap() << (Size::bits() - 1)).unwrap()
             } else {
                 Size::from(0b0).unwrap()
             };
@@ -1430,10 +1430,10 @@ impl<'a> Cpu<'a> {
         let result = if count > 0 {
             let mut result = val;
             for _ in 0..count {
-                let last_bit = !(val & Size::from(0b1).unwrap()).is_zero();
-                result = (val >> 1)
+                let last_bit = !(result & Size::from(0b1).unwrap()).is_zero();
+                result = (result >> 1)
                     | if self.flag(EXTEND) {
-                    Size::from(0b1 << (Size::bits() - 1)).unwrap()
+                    Size::from(Size::from(0b1).unwrap() << (Size::bits() - 1)).unwrap()
                 } else {
                     Size::from(0b0).unwrap()
                 };
