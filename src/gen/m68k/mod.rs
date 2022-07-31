@@ -525,9 +525,9 @@ impl<'a> Cpu<'a> {
             Size::address_size()
         };
         if register == 7 && self.flag(SUPERVISOR_MODE) {
-            self.ssp += val;
+            self.ssp = self.ssp.wrapping_add(val);
         } else {
-            self.a[register] += val;
+            self.a[register] = self.a[register].wrapping_add(val);
         }
     }
 
@@ -538,9 +538,9 @@ impl<'a> Cpu<'a> {
             Size::address_size()
         };
         if register == 7 && self.flag(SUPERVISOR_MODE) {
-            self.ssp -= val;
+            self.ssp = self.ssp.wrapping_sub(val);
         } else {
-            self.a[register] -= val;
+            self.a[register] = self.a[register].wrapping_sub(val);
         }
     }
 
