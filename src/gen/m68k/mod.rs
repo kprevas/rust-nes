@@ -2747,6 +2747,10 @@ pub mod testing {
             opcode(self.read_addr(self.pc))
         }
 
+        pub fn peek_ram_long(&mut self, addr: u32) -> u32 {
+            self.read_addr_no_tick(addr)
+        }
+
         pub fn verify_ram(&mut self, addr: u32, val: u8, test_id: &str) {
             assert_eq!(
                 self.read_addr::<u8>(addr),
