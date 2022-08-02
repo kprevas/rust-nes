@@ -427,7 +427,7 @@ impl<'a> Cpu<'a> {
 
     fn tick(&mut self, cycle_count: u8) {
         for _ in 0..cycle_count {
-            self.vdp.tick();
+            self.vdp.tick(&self.cartridge, &self.internal_ram);
             self.ticks -= 1.0;
             self.cycle_count = self.cycle_count.wrapping_add(1);
         }

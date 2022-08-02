@@ -12,6 +12,7 @@ pub enum AddrTarget {
 }
 
 #[allow(dead_code)]
+#[derive(Copy, Clone)]
 pub struct Addr {
     pub mode: AddrMode,
     pub target: AddrTarget,
@@ -237,7 +238,7 @@ pub struct VdpBus {
     dma_length_half: u16,
     dma_source_addr_half: u32,
     dma_type: DmaType,
-    pub addr: Addr,
+    pub addr: Option<Addr>,
     pub read_data: u32,
     pub write_data: Option<WriteData>,
 }
@@ -304,13 +305,7 @@ impl VdpBus {
             dma_length_half: 0,
             dma_source_addr_half: 0,
             dma_type: DmaType::RamToVram,
-            addr: Addr {
-                mode: AddrMode::Read,
-                target: AddrTarget::VRAM,
-                addr: 0,
-                vram_to_vram: false,
-                dma: false,
-            },
+            addr: None,
             read_data: 0,
             write_data: None,
         }
@@ -319,10 +314,10 @@ impl VdpBus {
     pub fn read_byte(&mut self, addr: u32) -> u8 {
         match addr {
             0xC00000 => {
-                if let Addr {
-                    mode: AddrMode::Read,
-                    ..
-                } = &self.addr
+                if let Some(Addr {
+                                mode: AddrMode::Read,
+                                ..
+                            }) = &self.addr
                 {
                     self.increment_addr();
                     (self.read_data >> 24) as u8
@@ -343,10 +338,10 @@ impl VdpBus {
     pub fn read_word(&mut self, addr: u32) -> u16 {
         match addr {
             0xC00000 => {
-                if let Addr {
-                    mode: AddrMode::Read,
-                    ..
-                } = &self.addr
+                if let Some(Addr {
+                                mode: AddrMode::Read,
+                                ..
+                            }) = &self.addr
                 {
                     self.increment_addr();
                     (self.read_data >> 16) as u16
@@ -371,10 +366,10 @@ impl VdpBus {
     pub fn read_long(&mut self, addr: u32) -> u32 {
         match addr {
             0xC00000 => {
-                if let Addr {
-                    mode: AddrMode::Read,
-                    ..
-                } = &self.addr
+                if let Some(Addr {
+                                mode: AddrMode::Read,
+                                ..
+                            }) = &self.addr
                 {
                     self.increment_addr();
                     self.read_data
@@ -390,10 +385,10 @@ impl VdpBus {
     pub fn write_byte(&mut self, addr: u32, data: u8) {
         match addr {
             0xC00000 => {
-                if let Addr {
-                    mode: AddrMode::Write,
-                    ..
-                } = &self.addr
+                if let Some(Addr {
+                                mode: AddrMode::Write,
+                                ..
+                            }) = &self.addr
                 {
                     self.write_data = Some(WriteData::Byte(data));
                     self.increment_addr();
@@ -408,10 +403,10 @@ impl VdpBus {
     pub fn write_word(&mut self, addr: u32, data: u16) {
         match addr {
             0xC00000 => {
-                if let Addr {
-                    mode: AddrMode::Write,
-                    ..
-                } = &self.addr
+                if let Some(Addr {
+                                mode: AddrMode::Write,
+                                ..
+                            }) = &self.addr
                 {
                     self.write_data = Some(WriteData::Word(data));
                     self.increment_addr();
@@ -419,7 +414,7 @@ impl VdpBus {
             }
             0xC00004 => {
                 if let Some(high_word) = self.control_high_word.take() {
-                    self.addr = Addr::from_u32(((high_word as u32) << 16) | (data as u32));
+                    self.addr = Some(Addr::from_u32(((high_word as u32) << 16) | (data as u32)));
                 } else if (data >> 14) & 0b11 == 0b10 {
                     let (register_number, data) = ((data >> 8) & 0b11111, data & 0xFF);
                     match register_number {
@@ -482,7 +477,7 @@ impl VdpBus {
                         }
                         0x16 => {
                             self.dma_source_addr_half =
-                                (self.dma_source_addr_half & 0xFF00FF) | data as u32
+                                (self.dma_source_addr_half & 0xFF00FF) | ((data as u32) << 8)
                         }
                         0x17 => {
                             self.dma_type = match (data & 0b11000000) >> 6 {
@@ -491,8 +486,12 @@ impl VdpBus {
                                 0b11 => DmaType::VramToVram,
                                 _ => panic!(),
                             };
+                            let addr_mask = match self.dma_type {
+                                DmaType::RamToVram => 0b1111111,
+                                DmaType::VramFill | DmaType::VramToVram => 0b111111,
+                            };
                             self.dma_source_addr_half = (self.dma_source_addr_half & 0x00FFFF)
-                                | (((data & 0b11111) as u32) << 16);
+                                | (((data & addr_mask) as u32) << 16);
                         }
                         _ => panic!(),
                     }
@@ -508,10 +507,10 @@ impl VdpBus {
     pub fn write_long(&mut self, addr: u32, data: u32) {
         match addr {
             0xC00000 => {
-                if let Addr {
-                    mode: AddrMode::Write,
-                    ..
-                } = &self.addr
+                if let Some(Addr {
+                                mode: AddrMode::Write,
+                                ..
+                            }) = &self.addr
                 {
                     self.write_data = Some(WriteData::Long(data));
                     self.increment_addr();
@@ -526,18 +525,70 @@ impl VdpBus {
     }
 
     fn increment_addr(&mut self) {
-        let new_addr = self.addr.addr.wrapping_add(self.auto_increment as u16);
-        let new_addr_wrapped = match self.addr.target {
-            AddrTarget::VRAM => new_addr,
-            AddrTarget::CRAM => new_addr % 0x80,
-            AddrTarget::VSRAM => new_addr % 0x50,
-        };
-        self.addr = Addr {
-            mode: self.addr.mode,
-            target: self.addr.target,
-            addr: new_addr_wrapped,
-            vram_to_vram: self.addr.vram_to_vram,
-            dma: self.addr.dma,
+        if let Some(addr) = self.addr {
+            let new_addr = addr.addr.wrapping_add(self.auto_increment as u16);
+            let new_addr_wrapped = match addr.target {
+                AddrTarget::VRAM => new_addr,
+                AddrTarget::CRAM => new_addr % 0x80,
+                AddrTarget::VSRAM => new_addr % 0x50,
+            };
+            self.addr = Some(Addr {
+                mode: addr.mode,
+                target: addr.target,
+                addr: new_addr_wrapped,
+                vram_to_vram: addr.vram_to_vram,
+                dma: addr.dma,
+            })
         }
+    }
+
+    pub fn dma(&mut self, m68k_cartridge: &[u8], m68k_ram: &[u8], target: &mut [u8]) {
+        let mut len = self.dma_length_half as usize * 2;
+        let mut source = self.dma_source_addr_half as usize * 2;
+        let fill_val = if let DmaType::VramFill = self.dma_type {
+            match self.write_data.take() {
+                None => return,
+                Some(data) => match data {
+                    WriteData::Byte(val) => val,
+                    WriteData::Word(val) => (val >> 8) as u8,
+                    WriteData::Long(val) => (val >> 24) as u8,
+                },
+            }
+        } else {
+            0
+        };
+        while len > 0 {
+            let addr = self.addr.unwrap().addr as usize;
+            match self.dma_type {
+                DmaType::RamToVram => {
+                    match source {
+                        0x000000..=0x3FFFFF => {
+                            target[addr] = m68k_cartridge[source];
+                            target[addr + 1] = m68k_cartridge[source + 1];
+                        }
+                        0xE00000..=0xFFFFFF => {
+                            target[addr] = m68k_ram[source & 0xFFFF];
+                            target[addr + 1] = m68k_ram[(source & 0xFFFF) + 1];
+                        }
+                        _ => panic!(),
+                    }
+                    len -= 2;
+                    source += 2;
+                }
+                DmaType::VramFill => {
+                    target[addr] = fill_val;
+                    len -= 1;
+                    source += 1;
+                }
+                DmaType::VramToVram => {
+                    target[addr] = target[source];
+                    target[addr + 1] = target[source + 1];
+                    len -= 2;
+                    source += 2;
+                }
+            };
+            self.increment_addr();
+        }
+        self.addr = None;
     }
 }

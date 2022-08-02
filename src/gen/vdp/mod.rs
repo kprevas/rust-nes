@@ -1,3 +1,4 @@
+use std::borrow::BorrowMut;
 use std::cell::RefCell;
 use std::convert::TryInto;
 
@@ -24,45 +25,46 @@ impl<'a> Vdp<'a> {
         }
     }
 
-    pub fn tick(&mut self) {
+    pub fn tick(&mut self, m68k_cartridge: &[u8], m68k_ram: &[u8]) {
         let mut bus = self.bus.borrow_mut();
         let write_data = bus.write_data.take();
-        match &bus.addr {
-            Addr {
-                mode: AddrMode::Read,
-                target,
-                addr,
-                ..
-            } => match target {
+        match bus.addr {
+            Some(Addr {
+                     mode: AddrMode::Read,
+                     target,
+                     addr,
+                     ..
+                 }) => match target {
                 AddrTarget::VRAM => {
                     bus.read_data = u32::from_le_bytes(
-                        self.vram[*addr as usize..(*addr + 4) as usize]
+                        self.vram[addr as usize..(addr + 4) as usize]
                             .try_into()
                             .unwrap(),
                     );
                 }
                 AddrTarget::CRAM => {
                     bus.read_data = u32::from_le_bytes(
-                        self.cram[*addr as usize..(*addr + 4) as usize]
+                        self.cram[addr as usize..(addr + 4) as usize]
                             .try_into()
                             .unwrap(),
                     );
                 }
                 AddrTarget::VSRAM => {
                     bus.read_data = u32::from_le_bytes(
-                        self.vsram[*addr as usize..(*addr + 4) as usize]
+                        self.vsram[addr as usize..(addr + 4) as usize]
                             .try_into()
                             .unwrap(),
                     );
                 }
             },
-            Addr {
-                mode: AddrMode::Write,
-                target,
-                addr,
-                ..
-            } => {
-                let addr = *addr as usize;
+            Some(Addr {
+                     mode: AddrMode::Write,
+                     target,
+                     addr,
+                     dma: false,
+                     ..
+                 }) => {
+                let addr = addr as usize;
                 if let Some(data) = write_data {
                     match target {
                         AddrTarget::VRAM => {
@@ -119,6 +121,20 @@ impl<'a> Vdp<'a> {
                     }
                 }
             }
+            Some(Addr {
+                     mode: AddrMode::Write,
+                     target,
+                     dma: true,
+                     ..
+                 }) => {
+                // TODO DMA shouldn't happen instantaneously
+                bus.dma(m68k_cartridge, m68k_ram, match target {
+                    AddrTarget::VRAM => self.vram.borrow_mut(),
+                    AddrTarget::CRAM => self.cram.borrow_mut(),
+                    AddrTarget::VSRAM => self.vsram.borrow_mut(),
+                });
+            }
+            None => {}
         }
     }
 }
