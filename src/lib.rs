@@ -6,6 +6,7 @@ extern crate clap;
 extern crate core;
 extern crate dasp;
 extern crate find_folder;
+extern crate gfx_device_gl;
 extern crate hex_slice;
 extern crate image;
 #[macro_use]

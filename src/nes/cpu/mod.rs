@@ -6,8 +6,9 @@ use std::ops::Range;
 
 use bincode::{deserialize_from, serialize};
 use bytes::*;
-use piston_window::{Context, G2d, G2dTextureContext, Glyphs};
+use piston_window::{Context, G2d, G2dTextureContext};
 
+use gfx_device_gl::Device;
 use input::ControllerState;
 use nes::apu::*;
 use nes::apu::bus::*;
@@ -1158,9 +1159,9 @@ impl<'a> Cpu<'a> {
         c: Context,
         texture_ctx: &mut G2dTextureContext,
         gl: &mut G2d,
-        glyphs: &mut Glyphs,
+        device: &mut Device,
     ) {
-        self.ppu.render(c, texture_ctx, gl, glyphs);
+        self.ppu.render(c, texture_ctx, gl, device);
     }
 
     pub fn reset(&mut self, soft: bool) {

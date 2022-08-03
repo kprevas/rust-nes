@@ -162,18 +162,16 @@ pub fn run(matches: &ArgMatches) {
             frame_count += 1;
         }
 
-        if let Some(_r) = e.render_args() {
-            window.draw_2d(&e, |c, gl, _| {
-                let trans = c.trans(x_trans, y_trans).scale(scale, scale);
-                cpu.render(trans, &mut texture_ctx, gl, &mut glyphs);
-                recorder.render_overlay(c, gl);
-                if input_overlay {
-                    inputs[0].render_overlay(trans.trans(10.0, 230.0), gl, &mut glyphs);
-                    inputs[1].render_overlay(trans.trans(170.0, 230.0), gl, &mut glyphs);
-                }
-                menu.render(trans, gl, &mut glyphs);
-            });
-        }
+        window.draw_2d(&e, |c, gl, device| {
+            let trans = c.trans(x_trans, y_trans).scale(scale, scale);
+            cpu.render(trans, &mut texture_ctx, gl, device);
+            recorder.render_overlay(c, gl);
+            if input_overlay {
+                inputs[0].render_overlay(trans.trans(10.0, 230.0), gl, &mut glyphs);
+                inputs[1].render_overlay(trans.trans(170.0, 230.0), gl, &mut glyphs);
+            }
+            menu.render(trans, gl, &mut glyphs);
+        });
 
         if let Some(r) = e.resize_args() {
             let width = r.draw_size[0] as f64;

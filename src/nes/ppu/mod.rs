@@ -10,6 +10,7 @@ use bytes::*;
 use image::{DynamicImage, GenericImage, Rgba};
 use piston_window::*;
 
+use gfx_device_gl::Device;
 use nes::cartridge::CartridgeBus;
 
 use self::bus::*;
@@ -686,7 +687,7 @@ impl<'a> Ppu<'a> {
         c: Context,
         mut texture_ctx: &mut G2dTextureContext,
         gl: &mut G2d,
-        _glyphs: &mut Glyphs,
+        device: &mut Device,
     ) {
         if let Some(ref mut texture) = self.texture {
             texture
@@ -696,6 +697,7 @@ impl<'a> Ppu<'a> {
                 )
                 .unwrap();
             image(texture, c.transform.scale(8.0 / 7.0, 1.0), gl);
+            texture_ctx.encoder.flush(device);
         }
     }
 
