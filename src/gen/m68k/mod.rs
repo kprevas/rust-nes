@@ -3,8 +3,10 @@ use std::convert::TryFrom;
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Shl, Shr, Sub, SubAssign};
 
+use bytes::Buf;
 use num_integer::Integer;
 use num_traits::{PrimInt, Signed, WrappingAdd, WrappingSub};
+use piston_window::*;
 
 use gen::m68k::opcodes::{
     AddressingMode, BitNum, brief_extension_word, Condition, Direction, ExchangeMode, opcode,
@@ -12,7 +14,10 @@ use gen::m68k::opcodes::{
 };
 use gen::vdp::bus::VdpBus;
 use gen::vdp::Vdp;
+use gfx_device_gl::Device;
 use input::ControllerState;
+use window;
+use window::Cpu as wcpu;
 
 pub mod opcodes;
 
@@ -2729,23 +2734,9 @@ impl<'a> Cpu<'a> {
         }
     }
 
-    pub fn do_frame(&mut self, time_secs: f64, inputs: &[ControllerState<8>; 2]) {
-        self.ticks += time_secs * CPU_TICKS_PER_SECOND * self.speed_adj;
-
-        while self.ticks > 0.0 {
-            self.next_operation(inputs);
-        }
+    pub fn close(&mut self) {
+        self.vdp.close();
     }
-
-    pub fn reset(&mut self, _soft: bool) {
-        self.ssp = self.read_addr_no_tick(0x000000);
-        self.pc = self.read_addr_no_tick(0x000004);
-        self.set_interrupt_level(7);
-        self.set_flag(SUPERVISOR_MODE, true);
-        self.stopped = false;
-    }
-
-    pub fn close(&mut self) {}
 }
 
 #[cfg(feature = "test")]
@@ -2824,5 +2815,49 @@ pub mod testing {
         }
 
         pub fn pc_for_test(&self) -> u32 { self.pc }
+    }
+}
+
+impl window::Cpu for Cpu<'_> {
+    fn reset(&mut self, _soft: bool) {
+        self.ssp = self.read_addr_no_tick(0x000000);
+        self.pc = self.read_addr_no_tick(0x000004);
+        self.set_interrupt_level(7);
+        self.set_flag(SUPERVISOR_MODE, true);
+        self.stopped = false;
+    }
+
+    fn do_frame(&mut self, time_secs: f64, inputs: &[ControllerState<8>; 2]) {
+        self.ticks += time_secs * CPU_TICKS_PER_SECOND * self.speed_adj;
+
+        while self.ticks > 0.0 {
+            self.next_operation(inputs);
+        }
+    }
+
+    fn render(
+        &mut self,
+        c: Context,
+        texture_ctx: &mut G2dTextureContext,
+        gl: &mut G2d,
+        device: &mut Device,
+    ) {
+        self.vdp.render(c, texture_ctx, gl, device);
+    }
+
+    fn save_state(&self, _out: &mut Vec<u8>) {
+        todo!()
+    }
+
+    fn load_state(&mut self, _state: &mut dyn Buf) {
+        todo!()
+    }
+
+    fn increase_speed(&mut self) {
+        todo!()
+    }
+
+    fn decrease_speed(&mut self) {
+        todo!()
     }
 }

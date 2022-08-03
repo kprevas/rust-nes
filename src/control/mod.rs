@@ -4,6 +4,8 @@ use std::mem::swap;
 
 use piston_window::*;
 
+use window::Cpu;
+
 use super::record::Recorder;
 
 const SAVE_KEYS: [Key; 10] = [
@@ -41,7 +43,7 @@ impl<const B: usize> Control<B> {
     pub fn event(
         &mut self,
         event: &Event,
-        cpu: &mut super::nes::cpu::Cpu,
+        cpu: &mut dyn Cpu,
         reset: &mut bool,
         input_overlay: &mut bool,
         recorder: &mut Recorder<B>,
@@ -74,16 +76,10 @@ impl<const B: usize> Control<B> {
                 *input_overlay = !*input_overlay;
             }
             if key_pressed == Key::Equals {
-                if cpu.speed_adj < 2.5 {
-                    cpu.speed_adj += 0.25;
-                }
-                debug!(target: "ctrl", "speed adj {}", cpu.speed_adj);
+                cpu.increase_speed();
             }
             if key_pressed == Key::Minus {
-                if cpu.speed_adj > 0.25 {
-                    cpu.speed_adj -= 0.25;
-                }
-                debug!(target: "ctrl", "speed adj {}", cpu.speed_adj);
+                cpu.decrease_speed();
             }
         }
 

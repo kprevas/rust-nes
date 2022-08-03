@@ -7,6 +7,7 @@ extern crate core;
 extern crate dasp;
 extern crate find_folder;
 extern crate gfx_device_gl;
+extern crate graphics;
 extern crate hex_slice;
 extern crate image;
 #[macro_use]
@@ -21,6 +22,7 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate simple_error;
+extern crate triple_buffer;
 
 use std::fs::File;
 use std::io::prelude::*;
@@ -34,6 +36,7 @@ pub mod input;
 pub mod gen;
 pub mod menu;
 pub mod record;
+pub mod window;
 
 pub fn run(matches: ArgMatches) {
     if let Some(matches) = matches.subcommand_matches("disassemble") {

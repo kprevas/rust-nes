@@ -15,6 +15,8 @@ use nes::apu::bus::*;
 use nes::cartridge::CartridgeBus;
 use nes::ppu::*;
 use nes::ppu::bus::*;
+use window;
+use window::Cpu as wcpu;
 
 use self::opcodes::AddressingMode;
 use self::opcodes::AddressingMode::*;
@@ -1146,46 +1148,6 @@ impl<'a> Cpu<'a> {
         }
     }
 
-    pub fn do_frame(&mut self, time_secs: f64, inputs: &[ControllerState<8>; 2]) {
-        self.ticks += time_secs * CPU_TICKS_PER_SECOND * self.speed_adj;
-
-        while self.ticks > 0.0 {
-            self.next_operation(inputs);
-        }
-    }
-
-    pub fn render(
-        &mut self,
-        c: Context,
-        texture_ctx: &mut G2dTextureContext,
-        gl: &mut G2d,
-        device: &mut Device,
-    ) {
-        self.ppu.render(c, texture_ctx, gl, device);
-    }
-
-    pub fn reset(&mut self, soft: bool) {
-        if soft {
-            self.sp -= 3;
-            self.p |= 0x4;
-        } else {
-            self.sp = 0xfd;
-            self.p = 0x34;
-        };
-        self.pc = self.read_word_no_tick(0xFFFC);
-
-        self.apu_bus.borrow_mut().reset(soft);
-        self.write_memory_no_tick(0x2000, 0);
-        self.write_memory_no_tick(0x2001, 0);
-
-        for _ in 0..28 {
-            self.ppu.tick();
-        }
-        for _ in 0..9 {
-            self.apu.tick(self.cartridge);
-        }
-    }
-
     pub fn close(&mut self) {
         self.apu.close();
         self.ppu.close();
@@ -1199,58 +1161,6 @@ impl<'a> Cpu<'a> {
             info!(target: "cartridge", "no save data written");
         }
         result
-    }
-
-    pub fn save_state(&self, out: &mut Vec<u8>) {
-        out.put_u8(self.a);
-        out.put_u8(self.x);
-        out.put_u8(self.y);
-        out.put_u8(self.p);
-        out.put_u8(self.sp);
-        out.put_u16(self.pc);
-        out.put_slice(&serialize(&self.oam_dma_write).unwrap());
-        out.put_slice(&self.internal_ram);
-        out.put_u8(if self.controller_strobe { 1 } else { 0 });
-        out.put_u8(self.last_inputs[0]);
-        out.put_u8(self.last_inputs[1]);
-        out.put_f64(self.ticks);
-        out.put_u8(self.open_bus);
-        out.put_slice(&serialize(&self.delayed_irq_flag).unwrap());
-        out.put_u8(if self.irq { 1 } else { 0 });
-        out.put_u8(if self.prev_irq { 1 } else { 0 });
-        out.put_u8(self.dmc_delay);
-        out.put_u64(self.cycle_count);
-        self.cartridge.save_state(out);
-        self.ppu.save_state(out);
-        self.ppu_bus.borrow().save_state(out);
-        self.apu.save_state(out);
-        self.apu_bus.borrow().save_state(out);
-    }
-
-    pub fn load_state(&mut self, state: &mut dyn Buf) {
-        self.a = state.get_u8();
-        self.x = state.get_u8();
-        self.y = state.get_u8();
-        self.p = state.get_u8();
-        self.sp = state.get_u8();
-        self.pc = state.get_u16();
-        self.oam_dma_write = deserialize_from(state.reader()).unwrap();
-        state.copy_to_slice(&mut self.internal_ram);
-        self.controller_strobe = state.get_u8() == 1;
-        self.last_inputs[0] = state.get_u8();
-        self.last_inputs[1] = state.get_u8();
-        self.ticks = state.get_f64();
-        self.open_bus = state.get_u8();
-        self.delayed_irq_flag = deserialize_from(state.reader()).unwrap();
-        self.irq = state.get_u8() == 1;
-        self.prev_irq = state.get_u8() == 1;
-        self.dmc_delay = state.get_u8();
-        self.cycle_count = state.get_u64();
-        self.cartridge.load_state(state);
-        self.ppu.load_state(state);
-        self.ppu_bus.borrow_mut().load_state(state);
-        self.apu.load_state(state);
-        self.apu_bus.borrow_mut().load_state(state);
     }
 
     pub fn setup_for_test(&mut self, p_start: u8, pc_start: u16) {
@@ -1280,5 +1190,113 @@ impl<'a> Cpu<'a> {
 
     pub fn set_memory_watch(&mut self, addr: u16) {
         self.memory_watches.insert(addr);
+    }
+}
+
+impl window::Cpu for Cpu<'_> {
+    fn reset(&mut self, soft: bool) {
+        if soft {
+            self.sp -= 3;
+            self.p |= 0x4;
+        } else {
+            self.sp = 0xfd;
+            self.p = 0x34;
+        };
+        self.pc = self.read_word_no_tick(0xFFFC);
+
+        self.apu_bus.borrow_mut().reset(soft);
+        self.write_memory_no_tick(0x2000, 0);
+        self.write_memory_no_tick(0x2001, 0);
+
+        for _ in 0..28 {
+            self.ppu.tick();
+        }
+        for _ in 0..9 {
+            self.apu.tick(self.cartridge);
+        }
+    }
+
+    fn do_frame(&mut self, time_secs: f64, inputs: &[ControllerState<8>; 2]) {
+        self.ticks += time_secs * CPU_TICKS_PER_SECOND * self.speed_adj;
+
+        while self.ticks > 0.0 {
+            self.next_operation(inputs);
+        }
+    }
+
+    fn render(
+        &mut self,
+        c: Context,
+        texture_ctx: &mut G2dTextureContext,
+        gl: &mut G2d,
+        device: &mut Device,
+    ) {
+        self.ppu.render(c, texture_ctx, gl, device);
+    }
+
+    fn save_state(&self, out: &mut Vec<u8>) {
+        out.put_u8(self.a);
+        out.put_u8(self.x);
+        out.put_u8(self.y);
+        out.put_u8(self.p);
+        out.put_u8(self.sp);
+        out.put_u16(self.pc);
+        out.put_slice(&serialize(&self.oam_dma_write).unwrap());
+        out.put_slice(&self.internal_ram);
+        out.put_u8(if self.controller_strobe { 1 } else { 0 });
+        out.put_u8(self.last_inputs[0]);
+        out.put_u8(self.last_inputs[1]);
+        out.put_f64(self.ticks);
+        out.put_u8(self.open_bus);
+        out.put_slice(&serialize(&self.delayed_irq_flag).unwrap());
+        out.put_u8(if self.irq { 1 } else { 0 });
+        out.put_u8(if self.prev_irq { 1 } else { 0 });
+        out.put_u8(self.dmc_delay);
+        out.put_u64(self.cycle_count);
+        self.cartridge.save_state(out);
+        self.ppu.save_state(out);
+        self.ppu_bus.borrow().save_state(out);
+        self.apu.save_state(out);
+        self.apu_bus.borrow().save_state(out);
+    }
+
+    fn load_state(&mut self, state: &mut dyn Buf) {
+        self.a = state.get_u8();
+        self.x = state.get_u8();
+        self.y = state.get_u8();
+        self.p = state.get_u8();
+        self.sp = state.get_u8();
+        self.pc = state.get_u16();
+        self.oam_dma_write = deserialize_from(state.reader()).unwrap();
+        state.copy_to_slice(&mut self.internal_ram);
+        self.controller_strobe = state.get_u8() == 1;
+        self.last_inputs[0] = state.get_u8();
+        self.last_inputs[1] = state.get_u8();
+        self.ticks = state.get_f64();
+        self.open_bus = state.get_u8();
+        self.delayed_irq_flag = deserialize_from(state.reader()).unwrap();
+        self.irq = state.get_u8() == 1;
+        self.prev_irq = state.get_u8() == 1;
+        self.dmc_delay = state.get_u8();
+        self.cycle_count = state.get_u64();
+        self.cartridge.load_state(state);
+        self.ppu.load_state(state);
+        self.ppu_bus.borrow_mut().load_state(state);
+        self.apu.load_state(state);
+        self.apu_bus.borrow_mut().load_state(state);
+    }
+
+    fn increase_speed(&mut self) {
+        if self.speed_adj < 2.5 {
+            self.speed_adj += 0.25;
+        }
+        debug!(target: "ctrl", "speed adj {}", self.speed_adj);
+    }
+
+    fn decrease_speed(&mut self) {
+        if self.speed_adj > 0.25 {
+            self.speed_adj -= 0.25;
+        }
+        debug!(target: "ctrl", "speed adj {}", self.speed_adj);
     }
 }

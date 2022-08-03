@@ -1,12 +1,14 @@
 extern crate emu;
 extern crate itertools;
 extern crate json;
+extern crate piston;
 
 use std::cell::RefCell;
 
 use itertools::{Itertools, Tuples};
 use json::iterators::Members;
 use json::JsonValue;
+use piston::NoWindow;
 
 use emu::gen::m68k::opcodes::Opcode;
 use emu::gen::vdp::bus::VdpBus;
@@ -201,7 +203,7 @@ fn run_json_test(test_cases: JsonValue) {
         }
         let cartridge = vec![0; 8].into_boxed_slice();
         let vdp_bus = RefCell::new(VdpBus::new());
-        let mut cpu = emu::gen::m68k::Cpu::boot(&cartridge, Vdp::new(&vdp_bus), &vdp_bus, true);
+        let mut cpu = emu::gen::m68k::Cpu::boot(&cartridge, Vdp::new::<NoWindow>(&vdp_bus, None), &vdp_bus, true);
         cpu.expand_ram(0x1000000);
         cpu.reset(false);
         let initial_state = &test_case["initial state"];
@@ -297,7 +299,7 @@ fn test_all_opcodes() {
     let rom = include_bytes!("m68k/opcodes.bin");
     let cartridge = vec![0; 8].into_boxed_slice();
     let vdp_bus = RefCell::new(VdpBus::new());
-    let mut cpu = emu::gen::m68k::Cpu::boot(&cartridge, Vdp::new(&vdp_bus), &vdp_bus, true);
+    let mut cpu = emu::gen::m68k::Cpu::boot(&cartridge, Vdp::new::<NoWindow>(&vdp_bus, None), &vdp_bus, true);
     cpu.set_ram(rom);
     cpu.reset(false);
     let mut last_pc = 0;
@@ -321,7 +323,7 @@ fn test_bcd_verifier() {
         .to_vec()
         .into_boxed_slice();
     let vdp_bus = RefCell::new(VdpBus::new());
-    let mut cpu = emu::gen::m68k::Cpu::boot(&cartridge, Vdp::new(&vdp_bus), &vdp_bus, true);
+    let mut cpu = emu::gen::m68k::Cpu::boot(&cartridge, Vdp::new::<NoWindow>(&vdp_bus, None), &vdp_bus, true);
     cpu.reset(false);
     while cpu.pc_for_test() != 0x123a {
         cpu.next_operation(&[emu::input::player_1_gen(), emu::input::player_2_gen()]);

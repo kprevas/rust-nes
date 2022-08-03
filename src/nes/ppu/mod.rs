@@ -1,17 +1,15 @@
 extern crate triple_buffer;
 
 use std::cell::RefCell;
-use std::sync::*;
-use std::sync::atomic::*;
-use std::thread;
 
 use bincode::{deserialize_from, serialize};
 use bytes::*;
-use image::{DynamicImage, GenericImage, Rgba};
+use image::{GenericImage, Rgba};
 use piston_window::*;
 
 use gfx_device_gl::Device;
 use nes::cartridge::CartridgeBus;
+use window::renderer::Renderer;
 
 use self::bus::*;
 use self::triple_buffer::TripleBuffer;
@@ -47,10 +45,7 @@ impl Default for Sprite {
 
 pub struct Ppu<'a> {
     image_buffer: triple_buffer::Input<Box<[usize; 61440]>>,
-    image: Arc<Mutex<DynamicImage>>,
-    texture: Option<G2dTexture>,
-    join_handle: Option<thread::JoinHandle<()>>,
-    closed: Arc<AtomicBool>,
+    renderer: Renderer,
 
     scanline: u16,
     dot: u16,
@@ -98,59 +93,33 @@ impl<'a> Ppu<'a> {
         window: Option<&mut PistonWindow<W>>,
         instrumented: bool,
     ) -> Ppu<'b> {
-        let image = Arc::new(Mutex::new(DynamicImage::new_rgba8(256, 240)));
-        let image_clone = image.clone();
-        let texture = window.map(|window| {
-            G2dTexture::from_image(
-                &mut window.create_texture_context(),
-                image.lock().unwrap().as_rgba8().unwrap(),
-                &TextureSettings::new(),
-            )
-                .unwrap()
-        });
-
-        let (image_buffer, mut image_buffer_out) =
+        let (image_buffer, image_buffer_out) =
             TripleBuffer::new(&Box::new([0usize; 61440])).split();
-        let closed = Arc::new(AtomicBool::new(false));
-        let closed_clone = closed.clone();
-
-        let join_handle = thread::spawn(move || {
-            let mut image = DynamicImage::new_rgba8(256, 240);
-            loop {
-                image_buffer_out.update();
-                if closed_clone.load(Ordering::Relaxed) {
-                    break;
+        let renderer = Renderer::new(window, image_buffer_out, 256, |image_buffer_out, image| {
+            let pixels = image_buffer_out.output_buffer();
+            let mut dot = 0;
+            let mut scanline = 0;
+            for color_index in pixels.iter() {
+                image.put_pixel(
+                    dot,
+                    scanline,
+                    Rgba([
+                        NES_RGB[*color_index],
+                        NES_RGB[*color_index + 1],
+                        NES_RGB[*color_index + 2],
+                        0xff,
+                    ]),
+                );
+                dot += 1;
+                if dot == 256 {
+                    dot = 0;
+                    scanline += 1;
                 }
-                let pixels = image_buffer_out.output_buffer();
-                let mut dot = 0;
-                let mut scanline = 0;
-                for color_index in pixels.iter() {
-                    image.put_pixel(
-                        dot,
-                        scanline,
-                        Rgba([
-                            NES_RGB[*color_index],
-                            NES_RGB[*color_index + 1],
-                            NES_RGB[*color_index + 2],
-                            0xff,
-                        ]),
-                    );
-                    dot += 1;
-                    if dot == 256 {
-                        dot = 0;
-                        scanline += 1;
-                    }
-                }
-                image_clone.lock().unwrap().copy_from(&image, 0, 0).unwrap();
             }
         });
-
         Ppu {
-            image,
             image_buffer,
-            texture,
-            join_handle: Some(join_handle),
-            closed,
+            renderer,
             scanline: 0,
             dot: 0,
             vram_addr: 0,
@@ -685,26 +654,16 @@ impl<'a> Ppu<'a> {
     pub fn render(
         &mut self,
         c: Context,
-        mut texture_ctx: &mut G2dTextureContext,
+        texture_ctx: &mut G2dTextureContext,
         gl: &mut G2d,
         device: &mut Device,
     ) {
-        if let Some(ref mut texture) = self.texture {
-            texture
-                .update(
-                    &mut texture_ctx,
-                    self.image.lock().unwrap().as_rgba8().unwrap(),
-                )
-                .unwrap();
-            image(texture, c.transform.scale(8.0 / 7.0, 1.0), gl);
-            texture_ctx.encoder.flush(device);
-        }
+        self.renderer.render(c, texture_ctx, gl, device);
     }
 
     pub fn close(&mut self) {
-        self.closed.store(true, Ordering::Relaxed);
         self.image_buffer.publish();
-        self.join_handle.take().unwrap().join().unwrap();
+        self.renderer.close();
     }
 
     pub fn save_state(&self, out: &mut Vec<u8>) {

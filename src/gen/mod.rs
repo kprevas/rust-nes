@@ -6,6 +6,8 @@ use clap::ArgMatches;
 use nfd::Response;
 use piston_window::*;
 
+use window::window_loop;
+
 pub mod cartridge;
 pub mod m68k;
 pub mod vdp;
@@ -54,38 +56,26 @@ pub fn run(matches: &ArgMatches) {
         .ups_reset(0)
         .bench_mode(matches.is_present("bench_mode"));
 
-    let mut reset = false;
-
-    let mut _frame_count = 0u32;
-
-    let mut _inputs = [::input::player_1_gen(), ::input::player_2_gen()];
-
-    let instrument_cpu = matches.is_present("instrument_cpu");
-
     let cartridge;
-    let _save_path;
+    let save_path;
     if let Some((c, s)) = load_cartridge(matches) {
         cartridge = c;
-        _save_path = s;
+        save_path = s;
     } else {
         return;
     }
 
+    let mut inputs = [::input::player_1_gen(), ::input::player_2_gen()];
+    let record_path = save_path.with_extension("rcd");
+
+    let instrument_cpu = matches.is_present("instrument_cpu");
+
     let vdp_bus = RefCell::new(vdp::bus::VdpBus::new());
 
-    let vdp = vdp::Vdp::new(&vdp_bus);
+    let vdp = vdp::Vdp::new(&vdp_bus, Some(&mut window));
     let mut cpu = m68k::Cpu::boot(&cartridge, vdp, &vdp_bus, instrument_cpu);
 
-    while let Some(e) = window.next() {
-        if let Some(u) = e.update_args() {
-            if reset {
-                reset = false;
-                cpu.reset(true);
-            }
-            cpu.do_frame(u.dt, &_inputs);
-            _frame_count += 1;
-        }
-    }
+    window_loop(window, &mut inputs, &record_path, &mut cpu, 320.0, 224.0);
 
     cpu.close();
 }
