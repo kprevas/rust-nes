@@ -402,10 +402,12 @@ const INTERRUPT_SHIFT: u16 = 8;
 const SR_MASK: u16 = 0b1010011100011111;
 
 impl<'a> Cpu<'a> {
-    pub fn boot<'b>(cartridge: &'b Box<[u8]>,
-                    vdp: Vdp<'b>,
-                    vdp_bus: &'b RefCell<VdpBus>,
-                    instrumented: bool) -> Cpu<'b> {
+    pub fn boot<'b>(
+        cartridge: &'b Box<[u8]>,
+        vdp: Vdp<'b>,
+        vdp_bus: &'b RefCell<VdpBus>,
+        instrumented: bool,
+    ) -> Cpu<'b> {
         let mut cpu = Cpu {
             a: [0, 0, 0, 0, 0, 0, 0, 0],
             ssp: 0,
@@ -432,7 +434,7 @@ impl<'a> Cpu<'a> {
 
     fn tick(&mut self, cycle_count: u8) {
         for _ in 0..cycle_count {
-            self.vdp.tick(&self.cartridge, &self.internal_ram);
+            self.vdp.cpu_tick(&self.cartridge, &self.internal_ram);
             self.ticks -= 1.0;
             self.cycle_count = self.cycle_count.wrapping_add(1);
         }
@@ -546,8 +548,7 @@ impl<'a> Cpu<'a> {
     ) {
         if self.test_ram_only {
             val.set_memory_bytes(
-                &mut self.internal_ram
-                    [((addr + offset) as usize)..((addr + size) as usize)],
+                &mut self.internal_ram[((addr + offset) as usize)..((addr + size) as usize)],
             );
         } else {
             match addr {
@@ -1021,7 +1022,11 @@ impl<'a> Cpu<'a> {
     ) {
         let val = Size::from_register_value(self.d[register]);
         let result = if count > 0 {
-            let result = val << count;
+            let result = if count >= Size::bits() as u8 {
+                Size::from(0).unwrap()
+            } else {
+                val << count
+            };
             let result_with_last_bit = val << (count - 1);
             let carry = result_with_last_bit.is_negative();
             let sigs = val.unsigned_shr(Size::bits() as u32 - count as u32 - 1);
@@ -1199,7 +1204,11 @@ impl<'a> Cpu<'a> {
     ) {
         let val = Size::from_register_value(self.d[register]);
         let result = if count > 0 {
-            let result = val << count;
+            let result = if count >= Size::bits() as u8 {
+                Size::from(0).unwrap()
+            } else {
+                val << count
+            };
             let result_with_last_bit = val << (count - 1);
             let carry = result_with_last_bit.is_negative();
             self.set_flag(EXTEND, carry);
@@ -2730,6 +2739,21 @@ impl<'a> Cpu<'a> {
         if self.stopped {
             self.ticks = 0.0;
         } else {
+            if let Some((vdp_interrupt_vector, vdp_interrupt_level)) = {
+                let mut vdp_bus = self.vdp_bus.borrow_mut();
+                if vdp_bus.horizontal_interrupt {
+                    vdp_bus.horizontal_interrupt = false;
+                    Some((28, 4))
+                } else if vdp_bus.vertical_interrupt {
+                    vdp_bus.vertical_interrupt = false;
+                    Some((30, 6))
+                } else {
+                    None
+                }
+            } {
+                self.process_exception(vdp_interrupt_vector);
+                self.set_interrupt_level(vdp_interrupt_level);
+            }
             self.execute_opcode();
         }
     }
@@ -2814,7 +2838,9 @@ pub mod testing {
             );
         }
 
-        pub fn pc_for_test(&self) -> u32 { self.pc }
+        pub fn pc_for_test(&self) -> u32 {
+            self.pc
+        }
     }
 }
 
