@@ -720,8 +720,8 @@ dependencies = [
     "serde_derive",
     "serde_with",
     "simple-error",
- "time",
- "triple_buffer",
+    "time",
+    "triple_buffer",
 ]
 
 [[package]]

@@ -11,7 +11,7 @@ use emu::nes::cartridge;
 use emu::nes::cpu::*;
 use emu::nes::ppu::*;
 use emu::nes::ppu::bus::*;
-use emu::window::Cpu;
+use emu::window::Cpu as cpuw;
 
 use self::piston_window::*;
 
