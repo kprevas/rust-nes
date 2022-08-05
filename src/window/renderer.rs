@@ -63,6 +63,7 @@ impl Renderer {
         mut texture_ctx: &mut G2dTextureContext,
         gl: &mut G2d,
         device: &mut Device,
+        x_scale: f64,
     ) {
         if let Some(ref mut texture) = self.texture {
             texture
@@ -71,7 +72,7 @@ impl Renderer {
                     self.image.lock().unwrap().as_rgba8().unwrap(),
                 )
                 .unwrap();
-            image(texture, c.transform.scale(8.0 / 7.0, 1.0), gl);
+            image(texture, c.transform.scale(x_scale, 1.0), gl);
             texture_ctx.encoder.flush(device);
         }
     }

@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 #[derive(Copy, Clone)]
 pub enum AddrMode {
     Read,
@@ -75,9 +77,9 @@ impl Status {
 }
 
 #[allow(dead_code)]
-struct Mode1 {
+pub struct Mode1 {
     blank_leftmost_8: bool,
-    enable_horizontal_interrupt: bool,
+    pub enable_horizontal_interrupt: bool,
     use_high_color_bits: bool,
     freeze_hv_on_level_2_interrupt: bool,
     disable_display: bool,
@@ -164,8 +166,8 @@ enum InterlaceMode {
 }
 
 #[allow(dead_code)]
-struct Mode4 {
-    wide_mode: bool,
+pub struct Mode4 {
+    pub h_40_wide_mode: bool,
     freeze_hsync: bool,
     pixel_clock_signal_on_vsync: bool,
     enable_external_pixel_bus: bool,
@@ -176,7 +178,7 @@ struct Mode4 {
 impl Mode4 {
     fn from_u8(val: u8) -> Mode4 {
         Mode4 {
-            wide_mode: (val & 0b10000000) > 0,
+            h_40_wide_mode: (val & 0b10000000) > 0,
             freeze_hsync: (val & 0b01000000) > 0,
             pixel_clock_signal_on_vsync: (val & 0b00100000) > 0,
             enable_external_pixel_bus: (val & 0b00010000) > 0,
@@ -210,29 +212,28 @@ enum DmaType {
 pub enum WriteData {
     Byte(u8),
     Word(u16),
-    Long(u32),
 }
 
 pub struct VdpBus {
     control_high_word: Option<u16>,
     status: Status,
-    beam_vpos: u16,
-    beam_hpos: u16,
-    mode_1: Mode1,
+    pub beam_vpos: u16,
+    pub beam_hpos: u16,
+    pub mode_1: Mode1,
     mode_2: Mode2,
     mode_3: Mode3,
-    mode_4: Mode4,
-    plane_a_nametable_addr: u16,
-    plane_b_nametable_addr: u16,
-    window_nametable_addr: u16,
-    sprite_table_addr: u16,
-    bg_palette: u8,
-    bg_color: u8,
-    horizontal_interrupt_counter: u16,
+    pub mode_4: Mode4,
+    pub plane_a_nametable_addr: u16,
+    pub plane_b_nametable_addr: u16,
+    pub window_nametable_addr: u16,
+    pub sprite_table_addr: u16,
+    pub bg_palette: u8,
+    pub bg_color: u8,
+    pub horizontal_interrupt_counter: u16,
     horizontal_scroll_data_addr: u16,
     auto_increment: u8,
     plane_height: u16,
-    plane_width: u16,
+    pub(crate) plane_width: u16,
     window_h_pos: WindowHPos,
     window_v_pos: WindowVPos,
     dma_length_half: u16,
@@ -240,7 +241,9 @@ pub struct VdpBus {
     dma_type: DmaType,
     pub addr: Option<Addr>,
     pub read_data: u32,
-    pub write_data: Option<WriteData>,
+    pub write_data: VecDeque<WriteData>,
+    pub horizontal_interrupt: bool,
+    pub vertical_interrupt: bool,
 }
 
 impl VdpBus {
@@ -282,7 +285,7 @@ impl VdpBus {
                 horizontal_scrolling_mode: HorizontalScrollingMode::Row1Pixel,
             },
             mode_4: Mode4 {
-                wide_mode: false,
+                h_40_wide_mode: false,
                 freeze_hsync: false,
                 pixel_clock_signal_on_vsync: false,
                 enable_external_pixel_bus: false,
@@ -307,7 +310,9 @@ impl VdpBus {
             dma_type: DmaType::RamToVram,
             addr: None,
             read_data: 0,
-            write_data: None,
+            write_data: VecDeque::new(),
+            horizontal_interrupt: false,
+            vertical_interrupt: false
         }
     }
 
@@ -390,8 +395,7 @@ impl VdpBus {
                                 ..
                             }) = &self.addr
                 {
-                    self.write_data = Some(WriteData::Byte(data));
-                    self.increment_addr();
+                    self.write_data.push_back(WriteData::Byte(data));
                 }
             }
             0xC00004 | 0xC00005 => panic!(), // TODO: allowed?
@@ -408,8 +412,7 @@ impl VdpBus {
                                 ..
                             }) = &self.addr
                 {
-                    self.write_data = Some(WriteData::Word(data));
-                    self.increment_addr();
+                    self.write_data.push_back(WriteData::Word(data));
                 }
             }
             0xC00004 => {
@@ -505,26 +508,11 @@ impl VdpBus {
     }
 
     pub fn write_long(&mut self, addr: u32, data: u32) {
-        match addr {
-            0xC00000 => {
-                if let Some(Addr {
-                                mode: AddrMode::Write,
-                                ..
-                            }) = &self.addr
-                {
-                    self.write_data = Some(WriteData::Long(data));
-                    self.increment_addr();
-                }
-            }
-            0xC00004 => {
-                self.write_word(addr, (data >> 16) as u16);
-                self.write_word(addr, (data & 0xFFFF) as u16);
-            }
-            _ => panic!(),
-        }
+        self.write_word(addr, (data >> 16) as u16);
+        self.write_word(addr, (data & 0xFFFF) as u16);
     }
 
-    fn increment_addr(&mut self) {
+    pub(crate) fn increment_addr(&mut self) {
         if let Some(addr) = self.addr {
             let new_addr = addr.addr.wrapping_add(self.auto_increment as u16);
             let new_addr_wrapped = match addr.target {
@@ -546,12 +534,11 @@ impl VdpBus {
         let mut len = self.dma_length_half as usize * 2;
         let mut source = self.dma_source_addr_half as usize * 2;
         let fill_val = if let DmaType::VramFill = self.dma_type {
-            match self.write_data.take() {
+            match self.write_data.pop_front() {
                 None => return,
                 Some(data) => match data {
                     WriteData::Byte(val) => val,
                     WriteData::Word(val) => (val >> 8) as u8,
-                    WriteData::Long(val) => (val >> 24) as u8,
                 },
             }
         } else {
