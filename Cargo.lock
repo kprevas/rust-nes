@@ -690,38 +690,38 @@ checksum = "3f107b87b6afc2a64fd13cac55fe06d6c8859f12d4b14cbcdd2c67d0976781be"
 name = "emu"
 version = "0.1.0"
 dependencies = [
-    "array-init",
-    "bincode",
-    "bitflags 1.3.2",
-    "byteorder",
-    "bytes",
-    "clap",
-    "dasp",
-    "env_logger",
-    "find_folder",
-    "gfx_device_gl",
-    "hex-slice",
-    "image",
-    "itertools",
-    "json",
-    "log",
-    "nfd",
-    "num-integer",
-    "num-traits",
-    "piston",
-    "piston2d-graphics",
-    "piston2d-opengl_graphics",
-    "piston_window",
-    "pistoncore-sdl2_window",
-    "portaudio",
-    "rb",
-    "serde",
-    "serde_arrays",
-    "serde_derive",
-    "serde_with",
-    "simple-error",
-    "time",
-    "triple_buffer",
+ "array-init",
+ "bincode",
+ "bitflags 1.3.2",
+ "byteorder",
+ "bytes",
+ "clap",
+ "dasp",
+ "env_logger",
+ "find_folder",
+ "gfx_device_gl",
+ "hex-slice",
+ "image",
+ "itertools",
+ "json",
+ "log",
+ "nfd",
+ "num-integer",
+ "num-traits",
+ "piston",
+ "piston2d-graphics",
+ "piston2d-opengl_graphics",
+ "piston_window",
+ "pistoncore-sdl2_window",
+ "portaudio",
+ "rb",
+ "serde",
+ "serde_arrays",
+ "serde_derive",
+ "serde_with",
+ "simple-error",
+ "time",
+ "triple_buffer",
 ]
 
 [[package]]
@@ -2240,11 +2240,12 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.11"
+version = "0.3.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72c91f41dcb2f096c05f0873d667dceec1087ce5bcf984ec8ffb19acddbb3217"
+checksum = "74b7cc93fc23ba97fde84f7eea56c55d1ba183f495c6715defdfc7b9cb8c870f"
 dependencies = [
  "itoa",
+ "js-sys",
  "libc",
  "num_threads",
  "serde",
