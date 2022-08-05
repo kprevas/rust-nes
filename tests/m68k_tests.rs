@@ -13,6 +13,7 @@ use piston::NoWindow;
 use emu::gen::m68k::opcodes::Opcode;
 use emu::gen::vdp::bus::VdpBus;
 use emu::gen::vdp::Vdp;
+use emu::window::Cpu as cpuw;
 
 #[test]
 fn opcode_decoding() {
