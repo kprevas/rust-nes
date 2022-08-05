@@ -1716,10 +1716,27 @@ impl<'a> Cpu<'a> {
         let opcode = opcode(opcode_hex);
 
         if self.instrumented {
-            debug!(target: "cpu", "{:08X}\t{:04X}\t{}",
+            debug!(target: "cpu", "{:08X}\t{:04X}\t{}\t\tD {} {} {} {} {} {} {} {}\t\tA {} {} {} {} {} {} {} {}",
             opcode_pc,
             opcode_hex,
-            opcode);
+            opcode,
+            self.d[0] as i32,
+            self.d[1] as i32,
+            self.d[2] as i32,
+            self.d[3] as i32,
+            self.d[4] as i32,
+            self.d[5] as i32,
+            self.d[6] as i32,
+            self.d[7] as i32,
+            self.a[0] as i32,
+            self.a[1] as i32,
+            self.a[2] as i32,
+            self.a[3] as i32,
+            self.a[4] as i32,
+            self.a[5] as i32,
+            self.a[6] as i32,
+            self.a[7] as i32,
+            );
         }
 
         match opcode {
