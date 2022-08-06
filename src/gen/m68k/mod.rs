@@ -19,8 +19,8 @@ use input::ControllerState;
 use window;
 use window::Cpu as wcpu;
 
-pub mod opcodes;
 pub mod disassembler;
+pub mod opcodes;
 
 const CPU_TICKS_PER_SECOND: f64 = 7_670_454.0;
 
@@ -515,9 +515,15 @@ impl<'a> Cpu<'a> {
             )
         } else {
             match addr {
-                0x000000..=0x3FFFFF => Size::from_memory_bytes(
-                    &self.cartridge[((addr + offset) as usize)..((addr + size) as usize)],
-                ),
+                0x000000..=0x3FFFFF => {
+                    if (addr + size) as usize >= self.cartridge.len() {
+                        Size::from(0).unwrap()
+                    } else {
+                        Size::from_memory_bytes(
+                            &self.cartridge[((addr + offset) as usize)..((addr + size) as usize)],
+                        )
+                    }
+                }
                 0x400000..=0x7FFFFF => Size::from(0).unwrap(), // Expansion port
                 0xA00000..=0xA0FFFF => Size::from(0).unwrap(), // Z80 Area
                 0xA10001 => Size::from_byte(0b10100000),
