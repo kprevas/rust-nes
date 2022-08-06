@@ -380,7 +380,7 @@ pub struct Cpu<'a> {
 
     pub speed_adj: f64,
 
-    vdp: Vdp<'a>,
+    vdp: Option<Vdp<'a>>,
     vdp_bus: &'a RefCell<VdpBus>,
 
     test_ram_only: bool,
@@ -404,7 +404,7 @@ const SR_MASK: u16 = 0b1010011100011111;
 impl<'a> Cpu<'a> {
     pub fn boot<'b>(
         cartridge: &'b Box<[u8]>,
-        vdp: Vdp<'b>,
+        vdp: Option<Vdp<'b>>,
         vdp_bus: &'b RefCell<VdpBus>,
         instrumented: bool,
     ) -> Cpu<'b> {
@@ -434,7 +434,11 @@ impl<'a> Cpu<'a> {
 
     fn tick(&mut self, cycle_count: u8) {
         for _ in 0..cycle_count {
-            self.vdp.cpu_tick(&self.cartridge, &self.internal_ram);
+            let cartridge = &self.cartridge;
+            let internal_ram = &self.internal_ram;
+            self.vdp
+                .as_mut()
+                .map(|vdp| vdp.cpu_tick(cartridge, internal_ram));
             self.ticks -= 1.0;
             self.cycle_count = self.cycle_count.wrapping_add(1);
         }
@@ -2776,7 +2780,7 @@ impl<'a> Cpu<'a> {
     }
 
     pub fn close(&mut self) {
-        self.vdp.close();
+        self.vdp.as_mut().map(|vdp| vdp.close());
     }
 }
 
@@ -2885,7 +2889,9 @@ impl window::Cpu for Cpu<'_> {
         gl: &mut G2d,
         device: &mut Device,
     ) {
-        self.vdp.render(c, texture_ctx, gl, device);
+        self.vdp
+            .as_mut()
+            .map(|vdp| vdp.render(c, texture_ctx, gl, device));
     }
 
     fn save_state(&self, _out: &mut Vec<u8>) {

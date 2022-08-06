@@ -73,7 +73,7 @@ pub fn run(matches: &ArgMatches) {
     let vdp_bus = RefCell::new(vdp::bus::VdpBus::new());
 
     let vdp = vdp::Vdp::new(&vdp_bus, Some(&mut window));
-    let mut cpu = m68k::Cpu::boot(&cartridge, vdp, &vdp_bus, instrument_cpu);
+    let mut cpu = m68k::Cpu::boot(&cartridge, Some(vdp), &vdp_bus, instrument_cpu);
 
     window_loop(window, &mut inputs, &record_path, &mut cpu, 320.0, 224.0);
 
