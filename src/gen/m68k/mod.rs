@@ -4,6 +4,7 @@ use std::marker::PhantomData;
 use std::ops::{AddAssign, Shl, Shr, Sub, SubAssign};
 
 use bytes::Buf;
+use gfx_device_gl::Device;
 use num_integer::Integer;
 use num_traits::{PrimInt, Signed, WrappingAdd, WrappingSub};
 use piston_window::*;
@@ -14,12 +15,12 @@ use gen::m68k::opcodes::{
 };
 use gen::vdp::bus::VdpBus;
 use gen::vdp::Vdp;
-use gfx_device_gl::Device;
 use input::ControllerState;
 use window;
 use window::Cpu as wcpu;
 
 pub mod opcodes;
+pub mod disassembler;
 
 const CPU_TICKS_PER_SECOND: f64 = 7_670_454.0;
 
@@ -1723,7 +1724,7 @@ impl<'a> Cpu<'a> {
             debug!(target: "cpu", "{:08X}\t{:04X}\t{}\t\tD {} {} {} {} {} {} {} {}\t\tA {} {} {} {} {} {} {} {}",
             opcode_pc,
             opcode_hex,
-            opcode,
+            opcode.disassemble(Some(&self.cartridge[self.pc as usize..self.pc as usize + 8])),
             self.d[0] as i32,
             self.d[1] as i32,
             self.d[2] as i32,

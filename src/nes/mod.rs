@@ -1,12 +1,13 @@
 use std::cell::RefCell;
+use std::error::Error;
 use std::fs::File;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 
 use clap::ArgMatches;
-use nfd::Response;
 use piston_window::*;
 use portaudio::PortAudio;
+use simple_error::SimpleResult;
 
 use nes::cartridge::Cartridge;
 use window::window_loop;
@@ -16,68 +17,27 @@ pub mod cartridge;
 pub mod cpu;
 pub mod ppu;
 
-fn load_cartridge(matches: &ArgMatches) -> Option<(Cartridge, PathBuf)> {
-    let mut save_path: PathBuf;
-    let cartridge: Cartridge = loop {
-        let input_file = match matches.value_of("INPUT") {
-            Some(i) => Some(PathBuf::from(i)),
-            None => match nfd::open_file_dialog(None, None).unwrap() {
-                Response::Okay(p) => Some(PathBuf::from(p)),
-                Response::OkayMultiple(v) => Some(PathBuf::from(&v[0])),
-                Response::Cancel => None,
-            },
-        };
-        if let Some(input_file) = input_file {
-            save_path = PathBuf::from(".")
-                .join(input_file.file_name().unwrap())
-                .with_extension("sav");
-            match cartridge::read(
-                File::open(input_file).as_mut().unwrap(),
-                match File::open(save_path.as_path()) {
-                    Ok(ref mut file) => Some(file),
-                    Err(_) => None,
-                },
-            ) {
-                Ok(c) => break c,
-                Err(e) => {
-                    if matches.is_present("INPUT") {
-                        panic!("{}", e);
-                    }
-                }
-            };
-        } else {
-            return None;
-        }
-    };
-    Some((cartridge, save_path))
+pub fn load_cartridge(
+    src: &mut dyn Read,
+    save_data: Option<&mut dyn Read>,
+) -> SimpleResult<Cartridge> {
+    cartridge::read(src, save_data)
 }
 
-pub fn disasssemble(matches: &ArgMatches, mut out: &mut Box<dyn Write>) {
-    let cartridge = if let Some((cartridge, _)) = load_cartridge(matches) {
-        cartridge
-    } else {
-        return;
-    };
-    cpu::disassembler::disassemble(cartridge.cpu_bus, 0x8000, &mut out).unwrap();
+pub fn disassemble(
+    cartridge: Cartridge,
+    mut out: &mut Box<dyn Write>,
+) -> Result<(), Box<dyn Error>> {
+    cpu::disassembler::disassemble(cartridge.cpu_bus, 0x8000, &mut out)
 }
 
-pub fn run(matches: &ArgMatches) {
-    let window: PistonWindow<sdl2_window::Sdl2Window> =
-        WindowSettings::new("nes", [293, 240]).build().unwrap();
+pub fn run(matches: &ArgMatches, mut cartridge: Cartridge, save_path: PathBuf,
+           mut window: PistonWindow<sdl2_window::Sdl2Window>) {
+    window.set_size([293, 240]);
     let mut window = window
         .ups(60)
         .ups_reset(0)
         .bench_mode(matches.is_present("bench_mode"));
-
-    let mut cartridge;
-    let save_path;
-    if let Some((c, s)) = load_cartridge(matches) {
-        cartridge = c;
-        save_path = s;
-    } else {
-        return;
-    }
-
     let instrument_cpu = matches.is_present("instrument_cpu");
     let instrument_ppu = matches.is_present("instrument_ppu");
 
