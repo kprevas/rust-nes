@@ -290,12 +290,12 @@ impl<'a> Vdp<'a> {
                 let (mut x_tile, mut x_offset) = x_in_sprite.div_rem(&8);
                 let (mut y_tile, mut y_offset) = y_in_sprite.div_rem(&8);
                 if flip_vertical {
-                    y_tile = height - y_tile;
-                    y_offset = 8 - y_offset;
+                    y_tile = height - 1 - y_tile;
+                    y_offset = 7 - y_offset;
                 }
                 if flip_horizontal {
-                    x_tile = width - x_tile;
-                    x_offset = 8 - x_offset;
+                    x_tile = width - 1 - x_tile;
+                    x_offset = 7 - x_offset;
                 }
                 let tile_index = height * x_tile + y_tile;
                 let tile_addr = (tile + tile_index) as usize * 0x20;
