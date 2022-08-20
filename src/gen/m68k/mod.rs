@@ -516,7 +516,7 @@ impl<'a> Cpu<'a> {
         } else {
             match addr {
                 0x000000..=0x3FFFFF => {
-                    if (addr + size) as usize >= self.cartridge.len() {
+                    if (addr + size) as usize > self.cartridge.len() {
                         Size::from(0).unwrap()
                     } else {
                         Size::from_memory_bytes(
