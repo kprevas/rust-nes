@@ -508,13 +508,18 @@ impl VdpBus {
     }
 
     pub fn write_long(&mut self, addr: u32, data: u32) {
-        self.write_word(addr, (data >> 16) as u16);
-        self.write_word(addr, (data & 0xFFFF) as u16);
+        if self.auto_increment == 1 && addr == 0xC00000 {
+            self.write_word(addr, (data & 0xFFFF) as u16);
+        } else {
+            self.write_word(addr, (data >> 16) as u16);
+            self.write_word(addr, (data & 0xFFFF) as u16);
+        }
     }
 
-    pub(crate) fn increment_addr(&mut self) {
+    pub fn increment_addr(&mut self) {
         if let Some(addr) = self.addr {
-            let new_addr = addr.addr.wrapping_add(self.auto_increment as u16);
+            let inc = if self.auto_increment == 1 { 2 } else { self.auto_increment as u16 };
+            let new_addr = addr.addr.wrapping_add(inc);
             let new_addr_wrapped = match addr.target {
                 AddrTarget::VRAM => new_addr,
                 AddrTarget::CRAM => new_addr % 0x80,
