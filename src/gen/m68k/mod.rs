@@ -31,6 +31,7 @@ trait DataSize: TryFrom<u32> + PrimInt {
     fn from_register_value(value: u32) -> Self;
     fn to_register_value(self) -> u32;
     fn from_byte(byte: u8) -> Self;
+    fn low_byte(self) -> u8;
     fn from_memory_bytes(bytes: &[u8]) -> Self;
     fn set_memory_bytes(self, bytes: &mut [u8]);
     fn apply_to_register(self, register_val: u32) -> u32;
@@ -61,6 +62,10 @@ impl DataSize for u8 {
 
     fn from_byte(byte: u8) -> Self {
         byte as Self
+    }
+
+    fn low_byte(self) -> u8 {
+        self
     }
 
     fn from_memory_bytes(bytes: &[u8]) -> Self {
@@ -115,6 +120,10 @@ impl DataSize for i8 {
         byte as Self
     }
 
+    fn low_byte(self) -> u8 {
+        self as u8
+    }
+
     fn from_memory_bytes(bytes: &[u8]) -> Self {
         bytes[0] as Self
     }
@@ -165,6 +174,10 @@ impl DataSize for u16 {
 
     fn from_byte(byte: u8) -> Self {
         byte as Self
+    }
+
+    fn low_byte(self) -> u8 {
+        (self & 0xFF) as u8
     }
 
     fn from_memory_bytes(bytes: &[u8]) -> Self {
@@ -220,6 +233,10 @@ impl DataSize for i16 {
         byte as Self
     }
 
+    fn low_byte(self) -> u8 {
+        ((self as u16) & 0xFF) as u8
+    }
+
     fn from_memory_bytes(bytes: &[u8]) -> Self {
         (((bytes[0] as u16) << 8) | (bytes[1] as u16)) as i16
     }
@@ -271,6 +288,10 @@ impl DataSize for u32 {
 
     fn from_byte(byte: u8) -> Self {
         byte as Self
+    }
+
+    fn low_byte(self) -> u8 {
+        (self & 0xFF) as u8
     }
 
     fn from_memory_bytes(bytes: &[u8]) -> Self {
@@ -331,6 +352,10 @@ impl DataSize for i32 {
         byte as Self
     }
 
+    fn low_byte(self) -> u8 {
+        ((self as u32) & 0xFF) as u8
+    }
+
     fn from_memory_bytes(bytes: &[u8]) -> Self {
         (((bytes[0] as u32) << 24)
             | ((bytes[1] as u32) << 16)
@@ -374,6 +399,11 @@ pub struct Cpu<'a> {
     pc: u32,
     cartridge: &'a Box<[u8]>,
     internal_ram: Box<[u8]>,
+
+    inputs: [u8; 2],
+    controller_th_bit: [u8; 4],
+    controller_read_state: [u8; 4],
+
     ticks: f64,
     instrumented: bool,
     cycle_count: u64,
@@ -417,6 +447,9 @@ impl<'a> Cpu<'a> {
             pc: 0,
             cartridge,
             internal_ram: vec![0; 0x10000].into_boxed_slice(),
+            inputs: [0, 0],
+            controller_th_bit: [0, 0, 0, 0],
+            controller_read_state: [0, 0, 0, 0],
             ticks: 0.0,
             instrumented,
             cycle_count: 0,
@@ -527,6 +560,8 @@ impl<'a> Cpu<'a> {
                 0x400000..=0x7FFFFF => Size::from(0).unwrap(), // Expansion port
                 0xA00000..=0xA0FFFF => Size::from(0).unwrap(), // Z80 Area
                 0xA10001 => Size::from_byte(0b10100000),
+                0xA10003 => self.read_controller(0),
+                0xA10005 => self.read_controller(1),
                 0xA10000..=0xA10FFF => Size::from(0).unwrap(), // IO Registers
                 0xA11000..=0xA11FFF => Size::from(0).unwrap(), // Z80 Control
                 0xC00000..=0xDFFFFF => Size::read_from_vdp_bus(self.vdp_bus, addr),
@@ -540,6 +575,37 @@ impl<'a> Cpu<'a> {
                 _ => panic!(),
             }
         }
+    }
+
+    fn read_controller<Size: DataSize>(&mut self, controller: usize) -> Size {
+        let mut val = 0;
+        val |= self.controller_th_bit[controller] << 6;
+        let up = !(self.inputs[controller] >> 4) & 0b1;
+        let down = !(self.inputs[controller] >> 5) & 0b1;
+        let left = !(self.inputs[controller] >> 6) & 0b1;
+        let right = !(self.inputs[controller] >> 7) & 0b1;
+        let a = !(self.inputs[controller]) & 0b1;
+        let b = !(self.inputs[controller] >> 1) & 0b1;
+        let c = !(self.inputs[controller] >> 2) & 0b1;
+        let start = !(self.inputs[controller] >> 3) & 0b1;
+        match self.controller_read_state[controller] {
+            0 | 2 | 4 | 6 => {
+                val |= up;
+                val |= down << 1;
+                val |= left << 2;
+                val |= right << 3;
+                val |= b << 4;
+                val |= c << 5;
+            }
+            1 | 3 | 5 | 7 => {
+                val |= up;
+                val |= down << 1;
+                val |= a << 4;
+                val |= start << 5;
+            }
+            _ => panic!()
+        }
+        Size::from_byte(val)
     }
 
     fn write_addr<Size: DataSize>(&mut self, addr: u32, val: Size) {
@@ -566,6 +632,24 @@ impl<'a> Cpu<'a> {
                 0x000000..=0x3FFFFF => {} // Vector table, ROM Cartridge
                 0x400000..=0x7FFFFF => {} // Expansion port
                 0xA00000..=0xA0FFFF => {} // Z80 Area
+                0xA10003 => {
+                    let th_bit = (val.low_byte() >> 6) & 0b1;
+                    if th_bit != self.controller_th_bit[0] {
+                        self.controller_th_bit[0] = th_bit;
+                        if self.controller_read_state[0] != 0 || th_bit == 0 {
+                            self.controller_read_state[0] = (self.controller_read_state[0] + 1) % 8;
+                        }
+                    }
+                }
+                0xA10005 => {
+                    let th_bit = (val.low_byte() >> 6) & 0b1;
+                    if th_bit != self.controller_th_bit[1] {
+                        self.controller_th_bit[1] = th_bit;
+                        if self.controller_read_state[1] != 0 || th_bit == 0 {
+                            self.controller_read_state[1] = (self.controller_read_state[1] + 1) % 8;
+                        }
+                    }
+                }
                 0xA10000..=0xA10FFF => {} // IO Registers
                 0xA11000..=0xA11FFF => {} // Z80 Control
                 0xC00000..=0xDFFFFF => Size::write_to_vdp_bus(self.vdp_bus, addr, val),
@@ -2763,7 +2847,8 @@ impl<'a> Cpu<'a> {
         self.tick(opcode.cycle_count());
     }
 
-    pub fn next_operation(&mut self, _inputs: &[ControllerState<8>; 2]) {
+    pub fn next_operation(&mut self, inputs: &[ControllerState<8>; 2]) {
+        self.inputs = [inputs[0].to_u8(), inputs[1].to_u8()];
         if self.stopped {
             self.ticks = 0.0;
         } else {
@@ -2882,6 +2967,8 @@ impl window::Cpu for Cpu<'_> {
     }
 
     fn do_frame(&mut self, time_secs: f64, inputs: &[ControllerState<8>; 2]) {
+        self.controller_read_state = [0, 0, 0, 0];
+        self.controller_th_bit = [0, 0, 0, 0];
         self.ticks += time_secs * CPU_TICKS_PER_SECOND * self.speed_adj;
 
         while self.ticks > 0.0 {

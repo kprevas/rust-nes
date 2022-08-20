@@ -36,8 +36,9 @@ impl<'a, const B: usize> Menu<'a, B> {
     pub fn new(
         control_labels: [(&'a str, usize); B],
         default_controls: &[ControllerState<B>; 2],
+        settings_path: &Path,
     ) -> Menu<'a, B> {
-        let settings_file = File::open(Path::new("settings.dat"));
+        let settings_file = File::open(settings_path);
         let buttons = match settings_file {
             Ok(file) => match bincode::deserialize_from(file) {
                 Ok(buttons) => buttons,

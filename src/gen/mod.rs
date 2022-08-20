@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::error::Error;
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clap::ArgMatches;
 use piston_window::*;
@@ -27,8 +27,12 @@ pub fn disassemble(
     m68k::disassembler::disassemble(cartridge, &mut out)
 }
 
-pub fn run(matches: &ArgMatches, cartridge: Box<[u8]>, save_path: PathBuf,
-           mut window: PistonWindow<sdl2_window::Sdl2Window>) {
+pub fn run(
+    matches: &ArgMatches,
+    cartridge: Box<[u8]>,
+    save_path: PathBuf,
+    mut window: PistonWindow<sdl2_window::Sdl2Window>,
+) {
     window.set_size([320, 224]);
     let mut window = window
         .ups(60)
@@ -45,7 +49,15 @@ pub fn run(matches: &ArgMatches, cartridge: Box<[u8]>, save_path: PathBuf,
     let vdp = vdp::Vdp::new(&vdp_bus, Some(&mut window));
     let mut cpu = m68k::Cpu::boot(&cartridge, Some(vdp), &vdp_bus, instrument_cpu);
 
-    window_loop(window, &mut inputs, &record_path, &mut cpu, 320.0, 224.0);
+    window_loop(
+        window,
+        &mut inputs,
+        &record_path,
+        &mut cpu,
+        320.0,
+        224.0,
+        &Path::new("settings_gen.dat"),
+    );
 
     cpu.close();
 }

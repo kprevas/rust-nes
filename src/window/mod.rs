@@ -1,10 +1,10 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use bytes::Buf;
+use gfx_device_gl::Device;
 use piston_window::*;
 use sdl2_window::Sdl2Window;
 
-use gfx_device_gl::Device;
 use input::ControllerState;
 
 pub mod renderer;
@@ -32,6 +32,7 @@ pub fn window_loop(
     cpu: &mut dyn Cpu,
     width: f64,
     height: f64,
+    settings_path: &Path,
 ) {
     let mut reset = false;
     let mut input_overlay = false;
@@ -58,7 +59,7 @@ pub fn window_loop(
 
     let mut input_changed = false;
 
-    let mut menu = ::menu::Menu::new(::menu::NES_CONTROLS, &inputs);
+    let mut menu = ::menu::Menu::new(::menu::NES_CONTROLS, &inputs, settings_path);
     menu.update_controls(&mut inputs);
 
     let mut recorder = ::record::Recorder::new(&record_path);

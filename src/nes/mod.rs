@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::error::Error;
 use std::fs::File;
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clap::ArgMatches;
 use piston_window::*;
@@ -31,8 +31,12 @@ pub fn disassemble(
     cpu::disassembler::disassemble(cartridge.cpu_bus, 0x8000, &mut out)
 }
 
-pub fn run(matches: &ArgMatches, mut cartridge: Cartridge, save_path: PathBuf,
-           mut window: PistonWindow<sdl2_window::Sdl2Window>) {
+pub fn run(
+    matches: &ArgMatches,
+    mut cartridge: Cartridge,
+    save_path: PathBuf,
+    mut window: PistonWindow<sdl2_window::Sdl2Window>,
+) {
     window.set_size([293, 240]);
     let mut window = window
         .ups(60)
@@ -64,7 +68,15 @@ pub fn run(matches: &ArgMatches, mut cartridge: Cartridge, save_path: PathBuf,
         instrument_cpu,
     );
 
-    window_loop(window, &mut inputs, &record_path, &mut cpu, 293.0, 240.0);
+    window_loop(
+        window,
+        &mut inputs,
+        &record_path,
+        &mut cpu,
+        293.0,
+        240.0,
+        &Path::new("settings_nes.dat"),
+    );
 
     cpu.close();
     let mut save: Vec<u8> = Vec::new();
