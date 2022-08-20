@@ -2,12 +2,13 @@ use std::borrow::BorrowMut;
 use std::cell::RefCell;
 use std::convert::TryInto;
 
+use gfx_device_gl::Device;
 use image::{GenericImage, Rgba};
+use num_integer::Integer;
 use piston_window::*;
 use triple_buffer::TripleBuffer;
 
 use gen::vdp::bus::{Addr, AddrMode, AddrTarget, VdpBus, WriteData};
-use gfx_device_gl::Device;
 use window::renderer::Renderer;
 
 pub mod bus;
@@ -183,15 +184,19 @@ impl<'a> Vdp<'a> {
 
     fn tick_pixel(&mut self) {
         let mut bus = self.bus.borrow_mut();
-        let mut pixel = None;
         let width = if bus.mode_4.h_40_wide_mode { 320 } else { 256 };
 
         if self.dot < width && self.scanline >= 11 && self.scanline - 11 < 224 {
+            let mut pixel = None;
             let x = self.dot;
             let y = self.scanline - 11;
             let tile_x = x / 8;
             let tile_y = y / 8;
             let tile_index = tile_y * (bus.plane_width / 8) + tile_x;
+
+            if pixel.is_none() {
+                pixel = self.get_sprite_pixel(x, y, bus.sprite_table_addr as usize);
+            }
 
             if pixel.is_none() {
                 pixel = self.get_pixel(x, y, tile_index, bus.plane_a_nametable_addr);
@@ -238,6 +243,58 @@ impl<'a> Vdp<'a> {
         bus.beam_hpos = self.dot.max(width);
     }
 
+    fn get_sprite_pixel(&self, x: u16, y: u16, sprite_table_addr: usize) -> Option<[u8; 4]> {
+        let x = x + 128;
+        let y = y + 128;
+        let mut sprite_index = 0;
+        while {
+            let sprite_addr = sprite_table_addr + sprite_index * 8;
+
+            let sprite_y =
+                (self.vram[sprite_addr] as u16) << 8 | (self.vram[sprite_addr + 1] as u16);
+            let sprite_x =
+                (self.vram[sprite_addr + 6] as u16) << 8 | (self.vram[sprite_addr + 7] as u16);
+            let height = (self.vram[sprite_addr + 2] & 0b11) as u16 + 1;
+            let width = ((self.vram[sprite_addr + 2] >> 2) & 0b11) as u16 + 1;
+            let tile = ((self.vram[sprite_addr + 4] & 0b111) as u16) << 8
+                | (self.vram[sprite_addr + 5] as u16);
+            #[allow(unused_variables)]
+                let high_priority = (self.vram[sprite_addr + 4] & 0b10000000) > 0;
+            let flip_vertical = (self.vram[sprite_addr + 4] & 0b00010000) > 0;
+            let flip_horizontal = (self.vram[sprite_addr + 4] & 0b00001000) > 0;
+            let palette_line = (self.vram[sprite_addr + 4] >> 5) & 0b11;
+
+            if sprite_y <= y
+                && sprite_x <= x
+                && sprite_y + 8 * height > y
+                && sprite_x + 8 * width > x
+            {
+                let x_in_sprite = x - sprite_x;
+                let y_in_sprite = y - sprite_y;
+                let (mut x_tile, mut x_offset) = x_in_sprite.div_rem(&8);
+                let (mut y_tile, mut y_offset) = y_in_sprite.div_rem(&8);
+                if flip_vertical {
+                    y_tile = height - y_tile;
+                    y_offset = 8 - y_offset;
+                }
+                if flip_horizontal {
+                    x_tile = width - x_tile;
+                    x_offset = 8 - x_offset;
+                }
+                let tile_index = height * x_tile + y_tile;
+                let tile_addr = (tile + tile_index) as usize * 0x20;
+                let pixel = self.get_tile_pixel(tile_addr, x_offset, y_offset, palette_line);
+                if pixel.is_some() {
+                    return pixel;
+                }
+            }
+
+            sprite_index = self.vram[sprite_addr + 3] as usize;
+            sprite_index != 0
+        } {}
+        None
+    }
+
     fn get_pixel(
         &self,
         x: u16,
@@ -255,6 +312,16 @@ impl<'a> Vdp<'a> {
         let tile_addr = tile_index as usize * 0x20;
         let tile_x = if h_flip { 7 - (x % 8) } else { x % 8 };
         let tile_y = if v_flip { 7 - (y % 8) } else { y % 8 };
+        self.get_tile_pixel(tile_addr, tile_x, tile_y, palette_line)
+    }
+
+    fn get_tile_pixel(
+        &self,
+        tile_addr: usize,
+        tile_x: u16,
+        tile_y: u16,
+        palette_line: u8,
+    ) -> Option<[u8; 4]> {
         let pixel_addr = tile_addr + (tile_y as usize * 8) / 2 + tile_x as usize / 2;
         let pixel_data = self.vram[pixel_addr];
         let palette_color = if tile_x % 2 == 1 {
