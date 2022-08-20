@@ -193,12 +193,12 @@ impl Mode4 {
     }
 }
 
-enum WindowHPos {
+pub enum WindowHPos {
     DrawToRight(u8),
     DrawToLeft(u8),
 }
 
-enum WindowVPos {
+pub enum WindowVPos {
     DrawToTop(u8),
     DrawToBottom(u8),
 }
@@ -234,8 +234,8 @@ pub struct VdpBus {
     auto_increment: u8,
     plane_height: u16,
     pub(crate) plane_width: u16,
-    window_h_pos: WindowHPos,
-    window_v_pos: WindowVPos,
+    pub window_h_pos: WindowHPos,
+    pub window_v_pos: WindowVPos,
     dma_length_half: u16,
     dma_source_addr_half: u32,
     dma_type: DmaType,

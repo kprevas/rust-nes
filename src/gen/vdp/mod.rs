@@ -8,7 +8,7 @@ use num_integer::Integer;
 use piston_window::*;
 use triple_buffer::TripleBuffer;
 
-use gen::vdp::bus::{Addr, AddrMode, AddrTarget, VdpBus, WriteData};
+use gen::vdp::bus::{Addr, AddrMode, AddrTarget, VdpBus, WindowHPos, WindowVPos, WriteData};
 use window::renderer::Renderer;
 
 pub mod bus;
@@ -197,6 +197,21 @@ impl<'a> Vdp<'a> {
 
             if pixel.is_none() {
                 pixel = self.get_sprite_pixel(x, y, bus.sprite_table_addr as usize);
+            }
+
+            if pixel.is_none() {
+                let x_in_window = match bus.window_h_pos {
+                    WindowHPos::DrawToRight(window_width) => x > width - window_width as u16 * 8,
+                    WindowHPos::DrawToLeft(window_width) => x < window_width as u16 * 8,
+                };
+                let y_in_window = match bus.window_v_pos {
+                    WindowVPos::DrawToTop(window_height) => y < window_height as u16 * 8,
+                    WindowVPos::DrawToBottom(window_height) => y > 224 - window_height as u16 * 8,
+                };
+                if x_in_window || y_in_window {
+                    let window_tile_index = tile_y * 64 + tile_x;
+                    pixel = self.get_pixel(x, y, window_tile_index, bus.window_nametable_addr);
+                }
             }
 
             if pixel.is_none() {
