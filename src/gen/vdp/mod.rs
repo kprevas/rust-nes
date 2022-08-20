@@ -176,6 +176,7 @@ impl<'a> Vdp<'a> {
                         AddrTarget::CRAM => self.cram.borrow_mut(),
                         AddrTarget::VSRAM => self.vsram.borrow_mut(),
                     },
+                    write_data,
                 );
             }
             None => {}

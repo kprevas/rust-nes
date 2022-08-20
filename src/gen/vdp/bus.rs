@@ -312,7 +312,7 @@ impl VdpBus {
             read_data: 0,
             write_data: VecDeque::new(),
             horizontal_interrupt: false,
-            vertical_interrupt: false
+            vertical_interrupt: false,
         }
     }
 
@@ -518,7 +518,11 @@ impl VdpBus {
 
     pub fn increment_addr(&mut self) {
         if let Some(addr) = self.addr {
-            let inc = if self.auto_increment == 1 { 2 } else { self.auto_increment as u16 };
+            let inc = if self.auto_increment == 1 {
+                2
+            } else {
+                self.auto_increment as u16
+            };
             let new_addr = addr.addr.wrapping_add(inc);
             let new_addr_wrapped = match addr.target {
                 AddrTarget::VRAM => new_addr,
@@ -535,11 +539,17 @@ impl VdpBus {
         }
     }
 
-    pub fn dma(&mut self, m68k_cartridge: &[u8], m68k_ram: &[u8], target: &mut [u8]) {
+    pub fn dma(
+        &mut self,
+        m68k_cartridge: &[u8],
+        m68k_ram: &[u8],
+        target: &mut [u8],
+        write_data: Option<WriteData>,
+    ) {
         let mut len = self.dma_length_half as usize * 2;
         let mut source = self.dma_source_addr_half as usize * 2;
         let fill_val = if let DmaType::VramFill = self.dma_type {
-            match self.write_data.pop_front() {
+            match write_data {
                 None => return,
                 Some(data) => match data {
                     WriteData::Byte(val) => val,
