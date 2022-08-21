@@ -9,7 +9,8 @@ use piston_window::*;
 use triple_buffer::TripleBuffer;
 
 use gen::vdp::bus::{
-    Addr, AddrMode, AddrTarget, VdpBus, VerticalScrollingMode, WindowHPos, WindowVPos, WriteData,
+    Addr, AddrMode, AddrTarget, HorizontalScrollingMode, VdpBus, VerticalScrollingMode, WindowHPos,
+    WindowVPos, WriteData,
 };
 use window::renderer::Renderer;
 
@@ -217,7 +218,7 @@ impl<'a> Vdp<'a> {
 
             if pixel.is_none() {
                 let v_scroll_index = match bus.mode_3.vertical_scrolling_mode {
-                    VerticalScrollingMode::Column16Pixels => (y / 16 * 2 * 2) as usize,
+                    VerticalScrollingMode::Column16Pixels => (x / 16 * 2 * 2) as usize,
                     VerticalScrollingMode::FullScreen => 0,
                 };
                 let v_scroll = i16::from_be_bytes(
@@ -226,6 +227,20 @@ impl<'a> Vdp<'a> {
                         .unwrap(),
                 );
                 let y = (y.wrapping_add_signed(v_scroll)) % bus.plane_height;
+
+                let h_scroll_index = match bus.mode_3.horizontal_scrolling_mode {
+                    HorizontalScrollingMode::Row1Pixel => (y * 2 * 2) as usize,
+                    HorizontalScrollingMode::Row8Pixel => (y / 8 * 8 * 2 * 2) as usize,
+                    HorizontalScrollingMode::FullScreen => 0,
+                    HorizontalScrollingMode::Invalid => 0,
+                };
+                let h_scroll = i16::from_be_bytes(
+                    self.vram[bus.horizontal_scroll_data_addr as usize + h_scroll_index
+                        ..=bus.horizontal_scroll_data_addr as usize + h_scroll_index + 1]
+                        .try_into()
+                        .unwrap(),
+                );
+                let x = (x.wrapping_add_signed(h_scroll)) % bus.plane_width;
 
                 let tile_x = x / 8;
                 let tile_y = y / 8;
@@ -236,7 +251,7 @@ impl<'a> Vdp<'a> {
 
             if pixel.is_none() {
                 let v_scroll_index = match bus.mode_3.vertical_scrolling_mode {
-                    VerticalScrollingMode::Column16Pixels => (y / 16 * 2 * 2 + 1) as usize,
+                    VerticalScrollingMode::Column16Pixels => (x / 16 * 2 * 2 + 1) as usize,
                     VerticalScrollingMode::FullScreen => 2,
                 };
                 let v_scroll = i16::from_be_bytes(
@@ -245,6 +260,20 @@ impl<'a> Vdp<'a> {
                         .unwrap(),
                 );
                 let y = (y.wrapping_add_signed(v_scroll)) % bus.plane_height;
+
+                let h_scroll_index = match bus.mode_3.horizontal_scrolling_mode {
+                    HorizontalScrollingMode::Row1Pixel => (y * 2 * 2 + 1) as usize,
+                    HorizontalScrollingMode::Row8Pixel => (y / 8 * 8 * 2 * 2 + 1) as usize,
+                    HorizontalScrollingMode::FullScreen => 2,
+                    HorizontalScrollingMode::Invalid => 0,
+                };
+                let h_scroll = i16::from_be_bytes(
+                    self.vram[bus.horizontal_scroll_data_addr as usize + h_scroll_index
+                        ..=bus.horizontal_scroll_data_addr as usize + h_scroll_index + 1]
+                        .try_into()
+                        .unwrap(),
+                );
+                let x = (x.wrapping_add_signed(h_scroll)) % bus.plane_width;
 
                 let tile_x = x / 8;
                 let tile_y = y / 8;

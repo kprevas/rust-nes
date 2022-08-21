@@ -230,7 +230,7 @@ pub struct VdpBus {
     pub bg_palette: u8,
     pub bg_color: u8,
     pub horizontal_interrupt_counter: u16,
-    horizontal_scroll_data_addr: u16,
+    pub horizontal_scroll_data_addr: u16,
     auto_increment: u8,
     pub plane_height: u16,
     pub plane_width: u16,
