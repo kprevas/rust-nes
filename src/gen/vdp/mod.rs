@@ -234,12 +234,18 @@ impl<'a> Vdp<'a> {
                     HorizontalScrollingMode::FullScreen => 0,
                     HorizontalScrollingMode::Invalid => 0,
                 };
-                let h_scroll = i16::from_be_bytes(
-                    self.vram[bus.horizontal_scroll_data_addr as usize + h_scroll_index
-                        ..=bus.horizontal_scroll_data_addr as usize + h_scroll_index + 1]
-                        .try_into()
-                        .unwrap(),
-                );
+                let h_scroll = if let HorizontalScrollingMode::Invalid =
+                bus.mode_3.horizontal_scrolling_mode
+                {
+                    0
+                } else {
+                    i16::from_be_bytes(
+                        self.vram[bus.horizontal_scroll_data_addr as usize + h_scroll_index
+                            ..=bus.horizontal_scroll_data_addr as usize + h_scroll_index + 1]
+                            .try_into()
+                            .unwrap(),
+                    )
+                };
                 let x = (x.wrapping_add_signed(h_scroll)) % bus.plane_width;
 
                 let tile_x = x / 8;
@@ -267,12 +273,18 @@ impl<'a> Vdp<'a> {
                     HorizontalScrollingMode::FullScreen => 2,
                     HorizontalScrollingMode::Invalid => 0,
                 };
-                let h_scroll = i16::from_be_bytes(
-                    self.vram[bus.horizontal_scroll_data_addr as usize + h_scroll_index
-                        ..=bus.horizontal_scroll_data_addr as usize + h_scroll_index + 1]
-                        .try_into()
-                        .unwrap(),
-                );
+                let h_scroll = if let HorizontalScrollingMode::Invalid =
+                bus.mode_3.horizontal_scrolling_mode
+                {
+                    0
+                } else {
+                    i16::from_be_bytes(
+                        self.vram[bus.horizontal_scroll_data_addr as usize + h_scroll_index
+                            ..=bus.horizontal_scroll_data_addr as usize + h_scroll_index + 1]
+                            .try_into()
+                            .unwrap(),
+                    )
+                };
                 let x = (x.wrapping_add_signed(h_scroll)) % bus.plane_width;
 
                 let tile_x = x / 8;
@@ -305,7 +317,9 @@ impl<'a> Vdp<'a> {
             self.dot = 0;
             self.scanline += 1;
             if self.scanline == 243 {
-                bus.vertical_interrupt = true;
+                if bus.mode_2.enable_vertical_interrupt {
+                    bus.vertical_interrupt = true;
+                }
                 self.image_buffer.publish();
                 let bg = self.get_color(bus.bg_palette, bus.bg_color);
                 self.image_buffer.input_buffer().fill(bg);

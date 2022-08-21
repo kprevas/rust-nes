@@ -98,10 +98,10 @@ impl Mode1 {
 }
 
 #[allow(dead_code)]
-struct Mode2 {
+pub struct Mode2 {
     use_128k_vram: bool,
     enable_display: bool,
-    enable_vertical_interrupt: bool,
+    pub enable_vertical_interrupt: bool,
     enable_dma: bool,
     pal_mode: bool,
     mode_5: bool,
@@ -220,7 +220,7 @@ pub struct VdpBus {
     pub beam_vpos: u16,
     pub beam_hpos: u16,
     pub mode_1: Mode1,
-    mode_2: Mode2,
+    pub mode_2: Mode2,
     pub mode_3: Mode3,
     pub mode_4: Mode4,
     pub plane_a_nametable_addr: u16,
@@ -281,8 +281,8 @@ impl VdpBus {
             },
             mode_3: Mode3 {
                 enable_external_interrupt: false,
-                vertical_scrolling_mode: VerticalScrollingMode::Column16Pixels,
-                horizontal_scrolling_mode: HorizontalScrollingMode::Row1Pixel,
+                vertical_scrolling_mode: VerticalScrollingMode::FullScreen,
+                horizontal_scrolling_mode: HorizontalScrollingMode::FullScreen,
             },
             mode_4: Mode4 {
                 h_40_wide_mode: false,
