@@ -16,6 +16,7 @@ fn main() {
             (@arg instrument_cpu: -c "instruments CPU")
             (@arg instrument_ppu: -p "instruments PPU")
             (@arg bench_mode: -b "runs in benchmark mode")
+            (@arg dump_vram: -v "displays VRAM dump")
         )
         (@arg INPUT: "the input file to use")
     )

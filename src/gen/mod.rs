@@ -46,7 +46,7 @@ pub fn run(
 
     let vdp_bus = RefCell::new(vdp::bus::VdpBus::new());
 
-    let vdp = vdp::Vdp::new(&vdp_bus, Some(&mut window));
+    let vdp = vdp::Vdp::new(&vdp_bus, Some(&mut window), matches.is_present("dump_vram"));
     let mut cpu = m68k::Cpu::boot(&cartridge, Some(vdp), &vdp_bus, instrument_cpu);
 
     window_loop(
