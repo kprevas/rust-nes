@@ -120,11 +120,13 @@ impl Mode2 {
     }
 }
 
+#[derive(Copy, Clone)]
 pub enum VerticalScrollingMode {
     Column16Pixels,
     FullScreen,
 }
 
+#[derive(Copy, Clone)]
 pub enum HorizontalScrollingMode {
     Row1Pixel,
     Row8Pixel,
@@ -171,7 +173,7 @@ pub struct Mode4 {
     freeze_hsync: bool,
     pixel_clock_signal_on_vsync: bool,
     enable_external_pixel_bus: bool,
-    enable_shadow_highlight: bool,
+    pub enable_shadow_highlight: bool,
     interlace_mode: InterlaceMode,
 }
 

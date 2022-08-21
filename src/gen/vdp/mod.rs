@@ -18,6 +18,13 @@ pub mod bus;
 
 const BRIGHTNESS_VALS: [u8; 8] = [0, 52, 87, 116, 144, 172, 206, 255];
 
+enum SpritePixel {
+    Transparent,
+    Shadow,
+    Highlight,
+    Color([u8; 4]),
+}
+
 #[allow(dead_code)]
 pub struct Vdp<'a> {
     image_buffer: triple_buffer::Input<Box<[[u8; 4]; 71680]>>,
@@ -195,8 +202,56 @@ impl<'a> Vdp<'a> {
             let x = self.dot;
             let y = self.scanline - 11;
 
+            let mut shadow = false;
+            let mut highlight = false;
+
+            let (plane_a_x, plane_a_y, plane_a_tile_data) = self.plane_scroll(
+                x,
+                y,
+                bus.mode_3.vertical_scrolling_mode,
+                bus.mode_3.horizontal_scrolling_mode,
+                bus.plane_height,
+                bus.plane_width,
+                bus.horizontal_scroll_data_addr,
+                bus.plane_a_nametable_addr,
+                0,
+            );
+
+            let (plane_b_x, plane_b_y, plane_b_tile_data) = self.plane_scroll(
+                x,
+                y,
+                bus.mode_3.vertical_scrolling_mode,
+                bus.mode_3.horizontal_scrolling_mode,
+                bus.plane_height,
+                bus.plane_width,
+                bus.horizontal_scroll_data_addr,
+                bus.plane_b_nametable_addr,
+                2,
+            );
+
+            if (plane_a_tile_data >> 15) & 0b1 == 0 && (plane_b_tile_data >> 15) & 0b1 == 0 {
+                shadow = true;
+            }
+
             if pixel.is_none() {
-                pixel = self.get_sprite_pixel(x, y, bus.sprite_table_addr as usize);
+                match self.get_sprite_pixel(
+                    x,
+                    y,
+                    bus.sprite_table_addr as usize,
+                    bus.mode_4.enable_shadow_highlight,
+                    shadow,
+                ) {
+                    SpritePixel::Transparent => {}
+                    SpritePixel::Shadow => shadow = true,
+                    SpritePixel::Highlight => {
+                        if shadow {
+                            shadow = false;
+                        } else {
+                            highlight = true;
+                        }
+                    },
+                    SpritePixel::Color(color) => pixel = Some(color),
+                }
             }
 
             if pixel.is_none() {
@@ -212,90 +267,24 @@ impl<'a> Vdp<'a> {
                     let tile_x = x / 8;
                     let tile_y = y / 8;
                     let window_tile_index = tile_y * 64 + tile_x;
-                    pixel = self.get_pixel(x, y, window_tile_index, bus.window_nametable_addr);
+                    let tile_data_addr =
+                        (bus.window_nametable_addr + window_tile_index * 2) as usize;
+                    let tile_data = (self.vram[tile_data_addr] as u16) << 8
+                        | (self.vram[tile_data_addr + 1] as u16);
+                    pixel = self.get_pixel(x, y, tile_data, false, false);
                 }
             }
 
             if pixel.is_none() {
-                let v_scroll_index = match bus.mode_3.vertical_scrolling_mode {
-                    VerticalScrollingMode::Column16Pixels => (x / 16 * 2 * 2) as usize,
-                    VerticalScrollingMode::FullScreen => 0,
-                };
-                let v_scroll = i16::from_be_bytes(
-                    self.vsram[v_scroll_index..=v_scroll_index + 1]
-                        .try_into()
-                        .unwrap(),
-                );
-                let y = (y.wrapping_add_signed(v_scroll)) % bus.plane_height;
-
-                let h_scroll_index = match bus.mode_3.horizontal_scrolling_mode {
-                    HorizontalScrollingMode::Row1Pixel => (y * 2 * 2) as usize,
-                    HorizontalScrollingMode::Row8Pixel => (y / 8 * 8 * 2 * 2) as usize,
-                    HorizontalScrollingMode::FullScreen => 0,
-                    HorizontalScrollingMode::Invalid => 0,
-                };
-                let h_scroll = if let HorizontalScrollingMode::Invalid =
-                bus.mode_3.horizontal_scrolling_mode
-                {
-                    0
-                } else {
-                    i16::from_be_bytes(
-                        self.vram[bus.horizontal_scroll_data_addr as usize + h_scroll_index
-                            ..=bus.horizontal_scroll_data_addr as usize + h_scroll_index + 1]
-                            .try_into()
-                            .unwrap(),
-                    )
-                };
-                let x = (x.wrapping_add_signed(h_scroll)) % bus.plane_width;
-
-                let tile_x = x / 8;
-                let tile_y = y / 8;
-                let tile_index = tile_y * (bus.plane_width / 8) + tile_x;
-
-                pixel = self.get_pixel(x, y, tile_index, bus.plane_a_nametable_addr);
+                pixel = self.get_pixel(plane_a_x, plane_a_y, plane_a_tile_data, shadow, highlight);
             }
 
             if pixel.is_none() {
-                let v_scroll_index = match bus.mode_3.vertical_scrolling_mode {
-                    VerticalScrollingMode::Column16Pixels => (x / 16 * 2 * 2 + 1) as usize,
-                    VerticalScrollingMode::FullScreen => 2,
-                };
-                let v_scroll = i16::from_be_bytes(
-                    self.vsram[v_scroll_index..=v_scroll_index + 1]
-                        .try_into()
-                        .unwrap(),
-                );
-                let y = (y.wrapping_add_signed(v_scroll)) % bus.plane_height;
-
-                let h_scroll_index = match bus.mode_3.horizontal_scrolling_mode {
-                    HorizontalScrollingMode::Row1Pixel => (y * 2 * 2 + 1) as usize,
-                    HorizontalScrollingMode::Row8Pixel => (y / 8 * 8 * 2 * 2 + 1) as usize,
-                    HorizontalScrollingMode::FullScreen => 2,
-                    HorizontalScrollingMode::Invalid => 0,
-                };
-                let h_scroll = if let HorizontalScrollingMode::Invalid =
-                bus.mode_3.horizontal_scrolling_mode
-                {
-                    0
-                } else {
-                    i16::from_be_bytes(
-                        self.vram[bus.horizontal_scroll_data_addr as usize + h_scroll_index
-                            ..=bus.horizontal_scroll_data_addr as usize + h_scroll_index + 1]
-                            .try_into()
-                            .unwrap(),
-                    )
-                };
-                let x = (x.wrapping_add_signed(h_scroll)) % bus.plane_width;
-
-                let tile_x = x / 8;
-                let tile_y = y / 8;
-                let tile_index = tile_y * (bus.plane_width / 8) + tile_x;
-
-                pixel = self.get_pixel(x, y, tile_index, bus.plane_b_nametable_addr);
+                pixel = self.get_pixel(plane_b_x, plane_b_y, plane_b_tile_data, shadow, highlight);
             }
 
             if pixel.is_none() {
-                pixel = Some(self.get_color(bus.bg_palette, bus.bg_color));
+                pixel = Some(self.get_color(bus.bg_palette, bus.bg_color, false, false));
             }
 
             self.image_buffer.input_buffer()
@@ -321,7 +310,7 @@ impl<'a> Vdp<'a> {
                     bus.vertical_interrupt = true;
                 }
                 self.image_buffer.publish();
-                let bg = self.get_color(bus.bg_palette, bus.bg_color);
+                let bg = self.get_color(bus.bg_palette, bus.bg_color, false, false);
                 self.image_buffer.input_buffer().fill(bg);
             } else if self.scanline == 262 {
                 self.scanline = 0;
@@ -333,7 +322,71 @@ impl<'a> Vdp<'a> {
         bus.beam_hpos = self.dot.max(width);
     }
 
-    fn get_sprite_pixel(&self, x: u16, y: u16, sprite_table_addr: usize) -> Option<[u8; 4]> {
+    fn plane_scroll(
+        &mut self,
+        x: u16,
+        y: u16,
+        v_scroll_mode: VerticalScrollingMode,
+        h_scroll_mode: HorizontalScrollingMode,
+        plane_height: u16,
+        plane_width: u16,
+        h_scroll_data_addr: u16,
+        nametable_addr: u16,
+        plane_offset: usize,
+    ) -> (u16, u16, u16) {
+        let v_scroll_index = match v_scroll_mode {
+            VerticalScrollingMode::Column16Pixels => (x / 16 * 2 * 2) as usize,
+            VerticalScrollingMode::FullScreen => 0,
+        } + plane_offset;
+        let v_scroll = i16::from_be_bytes(
+            self.vsram[v_scroll_index..=v_scroll_index + 1]
+                .try_into()
+                .unwrap(),
+        );
+
+        let h_scroll_index = match h_scroll_mode {
+            HorizontalScrollingMode::Row1Pixel => {
+                (((y.wrapping_add_signed(v_scroll)) % plane_height) * 2 * 2) as usize
+            }
+            HorizontalScrollingMode::Row8Pixel => {
+                (((y.wrapping_add_signed(v_scroll)) % plane_height) / 8 * 8 * 2 * 2) as usize
+            }
+            HorizontalScrollingMode::FullScreen => 0,
+            HorizontalScrollingMode::Invalid => 0,
+        } + plane_offset;
+        let h_scroll = if let HorizontalScrollingMode::Invalid = h_scroll_mode {
+            0
+        } else {
+            i16::from_be_bytes(
+                self.vram[h_scroll_data_addr as usize + h_scroll_index
+                    ..=h_scroll_data_addr as usize + h_scroll_index + 1]
+                    .try_into()
+                    .unwrap(),
+            )
+        };
+
+        let x = (x.wrapping_add_signed(h_scroll)) % plane_width;
+        let y = (y.wrapping_add_signed(v_scroll)) % plane_height;
+
+        let tile_x = x / 8;
+        let tile_y = y / 8;
+        let tile_index = tile_y * (plane_width / 8) + tile_x;
+        let tile_data_addr =
+            (nametable_addr + tile_index * 2) as usize;
+        let tile_data = (self.vram[tile_data_addr] as u16) << 8
+            | (self.vram[tile_data_addr + 1] as u16);
+
+        (x, y, tile_data)
+    }
+
+    fn get_sprite_pixel(
+        &self,
+        x: u16,
+        y: u16,
+        sprite_table_addr: usize,
+        enable_shadow_highlight: bool,
+        shadow: bool,
+    ) -> SpritePixel {
         let x = x + 128;
         let y = y + 128;
         let mut sprite_index = 0;
@@ -373,28 +426,45 @@ impl<'a> Vdp<'a> {
                 }
                 let tile_index = height * x_tile + y_tile;
                 let tile_addr = (tile + tile_index) as usize * 0x20;
-                let pixel = self.get_tile_pixel(tile_addr, x_offset, y_offset, palette_line);
-                if pixel.is_some() {
-                    return pixel;
+                let pixel_addr = tile_addr + (y_offset as usize * 8) / 2 + x_offset as usize / 2;
+                let pixel_data = self.vram[pixel_addr];
+                let palette_color = if x_offset % 2 == 1 {
+                    pixel_data & 0xF
+                } else {
+                    pixel_data >> 4
+                };
+                if palette_color != 0 {
+                    if enable_shadow_highlight && palette_line == 3 {
+                        if palette_color == 14 {
+                            return SpritePixel::Highlight;
+                        }
+                        if palette_color == 15 {
+                            return SpritePixel::Shadow;
+                        }
+                    }
+                    return SpritePixel::Color(self.get_color(
+                        palette_line,
+                        palette_color,
+                        shadow,
+                        false,
+                    ));
                 }
             }
 
             sprite_index = self.vram[sprite_addr + 3] as usize;
             sprite_index != 0
         } {}
-        None
+        SpritePixel::Transparent
     }
 
     fn get_pixel(
         &self,
         x: u16,
         y: u16,
-        tile_data_index: u16,
-        nametable_addr: u16,
+        tile_data: u16,
+        shadow: bool,
+        highlight: bool,
     ) -> Option<[u8; 4]> {
-        let tile_data_addr = (nametable_addr + tile_data_index * 2) as usize;
-        let tile_data =
-            (self.vram[tile_data_addr] as u16) << 8 | (self.vram[tile_data_addr + 1] as u16);
         let palette_line = ((tile_data >> 13) & 0b11) as u8;
         let v_flip = (tile_data >> 12) & 0b1 == 1;
         let h_flip = (tile_data >> 11) & 0b1 == 1;
@@ -402,16 +472,6 @@ impl<'a> Vdp<'a> {
         let tile_addr = tile_index as usize * 0x20;
         let tile_x = if h_flip { 7 - (x % 8) } else { x % 8 };
         let tile_y = if v_flip { 7 - (y % 8) } else { y % 8 };
-        self.get_tile_pixel(tile_addr, tile_x, tile_y, palette_line)
-    }
-
-    fn get_tile_pixel(
-        &self,
-        tile_addr: usize,
-        tile_x: u16,
-        tile_y: u16,
-        palette_line: u8,
-    ) -> Option<[u8; 4]> {
         let pixel_addr = tile_addr + (tile_y as usize * 8) / 2 + tile_x as usize / 2;
         let pixel_data = self.vram[pixel_addr];
         let palette_color = if tile_x % 2 == 1 {
@@ -422,20 +482,35 @@ impl<'a> Vdp<'a> {
         if palette_color == 0 {
             None
         } else {
-            Some(self.get_color(palette_line, palette_color))
+            Some(self.get_color(palette_line, palette_color, shadow, highlight))
         }
     }
 
-    fn get_color(&self, palette_line: u8, palette_index: u8) -> [u8; 4] {
+    fn get_color(
+        &self,
+        palette_line: u8,
+        palette_index: u8,
+        shadow: bool,
+        highlight: bool,
+    ) -> [u8; 4] {
         let index = ((palette_line * 16 + palette_index) * 2) as usize;
         let palette_val_high = self.cram[index];
         let palette_val_low = self.cram[index + 1];
-        [
-            BRIGHTNESS_VALS[((palette_val_low & 0xF) / 2) as usize],
-            BRIGHTNESS_VALS[((palette_val_low >> 4) / 2) as usize],
-            BRIGHTNESS_VALS[(palette_val_high / 2) as usize],
-            0xff,
-        ]
+        let r = BRIGHTNESS_VALS[((palette_val_low & 0xF) / 2) as usize];
+        let g = BRIGHTNESS_VALS[((palette_val_low >> 4) / 2) as usize];
+        let b = BRIGHTNESS_VALS[(palette_val_high / 2) as usize];
+        if shadow {
+            [r / 2, g / 2, b / 2, 0xff]
+        } else if highlight {
+            [
+                r.saturating_mul(2),
+                g.saturating_mul(2),
+                b.saturating_mul(2),
+                0xff,
+            ]
+        } else {
+            [r, g, b, 0xff]
+        }
     }
 
     pub fn render(
