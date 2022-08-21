@@ -120,12 +120,12 @@ impl Mode2 {
     }
 }
 
-enum VerticalScrollingMode {
+pub enum VerticalScrollingMode {
     Column16Pixels,
     FullScreen,
 }
 
-enum HorizontalScrollingMode {
+pub enum HorizontalScrollingMode {
     Row1Pixel,
     Row8Pixel,
     FullScreen,
@@ -133,10 +133,10 @@ enum HorizontalScrollingMode {
 }
 
 #[allow(dead_code)]
-struct Mode3 {
+pub struct Mode3 {
     enable_external_interrupt: bool,
-    vertical_scrolling_mode: VerticalScrollingMode,
-    horizontal_scrolling_mode: HorizontalScrollingMode,
+    pub vertical_scrolling_mode: VerticalScrollingMode,
+    pub horizontal_scrolling_mode: HorizontalScrollingMode,
 }
 
 impl Mode3 {
@@ -221,7 +221,7 @@ pub struct VdpBus {
     pub beam_hpos: u16,
     pub mode_1: Mode1,
     mode_2: Mode2,
-    mode_3: Mode3,
+    pub mode_3: Mode3,
     pub mode_4: Mode4,
     pub plane_a_nametable_addr: u16,
     pub plane_b_nametable_addr: u16,
@@ -232,8 +232,8 @@ pub struct VdpBus {
     pub horizontal_interrupt_counter: u16,
     horizontal_scroll_data_addr: u16,
     auto_increment: u8,
-    plane_height: u16,
-    pub(crate) plane_width: u16,
+    pub plane_height: u16,
+    pub plane_width: u16,
     pub window_h_pos: WindowHPos,
     pub window_v_pos: WindowVPos,
     dma_length_half: u16,

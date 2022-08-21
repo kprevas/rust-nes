@@ -8,7 +8,9 @@ use num_integer::Integer;
 use piston_window::*;
 use triple_buffer::TripleBuffer;
 
-use gen::vdp::bus::{Addr, AddrMode, AddrTarget, VdpBus, WindowHPos, WindowVPos, WriteData};
+use gen::vdp::bus::{
+    Addr, AddrMode, AddrTarget, VdpBus, VerticalScrollingMode, WindowHPos, WindowVPos, WriteData,
+};
 use window::renderer::Renderer;
 
 pub mod bus;
@@ -191,9 +193,6 @@ impl<'a> Vdp<'a> {
             let mut pixel = None;
             let x = self.dot;
             let y = self.scanline - 11;
-            let tile_x = x / 8;
-            let tile_y = y / 8;
-            let tile_index = tile_y * (bus.plane_width / 8) + tile_x;
 
             if pixel.is_none() {
                 pixel = self.get_sprite_pixel(x, y, bus.sprite_table_addr as usize);
@@ -209,16 +208,48 @@ impl<'a> Vdp<'a> {
                     WindowVPos::DrawToBottom(window_height) => y > 224 - window_height as u16 * 8,
                 };
                 if x_in_window || y_in_window {
+                    let tile_x = x / 8;
+                    let tile_y = y / 8;
                     let window_tile_index = tile_y * 64 + tile_x;
                     pixel = self.get_pixel(x, y, window_tile_index, bus.window_nametable_addr);
                 }
             }
 
             if pixel.is_none() {
+                let v_scroll_index = match bus.mode_3.vertical_scrolling_mode {
+                    VerticalScrollingMode::Column16Pixels => (y / 16 * 2 * 2) as usize,
+                    VerticalScrollingMode::FullScreen => 0,
+                };
+                let v_scroll = i16::from_be_bytes(
+                    self.vsram[v_scroll_index..=v_scroll_index + 1]
+                        .try_into()
+                        .unwrap(),
+                );
+                let y = (y.wrapping_add_signed(v_scroll)) % bus.plane_height;
+
+                let tile_x = x / 8;
+                let tile_y = y / 8;
+                let tile_index = tile_y * (bus.plane_width / 8) + tile_x;
+
                 pixel = self.get_pixel(x, y, tile_index, bus.plane_a_nametable_addr);
             }
 
             if pixel.is_none() {
+                let v_scroll_index = match bus.mode_3.vertical_scrolling_mode {
+                    VerticalScrollingMode::Column16Pixels => (y / 16 * 2 * 2 + 1) as usize,
+                    VerticalScrollingMode::FullScreen => 2,
+                };
+                let v_scroll = i16::from_be_bytes(
+                    self.vsram[v_scroll_index..=v_scroll_index + 1]
+                        .try_into()
+                        .unwrap(),
+                );
+                let y = (y.wrapping_add_signed(v_scroll)) % bus.plane_height;
+
+                let tile_x = x / 8;
+                let tile_y = y / 8;
+                let tile_index = tile_y * (bus.plane_width / 8) + tile_x;
+
                 pixel = self.get_pixel(x, y, tile_index, bus.plane_b_nametable_addr);
             }
 
