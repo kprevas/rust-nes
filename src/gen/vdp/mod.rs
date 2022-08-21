@@ -205,6 +205,27 @@ impl<'a> Vdp<'a> {
             let mut shadow = false;
             let mut highlight = false;
 
+            let window_tile_index = (y / 8) * 64 + (x / 8);
+            let window_tile_data_addr =
+                (bus.window_nametable_addr + window_tile_index * 2) as usize;
+            let window_tile_data = (self.vram[window_tile_data_addr] as u16) << 8
+                | (self.vram[window_tile_data_addr + 1] as u16);
+            let window_priority = (window_tile_data >> 15) & 0b1 > 0;
+
+            let x_in_window = match bus.window_h_pos {
+                WindowHPos::DrawToRight(window_width) => x > width - window_width as u16 * 8,
+                WindowHPos::DrawToLeft(window_width) => x < window_width as u16 * 8,
+            };
+            let y_in_window = match bus.window_v_pos {
+                WindowVPos::DrawToTop(window_height) => y < window_height as u16 * 8,
+                WindowVPos::DrawToBottom(window_height) => y > 224 - window_height as u16 * 8,
+            };
+            let window_pixel = if x_in_window || y_in_window {
+                self.get_pixel(x, y, window_tile_data, false, false)
+            } else {
+                None
+            };
+
             let (plane_a_x, plane_a_y, plane_a_tile_data) = self.plane_scroll(
                 x,
                 y,
@@ -229,60 +250,66 @@ impl<'a> Vdp<'a> {
                 2,
             );
 
-            if (plane_a_tile_data >> 15) & 0b1 == 0 && (plane_b_tile_data >> 15) & 0b1 == 0 {
+            let plane_a_priority = (plane_a_tile_data >> 15) & 0b1 > 0;
+            let plane_b_priority = (plane_b_tile_data >> 15) & 0b1 > 0;
+            if bus.mode_4.enable_shadow_highlight && !plane_a_priority && !plane_b_priority {
                 shadow = true;
             }
 
-            if pixel.is_none() {
-                match self.get_sprite_pixel(
-                    x,
-                    y,
-                    bus.sprite_table_addr as usize,
-                    bus.mode_4.enable_shadow_highlight,
-                    shadow,
-                ) {
-                    SpritePixel::Transparent => {}
-                    SpritePixel::Shadow => shadow = true,
-                    SpritePixel::Highlight => {
-                        if shadow {
-                            shadow = false;
-                        } else {
-                            highlight = true;
-                        }
-                    },
-                    SpritePixel::Color(color) => pixel = Some(color),
+            let (sprite_pixel, sprite_priority) = self.get_sprite_pixel(
+                x,
+                y,
+                bus.sprite_table_addr as usize,
+                bus.mode_4.enable_shadow_highlight,
+                shadow,
+            );
+
+            let sprite_pixel = match sprite_pixel {
+                SpritePixel::Transparent => None,
+                SpritePixel::Shadow => {
+                    shadow = true;
+                    None
                 }
-            }
-
-            if pixel.is_none() {
-                let x_in_window = match bus.window_h_pos {
-                    WindowHPos::DrawToRight(window_width) => x > width - window_width as u16 * 8,
-                    WindowHPos::DrawToLeft(window_width) => x < window_width as u16 * 8,
-                };
-                let y_in_window = match bus.window_v_pos {
-                    WindowVPos::DrawToTop(window_height) => y < window_height as u16 * 8,
-                    WindowVPos::DrawToBottom(window_height) => y > 224 - window_height as u16 * 8,
-                };
-                if x_in_window || y_in_window {
-                    let tile_x = x / 8;
-                    let tile_y = y / 8;
-                    let window_tile_index = tile_y * 64 + tile_x;
-                    let tile_data_addr =
-                        (bus.window_nametable_addr + window_tile_index * 2) as usize;
-                    let tile_data = (self.vram[tile_data_addr] as u16) << 8
-                        | (self.vram[tile_data_addr + 1] as u16);
-                    pixel = self.get_pixel(x, y, tile_data, false, false);
+                SpritePixel::Highlight => {
+                    if shadow {
+                        shadow = false;
+                    } else {
+                        highlight = true;
+                    }
+                    None
                 }
-            }
+                SpritePixel::Color(color) => Some(color),
+            };
 
+            let plane_a_pixel =
+                self.get_pixel(plane_a_x, plane_a_y, plane_a_tile_data, shadow, highlight);
+            let plane_b_pixel =
+                self.get_pixel(plane_b_x, plane_b_y, plane_b_tile_data, shadow, highlight);
+
+            if pixel.is_none() && window_priority {
+                pixel = window_pixel;
+            }
+            if pixel.is_none() && sprite_priority {
+                pixel = sprite_pixel;
+            }
+            if pixel.is_none() && plane_a_priority {
+                pixel = plane_a_pixel;
+            }
+            if pixel.is_none() && plane_b_priority {
+                pixel = plane_b_pixel;
+            }
             if pixel.is_none() {
-                pixel = self.get_pixel(plane_a_x, plane_a_y, plane_a_tile_data, shadow, highlight);
+                pixel = window_pixel;
             }
-
             if pixel.is_none() {
-                pixel = self.get_pixel(plane_b_x, plane_b_y, plane_b_tile_data, shadow, highlight);
+                pixel = sprite_pixel;
             }
-
+            if pixel.is_none() {
+                pixel = plane_a_pixel;
+            }
+            if pixel.is_none() {
+                pixel = plane_b_pixel;
+            }
             if pixel.is_none() {
                 pixel = Some(self.get_color(bus.bg_palette, bus.bg_color, false, false));
             }
@@ -371,10 +398,9 @@ impl<'a> Vdp<'a> {
         let tile_x = x / 8;
         let tile_y = y / 8;
         let tile_index = tile_y * (plane_width / 8) + tile_x;
-        let tile_data_addr =
-            (nametable_addr + tile_index * 2) as usize;
-        let tile_data = (self.vram[tile_data_addr] as u16) << 8
-            | (self.vram[tile_data_addr + 1] as u16);
+        let tile_data_addr = (nametable_addr + tile_index * 2) as usize;
+        let tile_data =
+            (self.vram[tile_data_addr] as u16) << 8 | (self.vram[tile_data_addr + 1] as u16);
 
         (x, y, tile_data)
     }
@@ -386,7 +412,7 @@ impl<'a> Vdp<'a> {
         sprite_table_addr: usize,
         enable_shadow_highlight: bool,
         shadow: bool,
-    ) -> SpritePixel {
+    ) -> (SpritePixel, bool) {
         let x = x + 128;
         let y = y + 128;
         let mut sprite_index = 0;
@@ -401,8 +427,7 @@ impl<'a> Vdp<'a> {
             let width = ((self.vram[sprite_addr + 2] >> 2) & 0b11) as u16 + 1;
             let tile = ((self.vram[sprite_addr + 4] & 0b111) as u16) << 8
                 | (self.vram[sprite_addr + 5] as u16);
-            #[allow(unused_variables)]
-                let high_priority = (self.vram[sprite_addr + 4] & 0b10000000) > 0;
+            let high_priority = (self.vram[sprite_addr + 4] & 0b10000000) > 0;
             let flip_vertical = (self.vram[sprite_addr + 4] & 0b00010000) > 0;
             let flip_horizontal = (self.vram[sprite_addr + 4] & 0b00001000) > 0;
             let palette_line = (self.vram[sprite_addr + 4] >> 5) & 0b11;
@@ -436,25 +461,28 @@ impl<'a> Vdp<'a> {
                 if palette_color != 0 {
                     if enable_shadow_highlight && palette_line == 3 {
                         if palette_color == 14 {
-                            return SpritePixel::Highlight;
+                            return (SpritePixel::Highlight, high_priority);
                         }
                         if palette_color == 15 {
-                            return SpritePixel::Shadow;
+                            return (SpritePixel::Shadow, high_priority);
                         }
                     }
-                    return SpritePixel::Color(self.get_color(
-                        palette_line,
-                        palette_color,
-                        shadow,
-                        false,
-                    ));
+                    return (
+                        SpritePixel::Color(self.get_color(
+                            palette_line,
+                            palette_color,
+                            shadow,
+                            false,
+                        )),
+                        high_priority,
+                    );
                 }
             }
 
             sprite_index = self.vram[sprite_addr + 3] as usize;
             sprite_index != 0
         } {}
-        SpritePixel::Transparent
+        (SpritePixel::Transparent, false)
     }
 
     fn get_pixel(
