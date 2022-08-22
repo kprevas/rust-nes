@@ -47,15 +47,15 @@ impl Addr {
     }
 }
 
-struct Status {
+pub struct Status {
     fifo_empty: bool,
     fifo_full: bool,
     vertical_interrupt: bool,
     sprite_limit: bool,
     sprite_overlap: bool,
     interlaced_odd_frame: bool,
-    vblank: bool,
-    hblank: bool,
+    pub vblank: bool,
+    pub hblank: bool,
     dma: bool,
     pal: bool,
 }
@@ -218,7 +218,7 @@ pub enum WriteData {
 
 pub struct VdpBus {
     control_high_word: Option<u16>,
-    status: Status,
+    pub status: Status,
     pub beam_vpos: u16,
     pub beam_hpos: u16,
     pub mode_1: Mode1,

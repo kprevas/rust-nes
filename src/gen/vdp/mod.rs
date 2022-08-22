@@ -201,10 +201,10 @@ impl<'a> Vdp<'a> {
         let mut bus = self.bus.borrow_mut();
         let width = if bus.mode_4.h_40_wide_mode { 320 } else { 256 };
 
-        if self.dot < width && self.scanline >= 11 && self.scanline - 11 < 224 {
+        if self.dot >= 13 && self.dot - 13 < width && self.scanline >= 24 && self.scanline - 24 < 224 {
             let mut pixel = None;
-            let x = self.dot;
-            let y = self.scanline - 11;
+            let x = self.dot - 13;
+            let y = self.scanline - 24;
 
             if self.dump_mode {
                 self.draw_dump_pixel(x, y, width);
@@ -328,7 +328,25 @@ impl<'a> Vdp<'a> {
         }
 
         self.dot += 1;
-        if self.dot == width {
+        if self.dot == if bus.mode_4.h_40_wide_mode { 6 } else { 5 } {
+            bus.status.hblank = false;
+        } else if self.dot == if bus.mode_4.h_40_wide_mode { 330 } else { 266 } {
+            self.scanline += 1;
+            if self.scanline == 248 {
+                bus.status.vblank = true;
+                if bus.mode_2.enable_vertical_interrupt {
+                    bus.vertical_interrupt = true;
+                }
+                self.image_buffer.publish();
+                let bg = self.get_color(bus.bg_palette, bus.bg_color, false, false);
+                self.image_buffer.input_buffer().fill(bg);
+            } else if self.scanline == 261 {
+                bus.status.vblank = false;
+            } else if self.scanline == 262 {
+                self.scanline = 0;
+            }
+        } else if self.dot == if bus.mode_4.h_40_wide_mode { 358 } else { 294 } {
+            bus.status.hblank = true;
             if bus.mode_1.enable_horizontal_interrupt {
                 if self.hblank_counter == 0 {
                     bus.horizontal_interrupt = true;
@@ -337,24 +355,28 @@ impl<'a> Vdp<'a> {
                     self.hblank_counter -= 1;
                 }
             }
-        } else if self.dot == width + 33 {
+        } else if self.dot == if bus.mode_4.h_40_wide_mode { 420 } else { 324 } {
             self.dot = 0;
-            self.scanline += 1;
-            if self.scanline == 243 {
-                if bus.mode_2.enable_vertical_interrupt {
-                    bus.vertical_interrupt = true;
-                }
-                self.image_buffer.publish();
-                let bg = self.get_color(bus.bg_palette, bus.bg_color, false, false);
-                self.image_buffer.input_buffer().fill(bg);
-            } else if self.scanline == 262 {
-                self.scanline = 0;
-            }
         }
 
-        // TODO: match https://plutiedev.com/mirror/kabuto-hardware-notes#hv-counter
-        bus.beam_vpos = self.scanline.max(243);
-        bus.beam_hpos = self.dot.max(width);
+        bus.beam_vpos = if self.scanline < 24 { 512 - (24 - self.scanline) } else { self.scanline - 24 };
+        if bus.beam_vpos > 234 && bus.beam_vpos < 238 {
+            bus.beam_vpos += 250;
+        }
+
+        bus.beam_hpos = self.dot + if bus.mode_4.h_40_wide_mode { 13 } else { 11 };
+        if bus.mode_4.h_40_wide_mode {
+            if bus.beam_hpos > 364 {
+                bus.beam_hpos += 92;
+            }
+        } else {
+            if bus.beam_hpos > 295 {
+                bus.beam_hpos += 170;
+            }
+        }
+        if bus.beam_hpos > 512 {
+            bus.beam_hpos -= 512;
+        }
     }
 
     fn plane_scroll(
