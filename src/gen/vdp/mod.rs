@@ -113,21 +113,21 @@ impl<'a> Vdp<'a> {
                      ..
                  }) => match target {
                 AddrTarget::VRAM => {
-                    bus.read_data = u32::from_le_bytes(
+                    bus.read_data = u32::from_be_bytes(
                         self.vram[addr as usize..(addr + 4) as usize]
                             .try_into()
                             .unwrap(),
                     );
                 }
                 AddrTarget::CRAM => {
-                    bus.read_data = u32::from_le_bytes(
+                    bus.read_data = u32::from_be_bytes(
                         self.cram[addr as usize..(addr + 4) as usize]
                             .try_into()
                             .unwrap(),
                     );
                 }
                 AddrTarget::VSRAM => {
-                    bus.read_data = u32::from_le_bytes(
+                    bus.read_data = u32::from_be_bytes(
                         self.vsram[addr as usize..(addr + 4) as usize]
                             .try_into()
                             .unwrap(),
