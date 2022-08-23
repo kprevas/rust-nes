@@ -57,6 +57,7 @@ pub fn run(
         320.0,
         224.0,
         &Path::new("settings_gen.dat"),
+        matches.is_present("pause"),
     );
 
     cpu.close();

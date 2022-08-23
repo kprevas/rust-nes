@@ -14,9 +14,10 @@ fn main() {
         (@subcommand run =>
             (about: "load and run a ROM")
             (@arg instrument_cpu: -c "instruments CPU")
-            (@arg instrument_ppu: -p "instruments PPU")
+            (@arg instrument_ppu: --ppu "instruments NES PPU")
             (@arg bench_mode: -b "runs in benchmark mode")
             (@arg dump_vram: -v "displays VRAM dump")
+            (@arg pause: -p "starts paused")
         )
         (@arg INPUT: "the input file to use")
     )

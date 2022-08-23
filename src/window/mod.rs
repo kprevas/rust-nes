@@ -33,9 +33,9 @@ pub fn window_loop(
     width: f64,
     height: f64,
     settings_path: &Path,
+    mut pause: bool,
 ) {
     let mut reset = false;
-    let mut pause = false;
     let mut step = false;
     let mut input_overlay = false;
 
