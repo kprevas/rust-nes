@@ -35,6 +35,8 @@ pub fn window_loop(
     settings_path: &Path,
 ) {
     let mut reset = false;
+    let mut pause = false;
+    let mut step = false;
     let mut input_overlay = false;
 
     let mut frame_count = 0u32;
@@ -73,6 +75,8 @@ pub fn window_loop(
                 &e,
                 cpu,
                 &mut reset,
+                &mut pause,
+                &mut step,
                 &mut input_overlay,
                 &mut recorder,
                 frame_count,
@@ -86,13 +90,16 @@ pub fn window_loop(
                 reset = false;
                 cpu.reset(true);
             }
-            if input_changed {
-                recorder.input_changed(&inputs, frame_count);
-                input_changed = false;
+            if !pause || step {
+                step = false;
+                if input_changed {
+                    recorder.input_changed(&inputs, frame_count);
+                    input_changed = false;
+                }
+                recorder.set_frame_inputs(&mut inputs, frame_count);
+                cpu.do_frame(u.dt, &inputs);
+                frame_count += 1;
             }
-            recorder.set_frame_inputs(&mut inputs, frame_count);
-            cpu.do_frame(u.dt, &inputs);
-            frame_count += 1;
         }
 
         if let Some(_r) = e.render_args() {

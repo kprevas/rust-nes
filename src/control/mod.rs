@@ -45,6 +45,8 @@ impl<const B: usize> Control<B> {
         event: &Event,
         cpu: &mut dyn Cpu,
         reset: &mut bool,
+        pause: &mut bool,
+        step: &mut bool,
         input_overlay: &mut bool,
         recorder: &mut Recorder<B>,
         frame_count: u32,
@@ -69,7 +71,12 @@ impl<const B: usize> Control<B> {
             if key_pressed == Key::S && (self.left_ctrl_state || self.right_ctrl_state) {
                 recorder.toggle(frame_count);
             }
-            if key_pressed == Key::P && (self.left_ctrl_state || self.right_ctrl_state) {
+            if key_pressed == Key::P
+                && (self.left_ctrl_state || self.right_ctrl_state)
+                && (self.left_shift_state || self.right_shift_state)
+            {
+                *pause = !*pause;
+            } else if key_pressed == Key::P && (self.left_ctrl_state || self.right_ctrl_state) {
                 recorder.toggle_playback(frame_count);
             }
             if key_pressed == Key::I && (self.left_ctrl_state || self.right_ctrl_state) {
@@ -80,6 +87,9 @@ impl<const B: usize> Control<B> {
             }
             if key_pressed == Key::Minus {
                 cpu.decrease_speed();
+            }
+            if *pause && key_pressed == Key::Space {
+                *step = true;
             }
         }
 
