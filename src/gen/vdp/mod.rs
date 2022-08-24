@@ -201,7 +201,11 @@ impl<'a> Vdp<'a> {
         let mut bus = self.bus.borrow_mut();
         let width = if bus.mode_4.h_40_wide_mode { 320 } else { 256 };
 
-        if self.dot >= 13 && self.dot - 13 < width && self.scanline >= 24 && self.scanline - 24 < 224 {
+        if self.dot >= 13
+            && self.dot - 13 < width
+            && self.scanline >= 24
+            && self.scanline - 24 < 224
+        {
             let mut pixel = None;
             let x = self.dot - 13;
             let y = self.scanline - 24;
@@ -359,7 +363,11 @@ impl<'a> Vdp<'a> {
             self.dot = 0;
         }
 
-        bus.beam_vpos = if self.scanline < 24 { 512 - (24 - self.scanline) } else { self.scanline - 24 };
+        bus.beam_vpos = if self.scanline < 24 {
+            512 - (24 - self.scanline)
+        } else {
+            self.scanline - 24
+        };
         if bus.beam_vpos > 234 && bus.beam_vpos < 238 {
             bus.beam_vpos += 250;
         }
@@ -402,12 +410,8 @@ impl<'a> Vdp<'a> {
         );
 
         let h_scroll_index = match h_scroll_mode {
-            HorizontalScrollingMode::Row1Pixel => {
-                (((y.wrapping_add_signed(v_scroll)) % plane_height) * 2 * 2) as usize
-            }
-            HorizontalScrollingMode::Row8Pixel => {
-                (((y.wrapping_add_signed(v_scroll)) % plane_height) / 8 * 8 * 2 * 2) as usize
-            }
+            HorizontalScrollingMode::Row1Pixel => (y * 2 * 2) as usize,
+            HorizontalScrollingMode::Row8Pixel => (y / 8 * 8 * 2 * 2) as usize,
             HorizontalScrollingMode::FullScreen => 0,
             HorizontalScrollingMode::Invalid => 0,
         } + plane_offset;
@@ -422,7 +426,7 @@ impl<'a> Vdp<'a> {
             )
         };
 
-        let x = (x.wrapping_add_signed(h_scroll)) % plane_width;
+        let x = (x.wrapping_add_signed(-h_scroll)) % plane_width;
         let y = (y.wrapping_add_signed(v_scroll)) % plane_height;
 
         let tile_x = x / 8;
