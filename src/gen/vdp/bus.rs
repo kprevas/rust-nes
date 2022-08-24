@@ -379,6 +379,7 @@ impl VdpBus {
                             }) = &self.addr
                 {
                     self.increment_addr();
+                    self.increment_addr();
                     self.read_data
                 } else {
                     0
