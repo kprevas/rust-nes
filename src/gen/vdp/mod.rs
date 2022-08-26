@@ -17,6 +17,8 @@ use window::renderer::Renderer;
 pub mod bus;
 
 const BRIGHTNESS_VALS: [u8; 8] = [0, 52, 87, 116, 144, 172, 206, 255];
+const BRIGHTNESS_VALS_SHADOW: [u8; 8] = [0, 29, 52, 70, 87, 101, 116, 130];
+const BRIGHTNESS_VALS_HIGHLIGHT: [u8; 8] = [130, 144, 158, 172, 187, 206, 228, 255];
 
 enum SpritePixel {
     Transparent,
@@ -558,21 +560,19 @@ impl<'a> Vdp<'a> {
         let index = ((palette_line * 16 + palette_index) * 2) as usize;
         let palette_val_high = self.cram[index];
         let palette_val_low = self.cram[index + 1];
-        let r = BRIGHTNESS_VALS[((palette_val_low & 0xF) / 2) as usize];
-        let g = BRIGHTNESS_VALS[((palette_val_low >> 4) / 2) as usize];
-        let b = BRIGHTNESS_VALS[(palette_val_high / 2) as usize];
-        if shadow {
-            [r / 2, g / 2, b / 2, 0xff]
+        let brightness_vals = if shadow {
+            BRIGHTNESS_VALS_SHADOW
         } else if highlight {
-            [
-                r.saturating_mul(2),
-                g.saturating_mul(2),
-                b.saturating_mul(2),
-                0xff,
-            ]
+            BRIGHTNESS_VALS_HIGHLIGHT
         } else {
-            [r, g, b, 0xff]
-        }
+            BRIGHTNESS_VALS
+        };
+        [
+            brightness_vals[((palette_val_low & 0xF) / 2) as usize],
+            brightness_vals[((palette_val_low >> 4) / 2) as usize],
+            brightness_vals[(palette_val_high / 2) as usize],
+            0xff,
+        ]
     }
 
     fn draw_dump_pixel(&mut self, x: u16, y: u16, width: u16) {
