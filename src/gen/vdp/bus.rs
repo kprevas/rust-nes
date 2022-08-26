@@ -550,7 +550,6 @@ impl VdpBus {
         write_data: Option<WriteData>,
     ) {
         let mut len = self.dma_length_half as usize * 2;
-        let mut source = self.dma_source_addr_half as usize * 2;
         let fill_val = if let DmaType::VramFill = self.dma_type {
             match write_data {
                 None => return,
@@ -563,6 +562,7 @@ impl VdpBus {
             0
         };
         while len > 0 {
+            let source = self.dma_source_addr_half as usize * 2;
             let addr = self.addr.unwrap().addr as usize;
             match self.dma_type {
                 DmaType::RamToVram => {
@@ -577,21 +577,18 @@ impl VdpBus {
                         }
                         _ => panic!(),
                     }
-                    len -= 2;
-                    source += 2;
                 }
                 DmaType::VramFill => {
                     target[addr] = fill_val;
-                    len -= 1;
-                    source += 1;
+                    target[addr + 1] = fill_val;
                 }
                 DmaType::VramToVram => {
                     target[addr] = target[source];
                     target[addr + 1] = target[source + 1];
-                    len -= 2;
-                    source += 2;
                 }
             };
+            len -= 2;
+            self.dma_source_addr_half += 1;
             self.increment_addr();
         }
         self.addr = None;
