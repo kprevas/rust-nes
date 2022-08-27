@@ -49,6 +49,9 @@ pub struct Vdp<'a> {
     scanline: u16,
     dot: u16,
 
+    dot_overflow: bool,
+    prev_line_dot_overflow: bool,
+
     hblank_counter: u16,
 
     vram: Box<[u8]>,
@@ -90,6 +93,8 @@ impl<'a> Vdp<'a> {
             renderer,
             scanline: 0,
             dot: 0,
+            dot_overflow: false,
+            prev_line_dot_overflow: false,
             hblank_counter: 0,
             vram: vec![0; 0x10000].into_boxed_slice(),
             cram: vec![0; 0x80].into_boxed_slice(),
@@ -358,6 +363,8 @@ impl<'a> Vdp<'a> {
             bus.status.hblank = false;
             bus.status.sprite_limit = false;
             bus.status.sprite_overlap = false;
+            self.prev_line_dot_overflow = self.dot_overflow;
+            self.dot_overflow = false;
         } else if self.dot == if bus.mode_4.h_40_wide_mode { 330 } else { 266 } {
             self.scanline += 1;
             if self.scanline == 248 {
@@ -373,6 +380,7 @@ impl<'a> Vdp<'a> {
                 }
             } else if self.scanline == 261 {
                 bus.status.vblank = false;
+                self.prev_line_dot_overflow = false;
             } else if self.scanline == 262 {
                 self.scanline = 0;
             }
@@ -485,6 +493,8 @@ impl<'a> Vdp<'a> {
         let mut high_priority = false;
         let mut sprites_in_line = 0;
         let mut dots_in_line = 0;
+        let mut masked = false;
+        let mut unmasked_sprite_on_line = self.prev_line_dot_overflow;
         while {
             let sprite_addr = sprite_table_addr + sprite_index * 8;
 
@@ -521,7 +531,9 @@ impl<'a> Vdp<'a> {
                         (_, _) => status.sprite_overlap = true,
                     }
 
-                    let use_sprite_pixel = if sprites_in_line >= max_sprites_per_line {
+                    let use_sprite_pixel = if masked {
+                        false
+                    } else if sprites_in_line >= max_sprites_per_line {
                         status.sprite_limit = true;
                         false
                     } else if dots_in_line >= max_dots_per_line
@@ -560,6 +572,13 @@ impl<'a> Vdp<'a> {
                         high_priority = sprite.high_priority;
                     }
                 }
+                if sprite.x == 0 {
+                    if unmasked_sprite_on_line {
+                        masked = true;
+                    }
+                } else {
+                    unmasked_sprite_on_line = true;
+                }
                 sprites_in_line += 1;
                 dots_in_line += sprite.width * 8;
             }
@@ -567,6 +586,9 @@ impl<'a> Vdp<'a> {
             sprite_index = sprite.next;
             sprite_index != 0 && sprite_index < max_sprites_per_frame
         } {}
+        if dots_in_line >= max_dots_per_line {
+            self.dot_overflow = true;
+        }
         (sprite_pixel, high_priority)
     }
 
