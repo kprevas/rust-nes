@@ -9,8 +9,8 @@ use piston_window::*;
 use triple_buffer::TripleBuffer;
 
 use gen::vdp::bus::{
-    Addr, AddrMode, AddrTarget, HorizontalScrollingMode, VdpBus, VerticalScrollingMode, WindowHPos,
-    WindowVPos, WriteData,
+    Addr, AddrMode, AddrTarget, HorizontalScrollingMode, Status, VdpBus, VerticalScrollingMode,
+    WindowHPos, WindowVPos, WriteData,
 };
 use window::renderer::Renderer;
 
@@ -25,6 +25,20 @@ enum SpritePixel {
     Shadow,
     Highlight,
     Color([u8; 4]),
+}
+
+#[derive(Debug)]
+struct Sprite {
+    y: u16,
+    x: u16,
+    height: u16,
+    width: u16,
+    tile: u16,
+    high_priority: bool,
+    flip_vertical: bool,
+    flip_horizontal: bool,
+    palette_line: u8,
+    next: usize,
 }
 
 #[allow(dead_code)]
@@ -202,6 +216,8 @@ impl<'a> Vdp<'a> {
     fn tick_pixel(&mut self) {
         let mut bus = self.bus.borrow_mut();
         let width = if bus.mode_4.h_40_wide_mode { 320 } else { 256 };
+        let max_sprites_per_line = if bus.mode_4.h_40_wide_mode { 20 } else { 16 };
+        let max_sprites_per_frame = if bus.mode_4.h_40_wide_mode { 80 } else { 64 };
 
         if self.dot >= 13
             && self.dot - 13 < width
@@ -275,6 +291,10 @@ impl<'a> Vdp<'a> {
                     bus.sprite_table_addr as usize,
                     bus.mode_4.enable_shadow_highlight,
                     shadow,
+                    max_sprites_per_line,
+                    max_sprites_per_frame,
+                    width,
+                    &mut bus.status,
                 );
 
                 let sprite_pixel = match sprite_pixel {
@@ -336,6 +356,8 @@ impl<'a> Vdp<'a> {
         self.dot += 1;
         if self.dot == if bus.mode_4.h_40_wide_mode { 6 } else { 5 } {
             bus.status.hblank = false;
+            bus.status.sprite_limit = false;
+            bus.status.sprite_overlap = false;
         } else if self.dot == if bus.mode_4.h_40_wide_mode { 330 } else { 266 } {
             self.scanline += 1;
             if self.scanline == 248 {
@@ -346,6 +368,9 @@ impl<'a> Vdp<'a> {
                 self.image_buffer.publish();
                 let bg = self.get_color(bus.bg_palette, bus.bg_color, false, false);
                 self.image_buffer.input_buffer().fill(bg);
+                if self.dump_mode {
+                    self.dump_sprite_table(bus.sprite_table_addr as usize);
+                }
             } else if self.scanline == 261 {
                 bus.status.vblank = false;
             } else if self.scanline == 262 {
@@ -442,83 +467,123 @@ impl<'a> Vdp<'a> {
     }
 
     fn get_sprite_pixel(
-        &self,
+        &mut self,
         x: u16,
         y: u16,
         sprite_table_addr: usize,
         enable_shadow_highlight: bool,
         shadow: bool,
+        max_sprites_per_line: u32,
+        max_sprites_per_frame: usize,
+        max_dots_per_line: u16,
+        status: &mut Status,
     ) -> (SpritePixel, bool) {
         let x = x + 128;
         let y = y + 128;
         let mut sprite_index = 0;
+        let mut sprite_pixel = SpritePixel::Transparent;
+        let mut high_priority = false;
+        let mut sprites_in_line = 0;
+        let mut dots_in_line = 0;
         while {
             let sprite_addr = sprite_table_addr + sprite_index * 8;
 
-            let sprite_y =
-                (self.vram[sprite_addr] as u16) << 8 | (self.vram[sprite_addr + 1] as u16);
-            let sprite_x =
-                (self.vram[sprite_addr + 6] as u16) << 8 | (self.vram[sprite_addr + 7] as u16);
-            let height = (self.vram[sprite_addr + 2] & 0b11) as u16 + 1;
-            let width = ((self.vram[sprite_addr + 2] >> 2) & 0b11) as u16 + 1;
-            let tile = ((self.vram[sprite_addr + 4] & 0b111) as u16) << 8
-                | (self.vram[sprite_addr + 5] as u16);
-            let high_priority = (self.vram[sprite_addr + 4] & 0b10000000) > 0;
-            let flip_vertical = (self.vram[sprite_addr + 4] & 0b00010000) > 0;
-            let flip_horizontal = (self.vram[sprite_addr + 4] & 0b00001000) > 0;
-            let palette_line = (self.vram[sprite_addr + 4] >> 5) & 0b11;
+            let sprite = self.read_sprite(sprite_addr);
 
-            if sprite_y <= y
-                && sprite_x <= x
-                && sprite_y + 8 * height > y
-                && sprite_x + 8 * width > x
-            {
-                let x_in_sprite = x - sprite_x;
-                let y_in_sprite = y - sprite_y;
-                let (mut x_tile, mut x_offset) = x_in_sprite.div_rem(&8);
-                let (mut y_tile, mut y_offset) = y_in_sprite.div_rem(&8);
-                if flip_vertical {
-                    y_tile = height - 1 - y_tile;
-                    y_offset = 7 - y_offset;
-                }
-                if flip_horizontal {
-                    x_tile = width - 1 - x_tile;
-                    x_offset = 7 - x_offset;
-                }
-                let tile_index = height * x_tile + y_tile;
-                let tile_addr = (tile + tile_index) as usize * 0x20;
-                let pixel_addr = tile_addr + (y_offset as usize * 8) / 2 + x_offset as usize / 2;
-                let pixel_data = self.vram[pixel_addr];
-                let palette_color = if x_offset % 2 == 1 {
-                    pixel_data & 0xF
-                } else {
-                    pixel_data >> 4
-                };
-                if palette_color != 0 {
-                    if enable_shadow_highlight && palette_line == 3 {
-                        if palette_color == 14 {
-                            return (SpritePixel::Highlight, high_priority);
-                        }
-                        if palette_color == 15 {
-                            return (SpritePixel::Shadow, high_priority);
-                        }
+            if sprite.y <= y && sprite.y + 8 * sprite.height > y {
+                if sprite.x <= x && sprite.x + 8 * sprite.width > x {
+                    let x_in_sprite = x - sprite.x;
+                    let y_in_sprite = y - sprite.y;
+                    let (mut x_tile, mut x_offset) = x_in_sprite.div_rem(&8);
+                    let (mut y_tile, mut y_offset) = y_in_sprite.div_rem(&8);
+                    if sprite.flip_vertical {
+                        y_tile = sprite.height - 1 - y_tile;
+                        y_offset = 7 - y_offset;
                     }
-                    return (
-                        SpritePixel::Color(self.get_color(
-                            palette_line,
-                            palette_color,
-                            shadow,
-                            false,
-                        )),
-                        high_priority,
-                    );
+                    if sprite.flip_horizontal {
+                        x_tile = sprite.width - 1 - x_tile;
+                        x_offset = 7 - x_offset;
+                    }
+                    let tile_index = sprite.height * x_tile + y_tile;
+                    let tile_addr = (sprite.tile + tile_index) as usize * 0x20;
+                    let pixel_addr =
+                        tile_addr + (y_offset as usize * 8) / 2 + x_offset as usize / 2;
+                    let pixel_data = self.vram[pixel_addr];
+                    let palette_color = if x_offset % 2 == 1 {
+                        pixel_data & 0xF
+                    } else {
+                        pixel_data >> 4
+                    };
+
+                    match (&sprite_pixel, palette_color) {
+                        (SpritePixel::Transparent, _) => {}
+                        (_, 0) => {}
+                        (_, _) => status.sprite_overlap = true,
+                    }
+
+                    let use_sprite_pixel = if sprites_in_line >= max_sprites_per_line {
+                        status.sprite_limit = true;
+                        false
+                    } else if dots_in_line >= max_dots_per_line
+                        || x - sprite.x >= max_dots_per_line - dots_in_line
+                    {
+                        false
+                    } else if palette_color == 0 {
+                        false
+                    } else if let SpritePixel::Transparent = sprite_pixel {
+                        true
+                    } else if sprite.high_priority && !high_priority {
+                        true
+                    } else {
+                        false
+                    };
+
+                    if use_sprite_pixel {
+                        sprite_pixel = if enable_shadow_highlight
+                            && sprite.palette_line == 3
+                            && palette_color == 14
+                        {
+                            SpritePixel::Highlight
+                        } else if enable_shadow_highlight
+                            && sprite.palette_line == 3
+                            && palette_color == 15
+                        {
+                            SpritePixel::Shadow
+                        } else {
+                            SpritePixel::Color(self.get_color(
+                                sprite.palette_line,
+                                palette_color,
+                                shadow,
+                                false,
+                            ))
+                        };
+                        high_priority = sprite.high_priority;
+                    }
                 }
+                sprites_in_line += 1;
+                dots_in_line += sprite.width * 8;
             }
 
-            sprite_index = self.vram[sprite_addr + 3] as usize;
-            sprite_index != 0
+            sprite_index = sprite.next;
+            sprite_index != 0 && sprite_index < max_sprites_per_frame
         } {}
-        (SpritePixel::Transparent, false)
+        (sprite_pixel, high_priority)
+    }
+
+    fn read_sprite(&self, sprite_addr: usize) -> Sprite {
+        Sprite {
+            y: (self.vram[sprite_addr] as u16) << 8 | (self.vram[sprite_addr + 1] as u16),
+            x: (self.vram[sprite_addr + 6] as u16) << 8 | (self.vram[sprite_addr + 7] as u16),
+            height: (self.vram[sprite_addr + 2] & 0b11) as u16 + 1,
+            width: ((self.vram[sprite_addr + 2] >> 2) & 0b11) as u16 + 1,
+            tile: ((self.vram[sprite_addr + 4] & 0b111) as u16) << 8
+                | (self.vram[sprite_addr + 5] as u16),
+            high_priority: (self.vram[sprite_addr + 4] & 0b10000000) > 0,
+            flip_vertical: (self.vram[sprite_addr + 4] & 0b00010000) > 0,
+            flip_horizontal: (self.vram[sprite_addr + 4] & 0b00001000) > 0,
+            palette_line: (self.vram[sprite_addr + 4] >> 5) & 0b11,
+            next: self.vram[sprite_addr + 3] as usize,
+        }
     }
 
     fn get_pixel(
@@ -594,6 +659,16 @@ impl<'a> Vdp<'a> {
         };
         self.image_buffer.input_buffer()
             [y as usize * 320 as usize + ((320 - width) / 2) as usize + x as usize] = pixel;
+    }
+
+    fn dump_sprite_table(&self, sprite_table_addr: usize) {
+        println!();
+        for sprite_index in 0..128 {
+            let sprite_addr = sprite_table_addr + sprite_index * 8;
+
+            let sprite = self.read_sprite(sprite_addr);
+            println!("{:?}", sprite);
+        }
     }
 
     pub fn render(
