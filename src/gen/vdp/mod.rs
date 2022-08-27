@@ -48,6 +48,8 @@ pub struct Vdp<'a> {
 
     scanline: u16,
     dot: u16,
+    h_counter: u16,
+    v_counter: u16,
 
     dot_overflow: bool,
     prev_line_dot_overflow: bool,
@@ -93,6 +95,8 @@ impl<'a> Vdp<'a> {
             renderer,
             scanline: 0,
             dot: 0,
+            h_counter: 0,
+            v_counter: 0,
             dot_overflow: false,
             prev_line_dot_overflow: false,
             hblank_counter: 0,
@@ -223,15 +227,16 @@ impl<'a> Vdp<'a> {
         let width = if bus.mode_4.h_40_wide_mode { 320 } else { 256 };
         let max_sprites_per_line = if bus.mode_4.h_40_wide_mode { 20 } else { 16 };
         let max_sprites_per_frame = if bus.mode_4.h_40_wide_mode { 80 } else { 64 };
+        let active_display_h = if bus.mode_4.h_40_wide_mode { 26 } else { 24 };
+        let active_display_h_end = if bus.mode_4.h_40_wide_mode { 345 } else { 279 };
 
-        if self.dot >= 13
-            && self.dot - 13 < width
-            && self.scanline >= 24
-            && self.scanline - 24 < 224
+        if self.h_counter >= active_display_h
+            && self.h_counter <= active_display_h_end
+            && self.scanline < 224
         {
             let mut pixel = None;
-            let x = self.dot - 13;
-            let y = self.scanline - 24;
+            let x = self.dot;
+            let y = self.scanline;
 
             if self.dump_mode {
                 self.draw_dump_pixel(x, y, width);
@@ -358,16 +363,19 @@ impl<'a> Vdp<'a> {
             }
         }
 
-        self.dot += 1;
-        if self.dot == if bus.mode_4.h_40_wide_mode { 6 } else { 5 } {
+        self.h_counter += 1;
+        if self.h_counter > active_display_h && self.h_counter <= active_display_h_end {
+            self.dot += 1;
+        }
+        if self.h_counter == if bus.mode_4.h_40_wide_mode { 6 } else { 5 } {
             bus.status.hblank = false;
             bus.status.sprite_limit = false;
             bus.status.sprite_overlap = false;
             self.prev_line_dot_overflow = self.dot_overflow;
             self.dot_overflow = false;
-        } else if self.dot == if bus.mode_4.h_40_wide_mode { 330 } else { 266 } {
-            self.scanline += 1;
-            if self.scanline == 248 {
+        } else if self.h_counter == if bus.mode_4.h_40_wide_mode { 330 } else { 266 } {
+            self.v_counter += 1;
+            if self.v_counter == 224 {
                 bus.status.vblank = true;
                 if bus.mode_2.enable_vertical_interrupt {
                     bus.vertical_interrupt = true;
@@ -378,13 +386,12 @@ impl<'a> Vdp<'a> {
                 if self.dump_mode {
                     self.dump_sprite_table(bus.sprite_table_addr as usize);
                 }
-            } else if self.scanline == 261 {
+            } else if self.v_counter == 261 {
                 bus.status.vblank = false;
-                self.prev_line_dot_overflow = false;
-            } else if self.scanline == 262 {
-                self.scanline = 0;
+            } else if self.v_counter == 262 {
+                self.v_counter = 0;
             }
-        } else if self.dot == if bus.mode_4.h_40_wide_mode { 358 } else { 294 } {
+        } else if self.h_counter == if bus.mode_4.h_40_wide_mode { 358 } else { 294 } {
             bus.status.hblank = true;
             if bus.mode_1.enable_horizontal_interrupt {
                 if self.hblank_counter == 0 {
@@ -394,20 +401,22 @@ impl<'a> Vdp<'a> {
                     self.hblank_counter -= 1;
                 }
             }
-        } else if self.dot == if bus.mode_4.h_40_wide_mode { 420 } else { 324 } {
+        } else if self.h_counter == if bus.mode_4.h_40_wide_mode { 420 } else { 324 } {
+            self.h_counter = 0;
             self.dot = 0;
+            self.scanline += 1;
+            if self.v_counter == 0 {
+                self.prev_line_dot_overflow = false;
+                self.scanline = 0;
+            }
         }
 
-        bus.beam_vpos = if self.scanline < 24 {
-            512 - (24 - self.scanline)
-        } else {
-            self.scanline - 24
-        };
-        if bus.beam_vpos > 234 && bus.beam_vpos < 238 {
+        bus.beam_vpos = self.v_counter;
+        if bus.beam_vpos > 234 {
             bus.beam_vpos += 250;
         }
 
-        bus.beam_hpos = self.dot + if bus.mode_4.h_40_wide_mode { 13 } else { 11 };
+        bus.beam_hpos = self.h_counter;
         if bus.mode_4.h_40_wide_mode {
             if bus.beam_hpos > 364 {
                 bus.beam_hpos += 92;
