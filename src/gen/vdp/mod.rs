@@ -697,12 +697,12 @@ impl<'a> Vdp<'a> {
     }
 
     fn dump_sprite_table(&self, sprite_table_addr: usize) {
-        println!();
+        debug!(target: "vdp", "Sprite table:");
         for sprite_index in 0..128 {
             let sprite_addr = sprite_table_addr + sprite_index * 8;
 
             let sprite = self.read_sprite(sprite_addr);
-            println!("{:?}", sprite);
+            debug!(target: "vdp", "{:?}", sprite);
         }
     }
 
