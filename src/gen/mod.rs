@@ -36,7 +36,6 @@ pub fn run(
     window.set_size([320, 224]);
     let mut window = window
         .ups(60)
-        .ups_reset(0)
         .bench_mode(matches.is_present("bench_mode"));
 
     let mut inputs = [::input::player_1_gen(), ::input::player_2_gen()];
