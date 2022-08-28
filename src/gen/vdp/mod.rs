@@ -504,6 +504,7 @@ impl<'a> Vdp<'a> {
         let mut dots_in_line = 0;
         let mut masked = false;
         let mut unmasked_sprite_on_line = self.prev_line_dot_overflow;
+        let mut total_sprites = 0;
         while {
             let sprite_addr = sprite_table_addr + sprite_index * 8;
 
@@ -592,8 +593,11 @@ impl<'a> Vdp<'a> {
                 dots_in_line += sprite.width * 8;
             }
 
+            total_sprites += 1;
             sprite_index = sprite.next;
-            sprite_index != 0 && sprite_index < max_sprites_per_frame
+            sprite_index != 0
+                && sprite_index < max_sprites_per_frame
+                && total_sprites < max_sprites_per_frame
         } {}
         if dots_in_line >= max_dots_per_line {
             self.dot_overflow = true;
