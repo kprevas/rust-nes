@@ -4,6 +4,7 @@ use bytes::Buf;
 use gfx_device_gl::Device;
 use piston_window::*;
 use sdl2_window::Sdl2Window;
+use time::Instant;
 
 use input::ControllerState;
 
@@ -40,13 +41,10 @@ pub fn window_loop(
     let mut input_overlay = false;
 
     let mut frame_count = 0u32;
+    let mut last_frame = Instant::now();
 
-    let assets = find_folder::Search::ParentsThenKids(3, 3)
-        .for_folder("src")
-        .unwrap();
-    let ref font = assets.join("VeraMono.ttf");
-    let mut glyphs = Glyphs::new(
-        font,
+    let mut glyphs = Glyphs::from_bytes(
+        include_bytes!("../VeraMono.ttf"),
         window.create_texture_context(),
         TextureSettings::new(),
     )
@@ -110,8 +108,21 @@ pub fn window_loop(
                 if input_overlay {
                     inputs[0].render_overlay(trans.trans(10.0, height - 10.0), gl, &mut glyphs);
                     inputs[1].render_overlay(trans.trans(170.0, height - 10.0), gl, &mut glyphs);
+                    text(
+                        [1.0, 1.0, 1.0, 1.0],
+                        8,
+                        &format!(
+                            "{}",
+                            (Instant::now() - last_frame).as_seconds_f32() * 1000.0
+                        ),
+                        &mut glyphs,
+                        c.trans(width - 40.0, 10.0).transform,
+                        gl,
+                    ).unwrap();
                 }
                 menu.render(trans, gl, &mut glyphs);
+                glyphs.factory.encoder.flush(device);
+                last_frame = Instant::now();
             });
         }
 

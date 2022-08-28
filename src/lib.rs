@@ -22,6 +22,7 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate simple_error;
+extern crate time;
 extern crate triple_buffer;
 
 use std::fs::File;
