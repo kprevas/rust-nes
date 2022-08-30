@@ -20,14 +20,15 @@ const BRIGHTNESS_VALS: [u8; 8] = [0, 52, 87, 116, 144, 172, 206, 255];
 const BRIGHTNESS_VALS_SHADOW: [u8; 8] = [0, 29, 52, 70, 87, 101, 116, 130];
 const BRIGHTNESS_VALS_HIGHLIGHT: [u8; 8] = [130, 144, 158, 172, 187, 206, 228, 255];
 
+#[derive(Copy, Clone)]
 enum SpritePixel {
     Transparent,
     Shadow,
     Highlight,
-    Color([u8; 4]),
+    Color { palette_line: u8, palette_color: u8 },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default, Copy, Clone)]
 struct Sprite {
     y: u16,
     x: u16,
@@ -51,6 +52,7 @@ pub struct Vdp<'a> {
     h_counter: u16,
     v_counter: u16,
 
+    sprite_line_buffer: [(SpritePixel, bool); 320],
     dot_overflow: bool,
     prev_line_dot_overflow: bool,
 
@@ -97,6 +99,7 @@ impl<'a> Vdp<'a> {
             dot: 0,
             h_counter: 0,
             v_counter: 0,
+            sprite_line_buffer: [(SpritePixel::Transparent, false); 320],
             dot_overflow: false,
             prev_line_dot_overflow: false,
             hblank_counter: 0,
@@ -295,17 +298,7 @@ impl<'a> Vdp<'a> {
                     shadow = true;
                 }
 
-                let (sprite_pixel, sprite_priority) = self.get_sprite_pixel(
-                    x,
-                    y,
-                    bus.sprite_table_addr as usize,
-                    bus.mode_4.enable_shadow_highlight,
-                    shadow,
-                    max_sprites_per_line,
-                    max_sprites_per_frame,
-                    width,
-                    &mut bus.status,
-                );
+                let (sprite_pixel, sprite_priority) = self.sprite_line_buffer[x as usize];
 
                 let sprite_pixel = match sprite_pixel {
                     SpritePixel::Transparent => None,
@@ -321,7 +314,8 @@ impl<'a> Vdp<'a> {
                         }
                         None
                     }
-                    SpritePixel::Color(color) => Some(color),
+                    SpritePixel::Color { palette_line, palette_color } =>
+                        Some(self.get_color(palette_line, palette_color, shadow, highlight)),
                 };
 
                 let plane_a_pixel =
@@ -409,6 +403,15 @@ impl<'a> Vdp<'a> {
                 self.prev_line_dot_overflow = false;
                 self.scanline = 0;
             }
+            self.fill_sprite_buffer(
+                self.scanline,
+                bus.sprite_table_addr as usize,
+                max_sprites_per_line as usize,
+                max_sprites_per_frame,
+                width,
+                bus.mode_4.enable_shadow_highlight,
+                &mut bus.status,
+            );
         }
 
         bus.beam_vpos = self.v_counter;
@@ -483,34 +486,68 @@ impl<'a> Vdp<'a> {
         (x, y, tile_data)
     }
 
-    fn get_sprite_pixel(
+    fn fill_sprite_buffer(
         &mut self,
-        x: u16,
         y: u16,
         sprite_table_addr: usize,
-        enable_shadow_highlight: bool,
-        shadow: bool,
-        max_sprites_per_line: u32,
+        max_sprites_per_line: usize,
         max_sprites_per_frame: usize,
-        max_dots_per_line: u16,
+        width: u16,
+        enable_shadow_highlight: bool,
         status: &mut Status,
-    ) -> (SpritePixel, bool) {
-        let x = x + 128;
+    ) {
+        self.sprite_line_buffer = [(SpritePixel::Transparent, false); 320];
         let y = y + 128;
         let mut sprite_index = 0;
-        let mut sprite_pixel = SpritePixel::Transparent;
-        let mut high_priority = false;
         let mut sprites_in_line = 0;
         let mut dots_in_line = 0;
-        let mut masked = false;
         let mut unmasked_sprite_on_line = self.prev_line_dot_overflow;
+        let mut masked = false;
         let mut total_sprites = 0;
+        let mut line_sprites = [Sprite::default(); 20];
         while {
             let sprite_addr = sprite_table_addr + sprite_index * 8;
-
             let sprite = self.read_sprite(sprite_addr);
 
             if sprite.y <= y && sprite.y + 8 * sprite.height > y {
+                if !masked {
+                    if sprite.x == 0 {
+                        if unmasked_sprite_on_line {
+                            masked = true;
+                        }
+                    } else {
+                        unmasked_sprite_on_line = true;
+                        line_sprites[sprites_in_line] = sprite;
+                        line_sprites[sprites_in_line].width = line_sprites[sprites_in_line]
+                            .width
+                            .min((width - dots_in_line) / 8);
+                    }
+                }
+                sprites_in_line += 1;
+                dots_in_line += sprite.width * 8;
+            }
+
+            total_sprites += 1;
+            sprite_index = sprite.next;
+            sprite.next != 0
+                && sprite_index < max_sprites_per_frame
+                && sprites_in_line < max_sprites_per_line
+                && dots_in_line < width
+                && total_sprites < max_sprites_per_frame
+        } {}
+
+        if sprites_in_line >= max_sprites_per_line {
+            status.sprite_limit = true;
+        }
+        if dots_in_line >= width {
+            self.dot_overflow = true;
+        }
+        for x in 0..width {
+            let mut sprite_pixel = SpritePixel::Transparent;
+            let mut high_priority = false;
+
+            for sprite in line_sprites {
+                let x = x + 128;
                 if sprite.x <= x && sprite.x + 8 * sprite.width > x {
                     let x_in_sprite = x - sprite.x;
                     let y_in_sprite = y - sprite.y;
@@ -536,73 +573,33 @@ impl<'a> Vdp<'a> {
                     };
 
                     match (&sprite_pixel, palette_color) {
-                        (SpritePixel::Transparent, _) => {}
+                        (SpritePixel::Transparent, _) => {
+                            sprite_pixel = if enable_shadow_highlight
+                                && sprite.palette_line == 3
+                                && palette_color == 14
+                            {
+                                SpritePixel::Highlight
+                            } else if enable_shadow_highlight
+                                && sprite.palette_line == 3
+                                && palette_color == 15
+                            {
+                                SpritePixel::Shadow
+                            } else {
+                                SpritePixel::Color {
+                                    palette_line: sprite.palette_line,
+                                    palette_color,
+                                }
+                            };
+                            high_priority = sprite.high_priority;
+                        }
                         (_, 0) => {}
                         (_, _) => status.sprite_overlap = true,
                     }
-
-                    let use_sprite_pixel = if masked {
-                        false
-                    } else if sprites_in_line >= max_sprites_per_line {
-                        status.sprite_limit = true;
-                        false
-                    } else if dots_in_line >= max_dots_per_line
-                        || x - sprite.x >= max_dots_per_line - dots_in_line
-                    {
-                        false
-                    } else if palette_color == 0 {
-                        false
-                    } else if let SpritePixel::Transparent = sprite_pixel {
-                        true
-                    } else if sprite.high_priority && !high_priority {
-                        true
-                    } else {
-                        false
-                    };
-
-                    if use_sprite_pixel {
-                        sprite_pixel = if enable_shadow_highlight
-                            && sprite.palette_line == 3
-                            && palette_color == 14
-                        {
-                            SpritePixel::Highlight
-                        } else if enable_shadow_highlight
-                            && sprite.palette_line == 3
-                            && palette_color == 15
-                        {
-                            SpritePixel::Shadow
-                        } else {
-                            SpritePixel::Color(self.get_color(
-                                sprite.palette_line,
-                                palette_color,
-                                shadow,
-                                false,
-                            ))
-                        };
-                        high_priority = sprite.high_priority;
-                    }
                 }
-                if sprite.x == 0 {
-                    if unmasked_sprite_on_line {
-                        masked = true;
-                    }
-                } else {
-                    unmasked_sprite_on_line = true;
-                }
-                sprites_in_line += 1;
-                dots_in_line += sprite.width * 8;
             }
 
-            total_sprites += 1;
-            sprite_index = sprite.next;
-            sprite_index != 0
-                && sprite_index < max_sprites_per_frame
-                && total_sprites < max_sprites_per_frame
-        } {}
-        if dots_in_line >= max_dots_per_line {
-            self.dot_overflow = true;
+            self.sprite_line_buffer[x as usize] = (sprite_pixel, high_priority);
         }
-        (sprite_pixel, high_priority)
     }
 
     fn read_sprite(&self, sprite_addr: usize) -> Sprite {
