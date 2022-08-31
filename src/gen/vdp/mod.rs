@@ -113,15 +113,15 @@ impl<'a> Vdp<'a> {
         }
     }
 
-    pub fn cpu_tick(&mut self, m68k_cartridge: &[u8], m68k_ram: &[u8]) {
-        self.master_clock_ticks += 7;
+    pub fn tick(&mut self, m68k_cartridge: &[u8], m68k_ram: &[u8]) {
+        self.master_clock_ticks += 1;
         while self.master_clock_ticks > 4 {
-            self.tick(m68k_cartridge, m68k_ram);
+            self.do_tick(m68k_cartridge, m68k_ram);
             self.master_clock_ticks -= 4;
         }
     }
 
-    fn tick(&mut self, m68k_cartridge: &[u8], m68k_ram: &[u8]) {
+    fn do_tick(&mut self, m68k_cartridge: &[u8], m68k_ram: &[u8]) {
         self.handle_bus_data(m68k_cartridge, m68k_ram);
 
         if self.pixel_clock_tick {

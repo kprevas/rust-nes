@@ -22,7 +22,7 @@ use window::Cpu as wcpu;
 pub mod disassembler;
 pub mod opcodes;
 
-const CPU_TICKS_PER_SECOND: f64 = 7_670_454.0;
+const MASTER_CLOCK_TICKS_PER_SECOND: f64 = 53_693_175.0;
 
 trait DataSize: TryFrom<u32> + PrimInt {
     fn address_size() -> u32;
@@ -468,12 +468,14 @@ impl<'a> Cpu<'a> {
 
     fn tick(&mut self, cycle_count: u8) {
         for _ in 0..cycle_count {
-            let cartridge = &self.cartridge;
-            let internal_ram = &self.internal_ram;
-            self.vdp
-                .as_mut()
-                .map(|vdp| vdp.cpu_tick(cartridge, internal_ram));
-            self.ticks -= 1.0;
+            for _ in 0..7 {
+                let cartridge = &self.cartridge;
+                let internal_ram = &self.internal_ram;
+                self.vdp
+                    .as_mut()
+                    .map(|vdp| vdp.tick(cartridge, internal_ram));
+                self.ticks -= 1.0;
+            }
             self.cycle_count = self.cycle_count.wrapping_add(1);
         }
     }
@@ -2970,7 +2972,7 @@ impl window::Cpu for Cpu<'_> {
     fn do_frame(&mut self, time_secs: f64, inputs: &[ControllerState<8>; 2]) {
         self.controller_read_state = [0, 0, 0, 0];
         self.controller_th_bit = [0, 0, 0, 0];
-        self.ticks += time_secs * CPU_TICKS_PER_SECOND * self.speed_adj;
+        self.ticks += time_secs * MASTER_CLOCK_TICKS_PER_SECOND * self.speed_adj;
 
         while self.ticks > 0.0 {
             self.next_operation(inputs);
