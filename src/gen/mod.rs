@@ -12,6 +12,7 @@ use window::window_loop;
 pub mod cartridge;
 pub mod m68k;
 pub mod vdp;
+pub mod z80;
 
 pub fn load_cartridge(
     src: &mut dyn Read,

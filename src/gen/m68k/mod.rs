@@ -15,6 +15,7 @@ use gen::m68k::opcodes::{
 };
 use gen::vdp::bus::VdpBus;
 use gen::vdp::Vdp;
+use gen::z80;
 use input::ControllerState;
 use window;
 use window::Cpu as wcpu;
@@ -414,6 +415,8 @@ pub struct Cpu<'a> {
     vdp: Option<Vdp<'a>>,
     vdp_bus: &'a RefCell<VdpBus>,
 
+    z80: z80::Cpu<'a>,
+
     test_ram_only: bool,
 
     phantom: PhantomData<&'a u8>,
@@ -457,6 +460,7 @@ impl<'a> Cpu<'a> {
             speed_adj: 1.0,
             vdp,
             vdp_bus,
+            z80: z80::Cpu::new(cartridge),
             test_ram_only: false,
             phantom: PhantomData,
         };
