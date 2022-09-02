@@ -460,7 +460,7 @@ impl<'a> Cpu<'a> {
             speed_adj: 1.0,
             vdp,
             vdp_bus,
-            z80: z80::Cpu::new(cartridge),
+            z80: z80::Cpu::new(cartridge, instrumented),
             test_ram_only: false,
             phantom: PhantomData,
         };
