@@ -42,7 +42,6 @@ pub enum IndexRegister {
 #[derive(Debug, Copy, Clone)]
 pub enum AddrMode {
     Immediate,
-    Relative,
     Extended,
     Indexed(IndexRegister),
     Register(Register),
@@ -370,7 +369,7 @@ pub const OPCODES: [Opcode; 256] = [
     RET(NoZero),
     POP(RegisterPair(BC)),
     JP(NoZero),
-    JP,
+    JP(True),
     CALL(NoZero),
     PUSH(RegisterPair(BC)),
     ADD(Register(A), Immediate),
@@ -1538,7 +1537,7 @@ pub const IY_INSTRUCTIONS: [Opcode; 256] = [
     NOP,
     NOP,
     NOP,
-    IYBit,
+    IyBit,
     NOP,
     NOP,
     NOP,
