@@ -296,6 +296,17 @@ impl Cpu<'_> {
         }
     }
 
+    fn push(&mut self, val: u16) {
+        self.sp -= 2;
+        self.write_word(self.sp, val);
+    }
+
+    fn pop(&mut self) -> u16 {
+        let val = self.read_word_addr(self.sp);
+        self.sp += 2;
+        val
+    }
+
     pub fn reset(&mut self) {
         self.pc = 0;
         self.i = 0;
@@ -356,19 +367,31 @@ impl Cpu<'_> {
         }
 
         if self.instrumented {
-            debug!(target: "z80", "{:04X} {:?} {:02X} {:08b} {:04X} {:04X} {:04X} {:02X} {:02X}",
-            self.pc,
-            opcode,
-            self.a[self.af_bank],
-            self.f[self.af_bank],
-            self.bc[self.register_bank],
-            self.de[self.register_bank],
-            self.hl[self.register_bank],
-            self.i,
-            self.r);
+            debug!(target: "z80", "{:04X} {:?} {:02X} {:08b} {:04X} {:04X} {:04X} {:02X} {:02X} {:04X}",
+                self.pc,
+                opcode,
+                self.a[self.af_bank],
+                self.f[self.af_bank],
+                self.bc[self.register_bank],
+                self.de[self.register_bank],
+                self.hl[self.register_bank],
+                self.i,
+                self.r,
+                self.sp,
+            );
         }
 
         match opcode {
+            Opcode::CALL(condition) => {
+                let addr = self.read_word_addr(self.pc);
+                self.pc += 2;
+                if self.condition(condition) {
+                    self.push(self.pc);
+                    self.pc = addr;
+                    self.ticks += 7 * 15;
+                }
+                self.ticks += 10 * 15;
+            }
             Opcode::CP(mode) => {
                 let val = self.a[self.af_bank] as i8;
                 let operand = self.read_byte(mode).unwrap() as i8;
@@ -491,6 +514,10 @@ pub mod testing {
 
         pub fn set_pc(&mut self, pc: u16) {
             self.pc = pc;
+        }
+
+        pub fn set_sp(&mut self, sp: u16) {
+            self.sp = sp;
         }
 
         pub fn load_ram(&mut self, start: usize, ram: &[u8]) {
