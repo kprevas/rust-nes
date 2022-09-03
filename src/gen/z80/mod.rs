@@ -440,6 +440,10 @@ impl Cpu<'_> {
                 }
                 self.ticks += 10 * 15;
             }
+            Opcode::JP_Register(register) => {
+                self.pc = self.read_word(AddrMode::RegisterPair(register)).unwrap();
+                self.ticks += 4 * 15;
+            }
             Opcode::JR(condition) => {
                 let displacement = self.read_addr(self.pc) as i8;
                 self.pc += 1;
