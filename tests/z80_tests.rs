@@ -7,6 +7,12 @@ fn prelim() {
     run_test(include_bytes!("z80/prelim.com"), 0x44A);
 }
 
+#[test]
+#[ignore]
+fn zexdoc() {
+    run_test(include_bytes!("z80/zexdoc.cim"), 0x1DF9);
+}
+
 fn run_test(ram: &[u8], success_msg_addr: u16) {
     let _ = env_logger::try_init();
     let cartridge = vec![].into_boxed_slice();
