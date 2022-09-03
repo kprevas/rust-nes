@@ -468,6 +468,15 @@ impl Cpu<'_> {
             Opcode::NOP => {
                 self.ticks += 4 * 15;
             }
+            Opcode::POP(mode) => {
+                let val = self.pop();
+                self.write_byte_or_word(mode, None, Some(val));
+                self.ticks += match mode {
+                    AddrMode::RegisterPair(RegisterPair::IXP)
+                    | AddrMode::RegisterPair(RegisterPair::IYP) => 14,
+                    _ => 10,
+                } * 15;
+            }
             _ => {}
         }
     }
