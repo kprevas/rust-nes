@@ -55,6 +55,7 @@ impl Cpu<'_> {
             hl: [0, 0],
             register_bank: 0,
             af_bank: 0,
+            interrupt_enabled: false,
             interrupt_mode: 0,
             stopped: false,
             ram: [0; 0x2000],
@@ -78,8 +79,97 @@ impl Cpu<'_> {
         }
     }
 
-    fn read_word(&mut self, addr: u16) -> u16 {
+    fn read_word_addr(&mut self, addr: u16) -> u16 {
         (self.read_addr(addr) as u16) | ((self.read_addr(addr + 1) as u16) << 8)
+    }
+
+    fn read_byte(&mut self, mode: AddrMode) -> Option<u8> {
+        match mode {
+            AddrMode::Immediate => {
+                let val = self.read_addr(self.pc);
+                self.pc += 1;
+                Some(val)
+            }
+            AddrMode::Extended => {
+                let addr = self.read_word_addr(self.pc);
+                self.pc += 2;
+                Some(self.read_addr(addr))
+            }
+            AddrMode::Indexed(register) => {
+                let addr = match register {
+                    IndexRegister::IX => self.ix,
+                    IndexRegister::IY => self.iy,
+                }
+                    .wrapping_add_signed((self.read_addr(self.pc) as i8) as i16);
+                self.pc += 1;
+                Some(self.read_addr(addr))
+            }
+            AddrMode::Register(register) => Some(match register {
+                Register::A => self.a[self.af_bank],
+                Register::B => (self.bc[self.register_bank] >> 8) as u8,
+                Register::C => (self.bc[self.register_bank] | 0xFF) as u8,
+                Register::D => (self.de[self.register_bank] >> 8) as u8,
+                Register::E => (self.de[self.register_bank] | 0xFF) as u8,
+                Register::H => (self.hl[self.register_bank] >> 8) as u8,
+                Register::L => (self.hl[self.register_bank] | 0xFF) as u8,
+                Register::I => self.i,
+                Register::R => self.r,
+                Register::IXH => (self.ix >> 8) as u8,
+                Register::IXL => (self.ix | 0xFF) as u8,
+                Register::IYH => (self.iy >> 8) as u8,
+                Register::IYL => (self.iy | 0xFF) as u8,
+            }),
+            AddrMode::RegisterIndirect(register) => Some(self.read_addr(match register {
+                RegisterPair::AF => {
+                    ((self.a[self.af_bank] as u16) << 8) | (self.f[self.af_bank] as u16)
+                }
+                RegisterPair::BC => self.bc[self.register_bank],
+                RegisterPair::DE => self.de[self.register_bank],
+                RegisterPair::HL => self.hl[self.register_bank],
+                RegisterPair::SP => self.sp,
+                RegisterPair::IXP => self.ix,
+                RegisterPair::IYP => self.iy,
+            })),
+            _ => None,
+        }
+    }
+
+    fn read_word(&mut self, mode: AddrMode) -> Option<u16> {
+        match mode {
+            AddrMode::Immediate => {
+                let val = self.read_word_addr(self.pc);
+                self.pc += 2;
+                Some(val)
+            }
+            AddrMode::Extended => {
+                let addr = self.read_word_addr(self.pc);
+                self.pc += 2;
+                Some(self.read_word_addr(addr))
+            }
+            AddrMode::Indexed(register) => {
+                let addr = match register {
+                    IndexRegister::IX => self.ix,
+                    IndexRegister::IY => self.iy,
+                }
+                    .wrapping_add_signed((self.read_addr(self.pc) as i8) as i16);
+                self.pc += 1;
+                Some(self.read_word_addr(addr))
+            }
+            AddrMode::RegisterPair(register) => Some(match register {
+                RegisterPair::AF => self.af(),
+                RegisterPair::BC => self.bc[self.register_bank],
+                RegisterPair::DE => self.de[self.register_bank],
+                RegisterPair::HL => self.hl[self.register_bank],
+                RegisterPair::IXP => self.ix,
+                RegisterPair::IYP => self.iy,
+                RegisterPair::SP => self.sp,
+            }),
+            AddrMode::RegisterIndirect(register) => {
+                let addr = self.register_addr(register);
+                Some(self.read_word_addr(addr))
+            }
+            _ => None,
+        }
     }
 
     fn write_addr(&mut self, addr: u16, val: u8) {
@@ -99,6 +189,93 @@ impl Cpu<'_> {
     fn write_word(&mut self, addr: u16, val: u16) {
         self.write_addr(addr, (val & 0xFF) as u8);
         self.write_addr(addr + 1, (val >> 8) as u8);
+    }
+
+
+    fn write_byte_or_word(&mut self, mode: AddrMode, byte: Option<u8>, word: Option<u16>) {
+        match mode {
+            AddrMode::Extended => {
+                let addr = self.read_word_addr(self.pc);
+                self.pc += 2;
+                self.write_byte_or_word_addr(byte, word, addr);
+            }
+            AddrMode::Indexed(register) => {
+                let addr = match register {
+                    IndexRegister::IX => self.ix,
+                    IndexRegister::IY => self.iy,
+                }
+                    .wrapping_add_signed((self.read_addr(self.pc) as i8) as i16);
+                self.pc += 1;
+                self.write_byte_or_word_addr(byte, word, addr);
+            }
+            AddrMode::Register(register) => match register {
+                Register::A => {
+                    let val = byte.unwrap();
+                    self.a[self.af_bank] = val;
+                },
+                Register::B => {
+                    self.bc[self.register_bank] = (self.bc[self.register_bank] & 0xFF)
+                        | ((byte.unwrap() as u16) << 8)
+                }
+                Register::C => {
+                    self.bc[self.register_bank] =
+                        (self.bc[self.register_bank] & 0xFF00) | (byte.unwrap() as u16)
+                }
+                Register::D => {
+                    self.de[self.register_bank] = (self.de[self.register_bank] & 0xFF)
+                        | ((byte.unwrap() as u16) << 8)
+                }
+                Register::E => {
+                    self.de[self.register_bank] =
+                        (self.de[self.register_bank] & 0xFF00) | (byte.unwrap() as u16)
+                }
+                Register::H => {
+                    self.hl[self.register_bank] = (self.hl[self.register_bank] & 0xFF)
+                        | ((byte.unwrap() as u16) << 8)
+                }
+                Register::L => {
+                    self.hl[self.register_bank] =
+                        (self.hl[self.register_bank] & 0xFF00) | (byte.unwrap() as u16)
+                }
+                Register::I => self.i = byte.unwrap(),
+                Register::R => self.r = byte.unwrap(),
+                Register::IXH => {
+                    self.ix = (self.ix & 0xFF) | ((byte.unwrap() as u16) << 8)
+                }
+                Register::IXL => self.ix = (self.ix & 0xFF00) | (byte.unwrap() as u16),
+                Register::IYH => {
+                    self.iy = (self.iy & 0xFF) | ((byte.unwrap() as u16) << 8)
+                }
+                Register::IYL => self.iy = (self.iy & 0xFF00) | (byte.unwrap() as u16),
+            },
+            AddrMode::RegisterPair(register) => match register {
+                RegisterPair::AF => {
+                    self.a[self.af_bank] = (word.unwrap() >> 8) as u8;
+                    self.f[self.af_bank] = (word.unwrap() & 0xFF) as u8;
+                }
+                RegisterPair::BC => self.bc[self.register_bank] = word.unwrap(),
+                RegisterPair::DE => self.de[self.register_bank] = word.unwrap(),
+                RegisterPair::HL => self.hl[self.register_bank] = word.unwrap(),
+                RegisterPair::SP => self.sp = word.unwrap(),
+                RegisterPair::IXP => self.ix = word.unwrap(),
+                RegisterPair::IYP => self.iy = word.unwrap(),
+            },
+            AddrMode::RegisterIndirect(register) => {
+                let addr = self.register_addr(register);
+                self.write_byte_or_word_addr(byte, word, addr);
+            }
+            _ => panic!(),
+        }
+    }
+
+    fn write_byte_or_word_addr(&mut self, byte: Option<u8>, word: Option<u16>, addr: u16) {
+        if let Some(val) = byte {
+            self.write_addr(addr, val);
+        } else if let Some(val) = word {
+            self.write_word(addr, val);
+        } else {
+            panic!();
+        }
     }
 
     fn set_flag(&mut self, flag: u8, set: bool) {
@@ -189,185 +366,21 @@ impl Cpu<'_> {
                 self.stopped = true;
             }
             Opcode::LD(dest, src) => {
-                let val_8 = match src {
-                    AddrMode::Immediate => {
-                        if let AddrMode::RegisterPair(_) = dest {
-                            None
-                        } else {
-                            let val = self.read_addr(self.pc);
-                            self.pc += 1;
-                            Some(val)
-                        }
-                    }
-                    AddrMode::Extended => {
-                        if let AddrMode::RegisterPair(_) = dest {
-                            None
-                        } else {
-                            let addr = self.read_word(self.pc);
-                            self.pc += 2;
-                            Some(self.read_addr(addr))
-                        }
-                    }
-                    AddrMode::Indexed(register) => {
-                        let addr = match register {
-                            IndexRegister::IX => self.ix,
-                            IndexRegister::IY => self.iy,
-                        }
-                            .wrapping_add_signed((self.read_addr(self.pc) as i8) as i16);
-                        self.pc += 1;
-                        Some(self.read_addr(addr))
-                    }
-                    AddrMode::Register(register) => Some(match register {
-                        Register::A => self.a[self.af_bank],
-                        Register::B => (self.bc[self.register_bank] >> 8) as u8,
-                        Register::C => (self.bc[self.register_bank] | 0xFF) as u8,
-                        Register::D => (self.de[self.register_bank] >> 8) as u8,
-                        Register::E => (self.de[self.register_bank] | 0xFF) as u8,
-                        Register::H => (self.hl[self.register_bank] >> 8) as u8,
-                        Register::L => (self.hl[self.register_bank] | 0xFF) as u8,
-                        Register::I => self.i,
-                        Register::R => self.r,
-                        Register::IXH => (self.ix >> 8) as u8,
-                        Register::IXL => (self.ix | 0xFF) as u8,
-                        Register::IYH => (self.iy >> 8) as u8,
-                        Register::IYL => (self.iy | 0xFF) as u8,
-                    }),
-                    AddrMode::RegisterIndirect(register) => Some(self.read_addr(match register {
-                        RegisterPair::AF => {
-                            ((self.a[self.af_bank] as u16) << 8) | (self.f[self.af_bank] as u16)
-                        }
-                        RegisterPair::BC => self.bc[self.register_bank],
-                        RegisterPair::DE => self.de[self.register_bank],
-                        RegisterPair::HL => self.hl[self.register_bank],
-                        RegisterPair::SP => self.sp,
-                        RegisterPair::IXP => self.ix,
-                        RegisterPair::IYP => self.iy,
-                    })),
-                    _ => None,
+                let (val_8, val_16) = match (dest, src) {
+                    (AddrMode::RegisterPair(_), _)
+                    | (_, AddrMode::RegisterPair(_)) => (None, self.read_word(src)),
+                    _ => (self.read_byte(src), None),
                 };
-                let val_16 = match src {
-                    AddrMode::Immediate => {
-                        if let AddrMode::RegisterPair(_) = dest {
-                            let val = self.read_word(self.pc);
-                            self.pc += 2;
-                            Some(val)
-                        } else {
-                            None
-                        }
+                self.write_byte_or_word(dest, val_8, val_16);
+                match (dest, src) {
+                    (AddrMode::Register(Register::A), AddrMode::Register(Register::I))
+                    | (AddrMode::Register(Register::A), AddrMode::Register(Register::R)) => {
+                        let val = val_8.unwrap();
+                        self.set_flag(ZERO, val == 0);
+                        self.set_flag(PARITY_OVERFLOW, self.interrupt_enabled);
+                        self.set_flag(SIGN, val & 0x80 > 0);
                     }
-                    AddrMode::Extended => {
-                        if let AddrMode::RegisterPair(_) = dest {
-                            let addr = self.read_word(self.pc);
-                            self.pc += 2;
-                            Some(self.read_word(addr))
-                        } else {
-                            None
-                        }
-                    }
-                    AddrMode::Indexed(register) => {
-                        let addr = match register {
-                            IndexRegister::IX => self.ix,
-                            IndexRegister::IY => self.iy,
-                        }
-                            .wrapping_add_signed((self.read_addr(self.pc) as i8) as i16);
-                        self.pc += 1;
-                        Some(self.read_word(addr))
-                    }
-                    AddrMode::RegisterPair(register) => Some(match register {
-                        RegisterPair::AF => self.af(),
-                        RegisterPair::BC => self.bc[self.register_bank],
-                        RegisterPair::DE => self.de[self.register_bank],
-                        RegisterPair::HL => self.hl[self.register_bank],
-                        RegisterPair::IXP => self.ix,
-                        RegisterPair::IYP => self.iy,
-                        RegisterPair::SP => self.sp,
-                    }),
-                    AddrMode::RegisterIndirect(register) => {
-                        let addr = self.register_addr(register);
-                        Some(self.read_word(addr))
-                    }
-                    _ => None,
-                };
-                match dest {
-                    AddrMode::Extended => {
-                        let addr = self.read_word(self.pc);
-                        self.pc += 2;
-                        self.write_byte_or_word(val_8, val_16, addr);
-                    }
-                    AddrMode::Indexed(register) => {
-                        let addr = match register {
-                            IndexRegister::IX => self.ix,
-                            IndexRegister::IY => self.iy,
-                        }
-                            .wrapping_add_signed((self.read_addr(self.pc) as i8) as i16);
-                        self.pc += 1;
-                        self.write_byte_or_word(val_8, val_16, addr);
-                    }
-                    AddrMode::Register(register) => match register {
-                        Register::A => {
-                            let val = val_8.unwrap();
-                            self.a[self.af_bank] = val;
-                            match src {
-                                AddrMode::Register(Register::I) | AddrMode::Register(Register::R) => {
-                                    self.set_flag(ZERO, val == 0);
-                                    self.set_flag(PARITY_OVERFLOW, self.interrupt_enabled);
-                                    self.set_flag(SIGN, val & 0x80 > 0);
-                                }
-                                _ => {}
-                            }
-                        },
-                        Register::B => {
-                            self.bc[self.register_bank] = (self.bc[self.register_bank] & 0xFF)
-                                | ((val_8.unwrap() as u16) << 8)
-                        }
-                        Register::C => {
-                            self.bc[self.register_bank] =
-                                (self.bc[self.register_bank] & 0xFF00) | (val_8.unwrap() as u16)
-                        }
-                        Register::D => {
-                            self.de[self.register_bank] = (self.de[self.register_bank] & 0xFF)
-                                | ((val_8.unwrap() as u16) << 8)
-                        }
-                        Register::E => {
-                            self.de[self.register_bank] =
-                                (self.de[self.register_bank] & 0xFF00) | (val_8.unwrap() as u16)
-                        }
-                        Register::H => {
-                            self.hl[self.register_bank] = (self.hl[self.register_bank] & 0xFF)
-                                | ((val_8.unwrap() as u16) << 8)
-                        }
-                        Register::L => {
-                            self.hl[self.register_bank] =
-                                (self.hl[self.register_bank] & 0xFF00) | (val_8.unwrap() as u16)
-                        }
-                        Register::I => self.i = val_8.unwrap(),
-                        Register::R => self.r = val_8.unwrap(),
-                        Register::IXH => {
-                            self.ix = (self.ix & 0xFF) | ((val_8.unwrap() as u16) << 8)
-                        }
-                        Register::IXL => self.ix = (self.ix & 0xFF00) | (val_8.unwrap() as u16),
-                        Register::IYH => {
-                            self.iy = (self.iy & 0xFF) | ((val_8.unwrap() as u16) << 8)
-                        }
-                        Register::IYL => self.iy = (self.iy & 0xFF00) | (val_8.unwrap() as u16),
-                    },
-                    AddrMode::RegisterPair(register) => match register {
-                        RegisterPair::AF => {
-                            self.a[self.af_bank] = (val_16.unwrap() >> 8) as u8;
-                            self.f[self.af_bank] = (val_16.unwrap() & 0xFF) as u8;
-                        }
-                        RegisterPair::BC => self.bc[self.register_bank] = val_16.unwrap(),
-                        RegisterPair::DE => self.de[self.register_bank] = val_16.unwrap(),
-                        RegisterPair::HL => self.hl[self.register_bank] = val_16.unwrap(),
-                        RegisterPair::SP => self.sp = val_16.unwrap(),
-                        RegisterPair::IXP => self.ix = val_16.unwrap(),
-                        RegisterPair::IYP => self.iy = val_16.unwrap(),
-                    },
-                    AddrMode::RegisterIndirect(register) => {
-                        let addr = self.register_addr(register);
-                        self.write_byte_or_word(val_8, val_16, addr);
-                    }
-                    _ => panic!(),
+                    _ => {}
                 }
                 self.ticks += match (dest, src) {
                     (AddrMode::Register(_), AddrMode::Register(Register::I))
@@ -401,16 +414,6 @@ impl Cpu<'_> {
                 self.ticks += 4 * 15;
             }
             _ => {}
-        }
-    }
-
-    fn write_byte_or_word(&mut self, byte: Option<u8>, word: Option<u16>, addr: u16) {
-        if let Some(val) = byte {
-            self.write_addr(addr, val);
-        } else if let Some(val) = word {
-            self.write_word(addr, val);
-        } else {
-            panic!();
         }
     }
 
