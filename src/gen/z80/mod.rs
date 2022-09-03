@@ -5,6 +5,13 @@ use gen::z80::opcodes::{
 
 mod opcodes;
 
+const CARRY: u8 = 0b1;
+const SUBTRACT: u8 = 0b10;
+const PARITY_OVERFLOW: u8 = 0b100;
+const HALF_CARRY: u8 = 0b10000;
+const ZERO: u8 = 0b1000000;
+const SIGN: u8 = 0b10000000;
+
 pub struct Cpu<'a> {
     pc: u16,
     sp: u16,
@@ -21,6 +28,7 @@ pub struct Cpu<'a> {
     register_bank: usize,
     af_bank: usize,
 
+    interrupt_enabled: bool,
     interrupt_mode: u8,
     pub stopped: bool,
 
@@ -91,6 +99,18 @@ impl Cpu<'_> {
     fn write_word(&mut self, addr: u16, val: u16) {
         self.write_addr(addr, (val & 0xFF) as u8);
         self.write_addr(addr + 1, (val >> 8) as u8);
+    }
+
+    fn set_flag(&mut self, flag: u8, set: bool) {
+        if set {
+            self.f[self.af_bank] = self.f[self.af_bank] | flag;
+        } else {
+            self.f[self.af_bank] = self.f[self.af_bank] & !flag;
+        }
+    }
+
+    fn flag(&self, flag: u8) -> bool {
+        self.f[self.af_bank] & flag > 0
     }
 
     pub fn reset(&mut self) {
@@ -284,7 +304,18 @@ impl Cpu<'_> {
                         self.write_byte_or_word(val_8, val_16, addr);
                     }
                     AddrMode::Register(register) => match register {
-                        Register::A => self.a[self.af_bank] = val_8.unwrap(),
+                        Register::A => {
+                            let val = val_8.unwrap();
+                            self.a[self.af_bank] = val;
+                            match src {
+                                AddrMode::Register(Register::I) | AddrMode::Register(Register::R) => {
+                                    self.set_flag(ZERO, val == 0);
+                                    self.set_flag(PARITY_OVERFLOW, self.interrupt_enabled);
+                                    self.set_flag(SIGN, val & 0x80 > 0);
+                                }
+                                _ => {}
+                            }
+                        },
                         Register::B => {
                             self.bc[self.register_bank] = (self.bc[self.register_bank] & 0xFF)
                                 | ((val_8.unwrap() as u16) << 8)
