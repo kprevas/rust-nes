@@ -188,7 +188,6 @@ impl Cpu<'_> {
         self.write_addr(addr + 1, (val >> 8) as u8);
     }
 
-
     fn write_byte_or_word(&mut self, mode: AddrMode, byte: Option<u8>, word: Option<u16>) {
         match mode {
             AddrMode::Extended => {
@@ -209,26 +208,26 @@ impl Cpu<'_> {
                 Register::A => {
                     let val = byte.unwrap();
                     self.a[self.af_bank] = val;
-                },
+                }
                 Register::B => {
-                    self.bc[self.register_bank] = (self.bc[self.register_bank] & 0xFF)
-                        | ((byte.unwrap() as u16) << 8)
+                    self.bc[self.register_bank] =
+                        (self.bc[self.register_bank] & 0xFF) | ((byte.unwrap() as u16) << 8)
                 }
                 Register::C => {
                     self.bc[self.register_bank] =
                         (self.bc[self.register_bank] & 0xFF00) | (byte.unwrap() as u16)
                 }
                 Register::D => {
-                    self.de[self.register_bank] = (self.de[self.register_bank] & 0xFF)
-                        | ((byte.unwrap() as u16) << 8)
+                    self.de[self.register_bank] =
+                        (self.de[self.register_bank] & 0xFF) | ((byte.unwrap() as u16) << 8)
                 }
                 Register::E => {
                     self.de[self.register_bank] =
                         (self.de[self.register_bank] & 0xFF00) | (byte.unwrap() as u16)
                 }
                 Register::H => {
-                    self.hl[self.register_bank] = (self.hl[self.register_bank] & 0xFF)
-                        | ((byte.unwrap() as u16) << 8)
+                    self.hl[self.register_bank] =
+                        (self.hl[self.register_bank] & 0xFF) | ((byte.unwrap() as u16) << 8)
                 }
                 Register::L => {
                     self.hl[self.register_bank] =
@@ -236,13 +235,9 @@ impl Cpu<'_> {
                 }
                 Register::I => self.i = byte.unwrap(),
                 Register::R => self.r = byte.unwrap(),
-                Register::IXH => {
-                    self.ix = (self.ix & 0xFF) | ((byte.unwrap() as u16) << 8)
-                }
+                Register::IXH => self.ix = (self.ix & 0xFF) | ((byte.unwrap() as u16) << 8),
                 Register::IXL => self.ix = (self.ix & 0xFF00) | (byte.unwrap() as u16),
-                Register::IYH => {
-                    self.iy = (self.iy & 0xFF) | ((byte.unwrap() as u16) << 8)
-                }
+                Register::IYH => self.iy = (self.iy & 0xFF) | ((byte.unwrap() as u16) << 8),
                 Register::IYL => self.iy = (self.iy & 0xFF00) | (byte.unwrap() as u16),
             },
             AddrMode::RegisterPair(register) => match register {
@@ -285,6 +280,20 @@ impl Cpu<'_> {
 
     fn flag(&self, flag: u8) -> bool {
         self.f[self.af_bank] & flag > 0
+    }
+
+    fn condition(&self, condition: Condition) -> bool {
+        match condition {
+            Condition::True => true,
+            Condition::Carry => self.flag(CARRY),
+            Condition::ParityOverflow => self.flag(PARITY_OVERFLOW),
+            Condition::Sign => self.flag(SIGN),
+            Condition::Zero => self.flag(ZERO),
+            Condition::NoCarry => !self.flag(CARRY),
+            Condition::NoSign => !self.flag(SIGN),
+            Condition::NoParityOverflow => !self.flag(PARITY_OVERFLOW),
+            Condition::NoZero => !self.flag(ZERO),
+        }
     }
 
     pub fn reset(&mut self) {
@@ -347,8 +356,9 @@ impl Cpu<'_> {
         }
 
         if self.instrumented {
-            debug!(target: "z80", "{:04X} {:02X} {:08b} {:04X} {:04X} {:04X} {:02X} {:02X}",
+            debug!(target: "z80", "{:04X} {:?} {:02X} {:08b} {:04X} {:04X} {:04X} {:02X} {:02X}",
             self.pc,
+            opcode,
             self.a[self.af_bank],
             self.f[self.af_bank],
             self.bc[self.register_bank],
@@ -366,8 +376,7 @@ impl Cpu<'_> {
                     Some(result) => (false, result),
                     None => (true, val.wrapping_sub(operand)),
                 };
-                let overflow = (operand < 0) == (result < 0)
-                    && (operand < 0) != (val < 0);
+                let overflow = (operand < 0) == (result < 0) && (operand < 0) != (val < 0);
                 self.set_flag(CARRY, carry);
                 self.set_flag(ZERO, result == 0);
                 self.set_flag(PARITY_OVERFLOW, overflow);
@@ -379,10 +388,19 @@ impl Cpu<'_> {
             Opcode::HALT => {
                 self.stopped = true;
             }
+            Opcode::JP(condition) => {
+                let addr = self.read_word_addr(self.pc);
+                self.pc += 2;
+                if self.condition(condition) {
+                    self.pc = addr;
+                }
+                self.ticks += 10 * 15;
+            }
             Opcode::LD(dest, src) => {
                 let (val_8, val_16) = match (dest, src) {
-                    (AddrMode::RegisterPair(_), _)
-                    | (_, AddrMode::RegisterPair(_)) => (None, self.read_word(src)),
+                    (AddrMode::RegisterPair(_), _) | (_, AddrMode::RegisterPair(_)) => {
+                        (None, self.read_word(src))
+                    }
                     _ => (self.read_byte(src), None),
                 };
                 self.write_byte_or_word(dest, val_8, val_16);
