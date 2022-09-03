@@ -30,7 +30,7 @@ pub struct Cpu<'a> {
     pub stopped: bool,
 
     ram: [u8; 0x2000],
-    cartridge: &'a Box<[u8]>,
+    _cartridge: &'a Box<[u8]>,
 
     ticks: u16,
     pub instrumented: bool,
@@ -56,7 +56,7 @@ impl Cpu<'_> {
             interrupt_mode: 0,
             stopped: false,
             ram: [0; 0x2000],
-            cartridge,
+            _cartridge: cartridge,
             ticks: 0,
             instrumented,
         }
@@ -72,7 +72,6 @@ impl Cpu<'_> {
             0x7F00..=0x7F1F => 0, // TODO: VDP
             0x7F20..=0x7FFF => 0xFF,
             0x8000..=0xFFFF => 0, // TODO: M68k
-            _ => panic!(),
         }
     }
 
@@ -179,7 +178,6 @@ impl Cpu<'_> {
             0x7F00..=0x7F1F => {} // TODO: VDP
             0x7F20..=0x7FFF => panic!(),
             0x8000..=0xFFFF => {}
-            _ => panic!(),
         }
     }
 

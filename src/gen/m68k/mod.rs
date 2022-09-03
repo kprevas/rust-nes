@@ -415,7 +415,7 @@ pub struct Cpu<'a> {
     vdp: Option<Vdp<'a>>,
     vdp_bus: &'a RefCell<VdpBus>,
 
-    z80: z80::Cpu<'a>,
+    _z80: z80::Cpu<'a>,
 
     test_ram_only: bool,
 
@@ -460,7 +460,7 @@ impl<'a> Cpu<'a> {
             speed_adj: 1.0,
             vdp,
             vdp_bus,
-            z80: z80::Cpu::new(cartridge, instrumented),
+            _z80: z80::Cpu::new(cartridge, instrumented),
             test_ram_only: false,
             phantom: PhantomData,
         };
