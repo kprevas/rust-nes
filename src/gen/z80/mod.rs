@@ -104,17 +104,17 @@ impl Cpu<'_> {
             AddrMode::Register(register) => Some(match register {
                 Register::A => self.a[self.af_bank],
                 Register::B => (self.bc[self.register_bank] >> 8) as u8,
-                Register::C => (self.bc[self.register_bank] | 0xFF) as u8,
+                Register::C => (self.bc[self.register_bank] & 0xFF) as u8,
                 Register::D => (self.de[self.register_bank] >> 8) as u8,
-                Register::E => (self.de[self.register_bank] | 0xFF) as u8,
+                Register::E => (self.de[self.register_bank] & 0xFF) as u8,
                 Register::H => (self.hl[self.register_bank] >> 8) as u8,
-                Register::L => (self.hl[self.register_bank] | 0xFF) as u8,
+                Register::L => (self.hl[self.register_bank] & 0xFF) as u8,
                 Register::I => self.i,
                 Register::R => self.r,
                 Register::IXH => (self.ix >> 8) as u8,
-                Register::IXL => (self.ix | 0xFF) as u8,
+                Register::IXL => (self.ix & 0xFF) as u8,
                 Register::IYH => (self.iy >> 8) as u8,
-                Register::IYL => (self.iy | 0xFF) as u8,
+                Register::IYL => (self.iy & 0xFF) as u8,
             }),
             AddrMode::RegisterIndirect(register) => Some(self.read_addr(match register {
                 RegisterPair::AF => {
