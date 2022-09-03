@@ -424,7 +424,8 @@ impl Cpu<'_> {
             Opcode::DJNZ => {
                 let displacement = self.read_addr(self.pc) as i8;
                 self.pc += 1;
-                self.bc[self.register_bank] -= 0x100;
+                self.bc[self.register_bank] =
+                    self.bc[self.register_bank].wrapping_add_signed(-0x100);
                 let zero = self.bc[self.register_bank] & 0xFF00 == 0;
                 if !zero {
                     self.pc = self.pc.wrapping_add_signed(displacement as i16);
@@ -441,6 +442,36 @@ impl Cpu<'_> {
             }
             Opcode::HALT => {
                 self.stopped = true;
+            }
+            Opcode::INC(mode) => {
+                match mode {
+                    AddrMode::Indexed(_)
+                    | AddrMode::Register(_)
+                    | AddrMode::RegisterIndirect(_) => {
+                        let operand = self.read_byte(mode).unwrap();
+                        let val = operand.wrapping_add(1);
+                        self.set_flag(ZERO, val == 0);
+                        self.set_flag(PARITY_OVERFLOW, val == 0xF0);
+                        self.set_flag(SIGN, val & 0x80 > 0);
+                        self.set_flag(SUBTRACT, false);
+                        self.set_flag(HALF_CARRY, operand & 0xF > val & 0xF);
+                        self.write_byte_or_word(mode, Some(val), None);
+                    }
+                    AddrMode::RegisterPair(_) => {
+                        let val = self.read_word(mode).unwrap().wrapping_add(1);
+                        self.write_byte_or_word(mode, None, Some(val));
+                    }
+                    _ => panic!(),
+                }
+                self.ticks += match mode {
+                    AddrMode::Indexed(_) => 23,
+                    AddrMode::Register(_) => 4,
+                    AddrMode::RegisterPair(RegisterPair::IXP)
+                    | AddrMode::RegisterPair(RegisterPair::IYP) => 10,
+                    AddrMode::RegisterPair(_) => 6,
+                    AddrMode::RegisterIndirect(_) => 11,
+                    _ => panic!(),
+                } * 15;
             }
             Opcode::JP(condition) => {
                 let addr = self.read_word_addr(self.pc);

@@ -3,7 +3,6 @@ extern crate emu;
 use emu::gen::z80::Cpu;
 
 #[test]
-#[ignore]
 fn prelim() {
     let _ = env_logger::try_init();
     let cartridge = vec![].into_boxed_slice();
