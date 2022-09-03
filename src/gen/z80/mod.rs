@@ -496,6 +496,19 @@ impl Cpu<'_> {
                     _ => 11,
                 } * 15;
             }
+            Opcode::RET(condition) => {
+                let condition_val = self.condition(condition);
+                if condition_val {
+                    self.pc = self.pop();
+                }
+                self.ticks += if let Condition::True = condition {
+                    10
+                } else if condition_val {
+                    11
+                } else {
+                    5
+                } * 15;
+            }
             _ => {}
         }
     }
