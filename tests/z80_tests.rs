@@ -4,15 +4,27 @@ use emu::gen::z80::Cpu;
 
 #[test]
 fn prelim() {
+    run_test(include_bytes!("z80/prelim.com"), 0x44A);
+}
+
+fn run_test(ram: &[u8], success_msg_addr: u16) {
     let _ = env_logger::try_init();
     let cartridge = vec![].into_boxed_slice();
     let mut cpu = Cpu::new(&cartridge, true);
     cpu.set_pc(0x100);
-    cpu.set_sp(0x2000);
-    cpu.load_ram(0x100, include_bytes!("z80/prelim.com"));
-    while cpu.get_pc() != 0 && cpu.get_pc() != 5 && !cpu.stopped {
+    cpu.load_ram(0x100, ram);
+    let mut output = false;
+    while cpu.get_pc() != 0 && !cpu.stopped {
+        if cpu.get_pc() == 5 {
+            if !output {
+                cpu.output_test_string();
+                output = true;
+            }
+        } else {
+            output = false;
+        }
         cpu.tick()
     }
-    assert_eq!(cpu.get_pc(), 5);
-    assert_eq!(cpu.get_de(), 0x44A)
+    assert_eq!(cpu.get_pc(), 0);
+    assert_eq!(cpu.get_de(), success_msg_addr)
 }

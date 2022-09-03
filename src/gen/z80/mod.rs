@@ -31,6 +31,7 @@ pub struct Cpu<'a> {
 
     ram: [u8; 0x2000],
     _cartridge: &'a Box<[u8]>,
+    test_ram: Option<Box<[u8]>>,
 
     cycles_to_next: u16,
     ticks_to_next: u16,
@@ -59,6 +60,7 @@ impl Cpu<'_> {
             stopped: false,
             ram: [0; 0x2000],
             _cartridge: cartridge,
+            test_ram: None,
             cycles_to_next: 0,
             ticks_to_next: 0,
             cycle_count: 0,
@@ -67,15 +69,18 @@ impl Cpu<'_> {
     }
 
     fn read_addr(&mut self, addr: u16) -> u8 {
-        match addr {
-            0x0000..=0x1FFF => self.ram[addr as usize],
-            0x2000..=0x3FFF => self.ram[(addr - 0x2000) as usize],
-            0x4000..=0x5FFF => 0, // TODO: YM2612
-            0x6000..=0x60FF => 0xFF,
-            0x6100..=0x7EFF => 0xFF,
-            0x7F00..=0x7F1F => 0, // TODO: VDP
-            0x7F20..=0x7FFF => 0xFF,
-            0x8000..=0xFFFF => 0, // TODO: M68k
+        match &self.test_ram {
+            Some(ram) => ram[addr as usize],
+            None => match addr {
+                0x0000..=0x1FFF => self.ram[addr as usize],
+                0x2000..=0x3FFF => self.ram[(addr - 0x2000) as usize],
+                0x4000..=0x5FFF => 0, // TODO: YM2612
+                0x6000..=0x60FF => 0xFF,
+                0x6100..=0x7EFF => 0xFF,
+                0x7F00..=0x7F1F => 0, // TODO: VDP
+                0x7F20..=0x7FFF => 0xFF,
+                0x8000..=0xFFFF => 0, // TODO: M68k
+            },
         }
     }
 
@@ -173,15 +178,18 @@ impl Cpu<'_> {
     }
 
     fn write_addr(&mut self, addr: u16, val: u8) {
-        match addr {
-            0x0000..=0x1FFF => self.ram[addr as usize] = val,
-            0x2000..=0x3FFF => self.ram[(addr - 0x2000) as usize] = val,
-            0x4000..=0x5FFF => {} // TODO: YM2612
-            0x6000..=0x60FF => {} // TODO: bank addr register
-            0x6100..=0x7EFF => {}
-            0x7F00..=0x7F1F => {} // TODO: VDP
-            0x7F20..=0x7FFF => panic!(),
-            0x8000..=0xFFFF => {}
+        match &mut self.test_ram {
+            Some(ram) => ram[addr as usize] = val,
+            None => match addr {
+                0x0000..=0x1FFF => self.ram[addr as usize] = val,
+                0x2000..=0x3FFF => self.ram[(addr - 0x2000) as usize] = val,
+                0x4000..=0x5FFF => {} // TODO: YM2612
+                0x6000..=0x60FF => {} // TODO: bank addr register
+                0x6100..=0x7EFF => {}
+                0x7F00..=0x7F1F => {} // TODO: VDP
+                0x7F20..=0x7FFF => panic!(),
+                0x8000..=0xFFFF => {}
+            }
         }
     }
 
@@ -340,6 +348,7 @@ impl Cpu<'_> {
     }
 
     fn execute_opcode(&mut self) {
+        let opcode_pc = self.pc;
         let opcode_hex = self.read_addr(self.pc) as usize;
         let mut opcode = OPCODES[opcode_hex];
         self.pc += 1;
@@ -376,7 +385,7 @@ impl Cpu<'_> {
 
         if self.instrumented {
             debug!(target: "z80", "{:04X} {:?} A:{:02X} F:{:08b} BC:{:04X} DE:{:04X} HL:{:04X} IX:{:04X} IY:{:04X} I:{:02X} R:{:02X} SP:{:04X} {}",
-                self.pc,
+                opcode_pc,
                 opcode,
                 self.a[self.af_bank],
                 self.f[self.af_bank],
@@ -624,6 +633,8 @@ impl Cpu<'_> {
 #[cfg(feature = "test")]
 #[allow(dead_code)]
 pub mod testing {
+    use std::borrow::Borrow;
+
     use gen::z80::Cpu;
 
     impl Cpu<'_> {
@@ -643,12 +654,23 @@ pub mod testing {
             self.pc = pc;
         }
 
-        pub fn set_sp(&mut self, sp: u16) {
-            self.sp = sp;
+        pub fn load_ram(&mut self, start: usize, src: &[u8]) {
+            let mut ram = vec!(0; start + src.len() + 0x100);
+            ram[start..start + src.len()].copy_from_slice(src);
+            self.sp = (ram.len() - 1) as u16;
+            self.test_ram = Some(ram.into_boxed_slice());
+            self.write_addr(0x5, 0xC9);
+            self.write_word(0x6, self.sp);
         }
 
-        pub fn load_ram(&mut self, start: usize, ram: &[u8]) {
-            self.ram[start..start + ram.len()].copy_from_slice(ram);
+        pub fn output_test_string(&self) {
+            let mut n = self.de[self.register_bank] as usize;
+            let test_ram: &[u8] = self.test_ram.as_ref().unwrap().borrow();
+            while test_ram[n] != '$' as u8 {
+                print!("{}", test_ram[n] as char);
+                n += 1;
+            }
+            println!()
         }
     }
 }
