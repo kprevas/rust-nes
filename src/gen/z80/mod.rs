@@ -332,8 +332,8 @@ impl Cpu<'_> {
     }
 
     fn execute_opcode(&mut self) {
-        let opcode_pc = self.read_addr(self.pc) as usize;
-        let mut opcode = OPCODES[opcode_pc];
+        let opcode_hex = self.read_addr(self.pc) as usize;
+        let mut opcode = OPCODES[opcode_hex];
         self.pc += 1;
         match opcode {
             Opcode::Bit => {
@@ -367,7 +367,7 @@ impl Cpu<'_> {
         }
 
         if self.instrumented {
-            debug!(target: "z80", "{:04X} {:?} {:02X} {:08b} {:04X} {:04X} {:04X} {:02X} {:02X} {:04X}",
+            debug!(target: "z80", "{:04X} {:?} {:02X} {:08b} {:04X} {:04X} {:04X} {:04X} {:04X} {:02X} {:02X} {:04X}",
                 self.pc,
                 opcode,
                 self.a[self.af_bank],
@@ -375,6 +375,8 @@ impl Cpu<'_> {
                 self.bc[self.register_bank],
                 self.de[self.register_bank],
                 self.hl[self.register_bank],
+                self.ix,
+                self.iy,
                 self.i,
                 self.r,
                 self.sp,
@@ -407,6 +409,14 @@ impl Cpu<'_> {
                 self.set_flag(SUBTRACT, true);
                 self.set_flag(HALF_CARRY, operand & 0xF > val & 0xF);
                 self.ticks += Self::arithmetic_ticks(mode) * 15;
+            }
+            Opcode::EX_AF => {
+                self.af_bank = 1 - self.af_bank;
+                self.ticks += 4 * 15;
+            }
+            Opcode::EXX => {
+                self.register_bank = 1 - self.register_bank;
+                self.ticks += 4 * 15;
             }
             Opcode::HALT => {
                 self.stopped = true;
