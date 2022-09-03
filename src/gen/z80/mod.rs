@@ -384,6 +384,17 @@ impl Cpu<'_> {
         }
 
         match opcode {
+            Opcode::AND(mode) => {
+                let result = self.a[self.af_bank] & self.read_byte(mode).unwrap();
+                self.a[self.af_bank] = result;
+                self.set_flag(CARRY, false);
+                self.set_flag(ZERO, result == 0);
+                self.set_flag(PARITY_OVERFLOW, result & 0b1 == 0);
+                self.set_flag(SIGN, result & 0x80 > 0);
+                self.set_flag(SUBTRACT, false);
+                self.set_flag(HALF_CARRY, false);
+                self.ticks += Self::arithmetic_ticks(mode) * 15;
+            }
             Opcode::CALL(condition) => {
                 let addr = self.read_word_addr(self.pc);
                 self.pc += 2;
