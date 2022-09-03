@@ -487,6 +487,15 @@ impl Cpu<'_> {
                     _ => 10,
                 } * 15;
             }
+            Opcode::PUSH(mode) => {
+                let val = self.read_word(mode).unwrap();
+                self.push(val);
+                self.ticks += match mode {
+                    AddrMode::RegisterPair(RegisterPair::IXP)
+                    | AddrMode::RegisterPair(RegisterPair::IYP) => 15,
+                    _ => 11,
+                } * 15;
+            }
             _ => {}
         }
     }
