@@ -367,7 +367,7 @@ impl Cpu<'_> {
         }
 
         if self.instrumented {
-            debug!(target: "z80", "{:04X} {:?} {:02X} {:08b} {:04X} {:04X} {:04X} {:04X} {:04X} {:02X} {:02X} {:04X}",
+            debug!(target: "z80", "{:04X} {:?} A:{:02X} F:{:08b} BC:{:04X} DE:{:04X} HL:{:04X} IX:{:04X} IY:{:04X} I:{:02X} R:{:02X} SP:{:04X}",
                 self.pc,
                 opcode,
                 self.a[self.af_bank],
@@ -420,6 +420,16 @@ impl Cpu<'_> {
                 self.set_flag(SUBTRACT, true);
                 self.set_flag(HALF_CARRY, operand & 0xF > val & 0xF);
                 self.ticks += Self::arithmetic_ticks(mode) * 15;
+            }
+            Opcode::DJNZ => {
+                let displacement = self.read_addr(self.pc) as i8;
+                self.pc += 1;
+                self.bc[self.register_bank] -= 0x100;
+                let zero = self.bc[self.register_bank] & 0xFF00 == 0;
+                if !zero {
+                    self.pc = self.pc.wrapping_add_signed(displacement as i16);
+                }
+                self.ticks += if zero { 8 } else { 13 } * 15;
             }
             Opcode::EX_AF => {
                 self.af_bank = 1 - self.af_bank;
