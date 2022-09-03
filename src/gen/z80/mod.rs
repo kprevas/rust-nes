@@ -32,7 +32,9 @@ pub struct Cpu<'a> {
     ram: [u8; 0x2000],
     _cartridge: &'a Box<[u8]>,
 
-    ticks: u16,
+    cycles_to_next: u16,
+    ticks_to_next: u16,
+    cycle_count: u64,
     pub instrumented: bool,
 }
 
@@ -57,7 +59,9 @@ impl Cpu<'_> {
             stopped: false,
             ram: [0; 0x2000],
             _cartridge: cartridge,
-            ticks: 0,
+            cycles_to_next: 0,
+            ticks_to_next: 0,
+            cycle_count: 0,
             instrumented,
         }
     }
@@ -313,15 +317,21 @@ impl Cpu<'_> {
     }
 
     pub fn tick(&mut self) {
-        if self.ticks == 0 {
-            self.next_operation();
+        if self.ticks_to_next == 0 {
+            if self.cycles_to_next == 0 {
+                self.next_operation();
+            }
+            assert_ne!(self.cycles_to_next, 0);
+            self.cycles_to_next = self.cycles_to_next.saturating_sub(1);
+            self.ticks_to_next = 15;
+            self.cycle_count = self.cycle_count.wrapping_add(1);
         }
-        self.ticks = self.ticks.saturating_sub(1);
+        self.ticks_to_next = self.ticks_to_next.saturating_sub(1);
     }
 
     fn next_operation(&mut self) {
         if self.stopped {
-            self.ticks = 0;
+            self.cycles_to_next = 0;
         } else {
             self.execute_opcode();
             self.r += 1;
@@ -365,7 +375,7 @@ impl Cpu<'_> {
         }
 
         if self.instrumented {
-            debug!(target: "z80", "{:04X} {:?} A:{:02X} F:{:08b} BC:{:04X} DE:{:04X} HL:{:04X} IX:{:04X} IY:{:04X} I:{:02X} R:{:02X} SP:{:04X}",
+            debug!(target: "z80", "{:04X} {:?} A:{:02X} F:{:08b} BC:{:04X} DE:{:04X} HL:{:04X} IX:{:04X} IY:{:04X} I:{:02X} R:{:02X} SP:{:04X} {}",
                 self.pc,
                 opcode,
                 self.a[self.af_bank],
@@ -378,6 +388,7 @@ impl Cpu<'_> {
                 self.i,
                 self.r,
                 self.sp,
+                self.cycle_count,
             );
         }
 
@@ -391,7 +402,7 @@ impl Cpu<'_> {
                 self.set_flag(SIGN, result & 0x80 > 0);
                 self.set_flag(SUBTRACT, false);
                 self.set_flag(HALF_CARRY, false);
-                self.ticks += Self::arithmetic_ticks(mode) * 15;
+                self.cycles_to_next += Self::arithmetic_cycles(mode);
             }
             Opcode::CALL(condition) => {
                 let addr = self.read_word_addr(self.pc);
@@ -399,9 +410,9 @@ impl Cpu<'_> {
                 if self.condition(condition) {
                     self.push(self.pc);
                     self.pc = addr;
-                    self.ticks += 7 * 15;
+                    self.cycles_to_next += 7;
                 }
-                self.ticks += 10 * 15;
+                self.cycles_to_next += 10;
             }
             Opcode::CP(mode) => {
                 let val = self.a[self.af_bank] as i8;
@@ -417,7 +428,7 @@ impl Cpu<'_> {
                 self.set_flag(SIGN, result < 0);
                 self.set_flag(SUBTRACT, true);
                 self.set_flag(HALF_CARRY, operand & 0xF > val & 0xF);
-                self.ticks += Self::arithmetic_ticks(mode) * 15;
+                self.cycles_to_next += Self::arithmetic_cycles(mode);
             }
             Opcode::DJNZ => {
                 let displacement = self.read_addr(self.pc) as i8;
@@ -428,15 +439,15 @@ impl Cpu<'_> {
                 if !zero {
                     self.pc = self.pc.wrapping_add_signed(displacement as i16);
                 }
-                self.ticks += if zero { 8 } else { 13 } * 15;
+                self.cycles_to_next += if zero { 8 } else { 13 };
             }
             Opcode::EX_AF => {
                 self.af_bank = 1 - self.af_bank;
-                self.ticks += 4 * 15;
+                self.cycles_to_next += 4;
             }
             Opcode::EXX => {
                 self.register_bank = 1 - self.register_bank;
-                self.ticks += 4 * 15;
+                self.cycles_to_next += 4;
             }
             Opcode::HALT => {
                 self.stopped = true;
@@ -461,7 +472,7 @@ impl Cpu<'_> {
                     }
                     _ => panic!(),
                 }
-                self.ticks += match mode {
+                self.cycles_to_next += match mode {
                     AddrMode::Indexed(_) => 23,
                     AddrMode::Register(_) => 4,
                     AddrMode::RegisterPair(RegisterPair::IXP)
@@ -469,7 +480,7 @@ impl Cpu<'_> {
                     AddrMode::RegisterPair(_) => 6,
                     AddrMode::RegisterIndirect(_) => 11,
                     _ => panic!(),
-                } * 15;
+                };
             }
             Opcode::JP(condition) => {
                 let addr = self.read_word_addr(self.pc);
@@ -477,11 +488,11 @@ impl Cpu<'_> {
                 if self.condition(condition) {
                     self.pc = addr;
                 }
-                self.ticks += 10 * 15;
+                self.cycles_to_next += 10;
             }
             Opcode::JP_Register(register) => {
                 self.pc = self.read_word(AddrMode::RegisterPair(register)).unwrap();
-                self.ticks += 4 * 15;
+                self.cycles_to_next += 4;
             }
             Opcode::JR(condition) => {
                 let displacement = self.read_addr(self.pc) as i8;
@@ -490,7 +501,7 @@ impl Cpu<'_> {
                 if condition_val {
                     self.pc = self.pc.wrapping_add_signed(displacement as i16);
                 }
-                self.ticks += if condition_val { 12 } else { 7 } * 15;
+                self.cycles_to_next += if condition_val { 12 } else { 7 };
             }
             Opcode::LD(dest, src) => {
                 let (val_8, val_16) = match (dest, src) {
@@ -510,7 +521,7 @@ impl Cpu<'_> {
                     }
                     _ => {}
                 }
-                self.ticks += match (dest, src) {
+                self.cycles_to_next += match (dest, src) {
                     (AddrMode::Register(_), AddrMode::Register(Register::I))
                     | (AddrMode::Register(_), AddrMode::Register(Register::R))
                     | (AddrMode::Register(Register::I), AddrMode::Register(_))
@@ -536,41 +547,41 @@ impl Cpu<'_> {
                     (AddrMode::RegisterPair(_), AddrMode::Extended)
                     | (AddrMode::Extended, AddrMode::RegisterPair(_)) => 20,
                     _ => panic!("{:?}", opcode),
-                } * 15;
+                };
             }
             Opcode::NOP => {
-                self.ticks += 4 * 15;
+                self.cycles_to_next += 4;
             }
             Opcode::POP(mode) => {
                 let val = self.pop();
                 self.write_byte_or_word(mode, None, Some(val));
-                self.ticks += match mode {
+                self.cycles_to_next += match mode {
                     AddrMode::RegisterPair(RegisterPair::IXP)
                     | AddrMode::RegisterPair(RegisterPair::IYP) => 14,
                     _ => 10,
-                } * 15;
+                };
             }
             Opcode::PUSH(mode) => {
                 let val = self.read_word(mode).unwrap();
                 self.push(val);
-                self.ticks += match mode {
+                self.cycles_to_next += match mode {
                     AddrMode::RegisterPair(RegisterPair::IXP)
                     | AddrMode::RegisterPair(RegisterPair::IYP) => 15,
                     _ => 11,
-                } * 15;
+                };
             }
             Opcode::RET(condition) => {
                 let condition_val = self.condition(condition);
                 if condition_val {
                     self.pc = self.pop();
                 }
-                self.ticks += if let Condition::True = condition {
+                self.cycles_to_next += if let Condition::True = condition {
                     10
                 } else if condition_val {
                     11
                 } else {
                     5
-                } * 15;
+                };
             }
             Opcode::RRCA => {
                 let result = self.a[self.af_bank].rotate_right(1);
@@ -578,7 +589,7 @@ impl Cpu<'_> {
                 self.set_flag(CARRY, result & 0x80 > 0);
                 self.set_flag(SUBTRACT, false);
                 self.set_flag(HALF_CARRY, false);
-                self.ticks += 4 * 15;
+                self.cycles_to_next += 4;
             }
             _ => {}
         }
@@ -600,7 +611,7 @@ impl Cpu<'_> {
         ((self.a[self.af_bank] as u16) << 8) | (self.f[self.af_bank] as u16)
     }
 
-    fn arithmetic_ticks(mode: AddrMode) -> u16 {
+    fn arithmetic_cycles(mode: AddrMode) -> u16 {
         match mode {
             AddrMode::Register(_) => 4,
             AddrMode::Immediate | AddrMode::RegisterIndirect(_) => 7,
@@ -616,12 +627,16 @@ pub mod testing {
     use gen::z80::Cpu;
 
     impl Cpu<'_> {
-        pub fn get_de(&mut self) -> u16 {
+        pub fn get_de(&self) -> u16 {
             self.de[0]
         }
 
-        pub fn get_pc(&mut self) -> u16 {
+        pub fn get_pc(&self) -> u16 {
             self.pc
+        }
+
+        pub fn get_cycle_count(&self) -> u64 {
+            self.cycle_count
         }
 
         pub fn set_pc(&mut self, pc: u16) {
