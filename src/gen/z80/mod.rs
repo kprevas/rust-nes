@@ -1,7 +1,4 @@
-use gen::z80::opcodes::{
-    AddrMode, BIT_INSTRUCTIONS, IndexRegister, IX_BIT_INSTRUCTIONS, IX_INSTRUCTIONS, IY_BIT_INSTRUCTIONS, IY_INSTRUCTIONS,
-    MISC_INSTRUCTIONS, Opcode, OPCODES, Register, RegisterPair,
-};
+use gen::z80::opcodes::*;
 
 mod opcodes;
 
@@ -350,7 +347,7 @@ impl Cpu<'_> {
         }
 
         if self.instrumented {
-            debug!(target: "z80", "{:04X} {:02X} {:02X} {:04X} {:04X} {:04X} {:02X} {:02X}",
+            debug!(target: "z80", "{:04X} {:02X} {:08b} {:04X} {:04X} {:04X} {:02X} {:02X}",
             self.pc,
             self.a[self.af_bank],
             self.f[self.af_bank],
@@ -362,6 +359,23 @@ impl Cpu<'_> {
         }
 
         match opcode {
+            Opcode::CP(mode) => {
+                let val = self.a[self.af_bank] as i8;
+                let operand = self.read_byte(mode).unwrap() as i8;
+                let (carry, result) = match val.checked_sub(operand) {
+                    Some(result) => (false, result),
+                    None => (true, val.wrapping_sub(operand)),
+                };
+                let overflow = (operand < 0) == (result < 0)
+                    && (operand < 0) != (val < 0);
+                self.set_flag(CARRY, carry);
+                self.set_flag(ZERO, result == 0);
+                self.set_flag(PARITY_OVERFLOW, overflow);
+                self.set_flag(SIGN, result < 0);
+                self.set_flag(SUBTRACT, true);
+                self.set_flag(HALF_CARRY, operand & 0xF > val & 0xF);
+                self.ticks += Self::arithmetic_ticks(mode) * 15;
+            }
             Opcode::HALT => {
                 self.stopped = true;
             }
@@ -431,6 +445,15 @@ impl Cpu<'_> {
 
     fn af(&mut self) -> u16 {
         ((self.a[self.af_bank] as u16) << 8) | (self.f[self.af_bank] as u16)
+    }
+
+    fn arithmetic_ticks(mode: AddrMode) -> u16 {
+        match mode {
+            AddrMode::Register(_) => 4,
+            AddrMode::Immediate | AddrMode::RegisterIndirect(_) => 7,
+            AddrMode::Indexed(_) => 19,
+            AddrMode::Extended | AddrMode::RegisterPair(_) => panic!(),
+        }
     }
 }
 
