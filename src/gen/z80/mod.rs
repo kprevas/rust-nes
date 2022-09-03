@@ -440,6 +440,15 @@ impl Cpu<'_> {
                 }
                 self.ticks += 10 * 15;
             }
+            Opcode::JR(condition) => {
+                let displacement = self.read_addr(self.pc) as i8;
+                self.pc += 1;
+                let condition_val = self.condition(condition);
+                if condition_val {
+                    self.pc = self.pc.wrapping_add_signed(displacement as i16);
+                }
+                self.ticks += if condition_val { 12 } else { 7 } * 15;
+            }
             Opcode::LD(dest, src) => {
                 let (val_8, val_16) = match (dest, src) {
                     (AddrMode::RegisterPair(_), _) | (_, AddrMode::RegisterPair(_)) => {
