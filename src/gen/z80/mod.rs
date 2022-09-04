@@ -506,6 +506,21 @@ impl Cpu<'_> {
                 }
                 self.cycles_to_next += if zero { 8 } else { 13 };
             }
+            Opcode::EX(dest, src) => {
+                let dest_val = self.read_word(dest).unwrap();
+                let src_val = self.read_word(src).unwrap();
+                self.write_byte_or_word(dest, None, Some(src_val));
+                self.write_byte_or_word(src, None, Some(dest_val));
+                self.cycles_to_next += match (dest, src) {
+                    (AddrMode::RegisterPair(_), AddrMode::RegisterPair(_)) => 4,
+                    (AddrMode::RegisterIndirect(_), AddrMode::RegisterPair(RegisterPair::IXP))
+                    | (AddrMode::RegisterIndirect(_), AddrMode::RegisterPair(RegisterPair::IYP)) => {
+                        23
+                    }
+                    (AddrMode::RegisterIndirect(_), AddrMode::RegisterPair(_)) => 19,
+                    _ => panic!(),
+                }
+            }
             Opcode::EX_AF => {
                 self.af_bank = 1 - self.af_bank;
                 self.cycles_to_next += 4;
@@ -613,6 +628,30 @@ impl Cpu<'_> {
                     | (AddrMode::Extended, AddrMode::RegisterPair(_)) => 20,
                     _ => panic!("{:?}", opcode),
                 };
+            }
+            Opcode::LDD | Opcode::LDDR | Opcode::LDI | Opcode::LDIR => {
+                let val = self.read_byte(AddrMode::RegisterIndirect(RegisterPair::HL));
+                self.write_byte_or_word(AddrMode::RegisterIndirect(RegisterPair::DE), val, None);
+                if let Opcode::LDI | Opcode::LDIR = opcode {
+                    self.de[self.register_bank] = self.de[self.register_bank].wrapping_add(1);
+                    self.hl[self.register_bank] = self.hl[self.register_bank].wrapping_add(1);
+                } else {
+                    self.de[self.register_bank] = self.de[self.register_bank].wrapping_sub(1);
+                    self.hl[self.register_bank] = self.hl[self.register_bank].wrapping_sub(1);
+                }
+                self.bc[self.register_bank] = self.bc[self.register_bank].wrapping_sub(1);
+                self.cycles_to_next += 16;
+                if let Opcode::LDIR | Opcode::LDDR = opcode {
+                    if self.bc[self.register_bank] != 0 {
+                        self.pc = opcode_pc;
+                        self.cycles_to_next += 5;
+                    }
+                    self.set_flag(PARITY_OVERFLOW, false);
+                } else {
+                    self.set_flag(PARITY_OVERFLOW, self.bc[self.register_bank] != 0);
+                }
+                self.set_flag(SUBTRACT, false);
+                self.set_flag(HALF_CARRY, false);
             }
             Opcode::NOP => {
                 self.cycles_to_next += 4;
