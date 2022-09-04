@@ -96,8 +96,11 @@ fn run_json_test(initial: &JsonValue, expected: &JsonValue) {
         );
     }
     let test_id = format!("{} - {:?}", initial["name"].as_str().unwrap(), cpu.peek_opcode());
+    let cycles = expected["state"]["tStates"].as_u64().unwrap();
 
-    cpu.step();
+    while cpu.get_cycle_count() < cycles {
+        cpu.step();
+    }
 
     let expected_state = &expected["state"];
     cpu.verify_state(
