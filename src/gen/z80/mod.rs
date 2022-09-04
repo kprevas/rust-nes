@@ -443,7 +443,7 @@ impl Cpu<'_> {
                 self.a[self.af_bank] = result;
                 self.set_flag(CARRY, false);
                 self.set_flag(ZERO, result == 0);
-                self.set_flag(PARITY_OVERFLOW, result & 0b1 == 0);
+                self.set_flag(PARITY_OVERFLOW, Self::parity(result));
                 self.set_flag(SIGN, result & 0x80 > 0);
                 self.set_flag(SUBTRACT, false);
                 self.set_flag(HALF_CARRY, false);
@@ -474,6 +474,44 @@ impl Cpu<'_> {
                 self.set_flag(SUBTRACT, true);
                 self.set_flag(HALF_CARRY, operand & 0xF > val & 0xF);
                 self.cycles_to_next += Self::arithmetic_cycles(mode);
+            }
+            Opcode::DAA => {
+                let mut a = self.a[self.af_bank];
+                let adj_lo = self.flag(HALF_CARRY) || a & 0xF > 0x9;
+                let adj_hi = self.flag(CARRY) || a > 0x99;
+                let half_carry = if self.flag(SUBTRACT) && !self.flag(HALF_CARRY) {
+                    false
+                } else if self.flag(SUBTRACT) && self.flag(HALF_CARRY) {
+                    a & 0xF < 0x6
+                } else {
+                    a & 0xF > 0xA
+                };
+                if adj_hi && adj_lo {
+                    if self.flag(SUBTRACT) {
+                        a = a.wrapping_sub(0x66);
+                    } else {
+                        a = a.wrapping_add(0x66);
+                    }
+                } else if adj_hi {
+                    if self.flag(SUBTRACT) {
+                        a = a.wrapping_sub(0x60);
+                    } else {
+                        a = a.wrapping_add(0x60);
+                    }
+                } else if adj_lo {
+                    if self.flag(SUBTRACT) {
+                        a = a.wrapping_sub(0x6);
+                    } else {
+                        a = a.wrapping_add(0x6);
+                    }
+                }
+                self.a[self.af_bank] = a;
+                self.set_flag(CARRY, adj_hi);
+                self.set_flag(ZERO, a == 0);
+                self.set_flag(PARITY_OVERFLOW, Self::parity(a));
+                self.set_flag(SIGN, a & 0x80 > 0);
+                self.set_flag(HALF_CARRY, half_carry);
+                self.cycles_to_next += 4;
             }
             Opcode::DEC(mode) => {
                 match mode {
@@ -679,7 +717,7 @@ impl Cpu<'_> {
                 self.a[self.af_bank] = result;
                 self.set_flag(CARRY, false);
                 self.set_flag(ZERO, result == 0);
-                self.set_flag(PARITY_OVERFLOW, result & 0b1 == 0);
+                self.set_flag(PARITY_OVERFLOW, Self::parity(result));
                 self.set_flag(SIGN, result & 0x80 > 0);
                 self.set_flag(SUBTRACT, false);
                 self.set_flag(HALF_CARRY, false);
@@ -791,7 +829,7 @@ impl Cpu<'_> {
                 self.a[self.af_bank] = result;
                 self.set_flag(CARRY, false);
                 self.set_flag(ZERO, result == 0);
-                self.set_flag(PARITY_OVERFLOW, result & 0b1 == 0);
+                self.set_flag(PARITY_OVERFLOW, Self::parity(result));
                 self.set_flag(SIGN, result & 0x80 > 0);
                 self.set_flag(SUBTRACT, false);
                 self.set_flag(HALF_CARRY, false);
@@ -872,6 +910,10 @@ impl Cpu<'_> {
     fn overflow_16(op1: u16, op2: u16, result: u16) -> bool {
         let result_sign = result & 0x8000 > 0;
         ((op1 & 0x8000 > 0) ^ result_sign) && ((op2 & 0x8000 > 0) ^ result_sign)
+    }
+
+    fn parity(val: u8) -> bool {
+        val.count_ones() % 2 == 0
     }
 }
 
