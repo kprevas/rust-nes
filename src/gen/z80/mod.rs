@@ -716,10 +716,28 @@ impl Cpu<'_> {
                     5
                 };
             }
+            Opcode::RLA => {
+                let carry_bit = self.a[self.af_bank] >> 7;
+                let result = self.a[self.af_bank] << 1 | if self.flag(CARRY) { 1 } else { 0 };
+                self.a[self.af_bank] = result;
+                self.set_flag(CARRY, carry_bit > 0);
+                self.set_flag(SUBTRACT, false);
+                self.set_flag(HALF_CARRY, false);
+                self.cycles_to_next += 4;
+            }
             Opcode::RLCA => {
                 let result = self.a[self.af_bank].rotate_left(1);
                 self.a[self.af_bank] = result;
                 self.set_flag(CARRY, result & 0x1 > 0);
+                self.set_flag(SUBTRACT, false);
+                self.set_flag(HALF_CARRY, false);
+                self.cycles_to_next += 4;
+            }
+            Opcode::RRA => {
+                let carry_bit = self.a[self.af_bank] & 0x1;
+                let result = self.a[self.af_bank] >> 1 | if self.flag(CARRY) { 0x80 } else { 0 };
+                self.a[self.af_bank] = result;
+                self.set_flag(CARRY, carry_bit > 0);
                 self.set_flag(SUBTRACT, false);
                 self.set_flag(HALF_CARRY, false);
                 self.cycles_to_next += 4;
