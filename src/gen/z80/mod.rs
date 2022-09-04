@@ -439,6 +439,36 @@ impl Cpu<'_> {
                 self.set_flag(HALF_CARRY, operand & 0xF > val & 0xF);
                 self.cycles_to_next += Self::arithmetic_cycles(mode);
             }
+            Opcode::DEC(mode) => {
+                match mode {
+                    AddrMode::Indexed(_)
+                    | AddrMode::Register(_)
+                    | AddrMode::RegisterIndirect(_) => {
+                        let operand = self.read_byte(mode).unwrap();
+                        let val = operand.wrapping_sub(1);
+                        self.set_flag(ZERO, val == 0);
+                        self.set_flag(PARITY_OVERFLOW, val == 0x0F);
+                        self.set_flag(SIGN, val & 0x80 > 0);
+                        self.set_flag(SUBTRACT, true);
+                        self.set_flag(HALF_CARRY, operand & 0xF < val & 0xF);
+                        self.write_byte_or_word(mode, Some(val), None);
+                    }
+                    AddrMode::RegisterPair(_) => {
+                        let val = self.read_word(mode).unwrap().wrapping_sub(1);
+                        self.write_byte_or_word(mode, None, Some(val));
+                    }
+                    _ => panic!(),
+                }
+                self.cycles_to_next += match mode {
+                    AddrMode::Indexed(_) => 23,
+                    AddrMode::Register(_) => 4,
+                    AddrMode::RegisterPair(RegisterPair::IXP)
+                    | AddrMode::RegisterPair(RegisterPair::IYP) => 10,
+                    AddrMode::RegisterPair(_) => 6,
+                    AddrMode::RegisterIndirect(_) => 11,
+                    _ => panic!(),
+                };
+            }
             Opcode::DJNZ => {
                 let displacement = self.read_addr(self.pc) as i8;
                 self.pc += 1;
