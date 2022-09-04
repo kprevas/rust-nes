@@ -385,6 +385,7 @@ impl Cpu<'_> {
                     self.set_flag(PARITY_OVERFLOW, Self::overflow_16(val, operand, result));
                     self.set_flag(SIGN, result & 0x8000 > 1);
                     self.set_flag(SUBTRACT, false);
+                    self.set_flag(HALF_CARRY, (result & 0xF) < (val & 0xF));
                     self.write_byte_or_word(dest, None, Some(result));
                     self.cycles_to_next += 15;
                 }
@@ -414,6 +415,7 @@ impl Cpu<'_> {
                         let result = val.wrapping_add(operand);
                         self.set_flag(CARRY, result < val);
                         self.set_flag(SUBTRACT, false);
+                        self.set_flag(HALF_CARRY, (result & 0xF) < (val & 0xF));
                         self.write_byte_or_word(dest, None, Some(result));
                         self.cycles_to_next += match dest {
                             AddrMode::RegisterPair(RegisterPair::IXP)
@@ -744,6 +746,7 @@ impl Cpu<'_> {
                     self.set_flag(PARITY_OVERFLOW, Self::overflow_16(val, operand, result));
                     self.set_flag(SIGN, result & 0x8000 > 1);
                     self.set_flag(SUBTRACT, true);
+                    self.set_flag(HALF_CARRY, (result & 0xF) > (val & 0xF));
                     self.write_byte_or_word(dest, None, Some(result));
                     self.cycles_to_next += 15;
                 }
@@ -946,18 +949,18 @@ pub mod testing {
             assert_eq!(
                 self.f[self.af_bank] & flags_mask,
                 (af[0] & 0xFF) as u8 & flags_mask,
-                "{}   F exp {:08b} act {:08b}",
+                "{}   F exp {:08b} act {:08b}  S V X H X P/V N C",
                 test_id,
-                af[0] & 0xFF,
-                self.f[0]
+                (af[0] & 0xFF) as u8 & flags_mask,
+                self.f[self.af_bank] & flags_mask
             );
             assert_eq!(
                 self.f[1 - self.af_bank] & flags_mask,
                 (af[1] & 0xFF) as u8 & flags_mask,
-                "{}   F' exp {:08b} act {:08b}",
+                "{}   F' exp {:08b} act {:08b}  S V X H X P/V N C",
                 test_id,
-                af[1] & 0xFF,
-                self.f[1]
+                (af[1] & 0xFF) as u8 & flags_mask,
+                self.f[1 - self.af_bank] & flags_mask
             );
             assert_eq!(self.bc[self.register_bank], bc[0], "{}   BC", test_id);
             assert_eq!(self.bc[1 - self.register_bank], bc[1], "{}   BC'", test_id);
