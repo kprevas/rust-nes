@@ -483,7 +483,7 @@ impl Cpu<'_> {
                         let operand = self.read_byte(mode).unwrap();
                         let val = operand.wrapping_sub(1);
                         self.set_flag(ZERO, val == 0);
-                        self.set_flag(PARITY_OVERFLOW, val == 0x0F);
+                        self.set_flag(PARITY_OVERFLOW, val == 0x7F);
                         self.set_flag(SIGN, val & 0x80 > 0);
                         self.set_flag(SUBTRACT, true);
                         self.set_flag(HALF_CARRY, operand & 0xF < val & 0xF);
@@ -558,7 +558,7 @@ impl Cpu<'_> {
                         let operand = self.read_byte(mode).unwrap();
                         let val = operand.wrapping_add(1);
                         self.set_flag(ZERO, val == 0);
-                        self.set_flag(PARITY_OVERFLOW, val == 0xF0);
+                        self.set_flag(PARITY_OVERFLOW, val == 0x80);
                         self.set_flag(SIGN, val & 0x80 > 0);
                         self.set_flag(SUBTRACT, false);
                         self.set_flag(HALF_CARRY, operand & 0xF > val & 0xF);
