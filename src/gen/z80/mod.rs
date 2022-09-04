@@ -189,7 +189,7 @@ impl Cpu<'_> {
                 0x7F00..=0x7F1F => {} // TODO: VDP
                 0x7F20..=0x7FFF => panic!(),
                 0x8000..=0xFFFF => {}
-            }
+            },
         }
     }
 
@@ -402,6 +402,32 @@ impl Cpu<'_> {
         }
 
         match opcode {
+            Opcode::ADD(dest, src) => {
+                match (dest, src) {
+                    (AddrMode::RegisterPair(_), AddrMode::RegisterPair(_)) => {
+                        let val = self.read_word(dest).unwrap();
+                        let operand = self.read_word(src).unwrap();
+                        let result = val.wrapping_add(operand);
+                        self.set_flag(CARRY, result < val);
+                        self.set_flag(SUBTRACT, false);
+                        self.write_byte_or_word(dest, None, Some(result));
+                        self.cycles_to_next += 11;
+                    }
+                    _ => {
+                        let val = self.read_byte(dest).unwrap();
+                        let operand = self.read_byte(src).unwrap();
+                        let result = val.wrapping_add(operand);
+                        self.set_flag(CARRY, result < val);
+                        self.set_flag(ZERO, result == 0);
+                        self.set_flag(PARITY_OVERFLOW, (result as i8) < (val as i8));
+                        self.set_flag(SIGN, result & 0x80 > 1);
+                        self.set_flag(SUBTRACT, false);
+                        self.set_flag(HALF_CARRY, (result & 0xF) < (val & 0xF));
+                        self.write_byte_or_word(dest, Some(result), None);
+                        self.cycles_to_next += Self::arithmetic_cycles(src);
+                    }
+                };
+            }
             Opcode::AND(mode) => {
                 let result = self.a[self.af_bank] & self.read_byte(mode).unwrap();
                 self.a[self.af_bank] = result;
@@ -641,7 +667,7 @@ impl Cpu<'_> {
                 self.set_flag(HALF_CARRY, false);
                 self.cycles_to_next += 4;
             }
-            _ => panic!("{:?}", opcode)
+            _ => panic!("{:?}", opcode),
         }
     }
 
@@ -696,7 +722,7 @@ pub mod testing {
         }
 
         pub fn load_ram(&mut self, start: usize, src: &[u8]) {
-            let mut ram = vec!(0; start + src.len() + 0x100);
+            let mut ram = vec![0; start + src.len() + 0x100];
             ram[start..start + src.len()].copy_from_slice(src);
             self.sp = (ram.len() - 1) as u16;
             self.test_ram = Some(ram.into_boxed_slice());
