@@ -349,39 +349,8 @@ impl Cpu<'_> {
 
     fn execute_opcode(&mut self) {
         let opcode_pc = self.pc;
-        let opcode_hex = self.read_addr(self.pc) as usize;
-        let mut opcode = OPCODES[opcode_hex];
-        self.pc += 1;
-        match opcode {
-            Opcode::Bit => {
-                opcode = BIT_INSTRUCTIONS[self.read_addr(self.pc) as usize];
-                self.pc += 1;
-            }
-            Opcode::Ix => {
-                opcode = IX_INSTRUCTIONS[self.read_addr(self.pc) as usize];
-                self.pc += 1;
-            }
-            Opcode::Iy => {
-                opcode = IY_INSTRUCTIONS[self.read_addr(self.pc) as usize];
-                self.pc += 1;
-            }
-            Opcode::Misc => {
-                opcode = MISC_INSTRUCTIONS[self.read_addr(self.pc) as usize];
-                self.pc += 1;
-            }
-            _ => {}
-        }
-        match opcode {
-            Opcode::IxBit => {
-                opcode = IX_BIT_INSTRUCTIONS[self.read_addr(self.pc) as usize];
-                self.pc += 1;
-            }
-            Opcode::IyBit => {
-                opcode = IY_BIT_INSTRUCTIONS[self.read_addr(self.pc) as usize];
-                self.pc += 1;
-            }
-            _ => {}
-        }
+        let (opcode, pc) = self.opcode_pc();
+        self.pc = pc;
 
         if self.instrumented {
             debug!(target: "z80", "{:04X} {:?} A:{:02X} F:{:08b} BC:{:04X} DE:{:04X} HL:{:04X} IX:{:04X} IY:{:04X} I:{:02X} R:{:02X} SP:{:04X} {}",
@@ -413,7 +382,7 @@ impl Cpu<'_> {
                     });
                     self.set_flag(CARRY, result < val);
                     self.set_flag(ZERO, result == 0);
-                    self.set_flag(PARITY_OVERFLOW, (result as i8) < (val as i8));
+                    self.set_flag(PARITY_OVERFLOW, Self::overflow_16(val, operand, result));
                     self.set_flag(SIGN, result & 0x8000 > 1);
                     self.set_flag(SUBTRACT, false);
                     self.write_byte_or_word(dest, None, Some(result));
@@ -429,7 +398,7 @@ impl Cpu<'_> {
                     });
                     self.set_flag(CARRY, result < val);
                     self.set_flag(ZERO, result == 0);
-                    self.set_flag(PARITY_OVERFLOW, (result as i8) < (val as i8));
+                    self.set_flag(PARITY_OVERFLOW, Self::overflow_8(val, operand, result));
                     self.set_flag(SIGN, result & 0x80 > 1);
                     self.set_flag(SUBTRACT, false);
                     self.set_flag(HALF_CARRY, (result & 0xF) < (val & 0xF));
@@ -458,7 +427,7 @@ impl Cpu<'_> {
                         let result = val.wrapping_add(operand);
                         self.set_flag(CARRY, result < val);
                         self.set_flag(ZERO, result == 0);
-                        self.set_flag(PARITY_OVERFLOW, (result as i8) < (val as i8));
+                        self.set_flag(PARITY_OVERFLOW, Self::overflow_8(val, operand, result));
                         self.set_flag(SIGN, result & 0x80 > 1);
                         self.set_flag(SUBTRACT, false);
                         self.set_flag(HALF_CARRY, (result & 0xF) < (val & 0xF));
@@ -772,7 +741,7 @@ impl Cpu<'_> {
                     });
                     self.set_flag(CARRY, result > val);
                     self.set_flag(ZERO, result == 0);
-                    self.set_flag(PARITY_OVERFLOW, (result as i8) > (val as i8));
+                    self.set_flag(PARITY_OVERFLOW, Self::overflow_16(val, operand, result));
                     self.set_flag(SIGN, result & 0x8000 > 1);
                     self.set_flag(SUBTRACT, true);
                     self.write_byte_or_word(dest, None, Some(result));
@@ -788,7 +757,7 @@ impl Cpu<'_> {
                     });
                     self.set_flag(CARRY, result > val);
                     self.set_flag(ZERO, result == 0);
-                    self.set_flag(PARITY_OVERFLOW, (result as i8) > (val as i8));
+                    self.set_flag(PARITY_OVERFLOW, Self::overflow_8(val, operand, result));
                     self.set_flag(SIGN, result & 0x80 > 1);
                     self.set_flag(SUBTRACT, true);
                     self.set_flag(HALF_CARRY, (result & 0xF) > (val & 0xF));
@@ -823,6 +792,44 @@ impl Cpu<'_> {
         }
     }
 
+    fn opcode_pc(&mut self) -> (Opcode, u16) {
+        let mut pc = self.pc;
+        let opcode_hex = self.read_addr(pc) as usize;
+        let mut opcode = OPCODES[opcode_hex];
+        pc += 1;
+        match opcode {
+            Opcode::Bit => {
+                opcode = BIT_INSTRUCTIONS[self.read_addr(pc) as usize];
+                pc += 1;
+            }
+            Opcode::Ix => {
+                opcode = IX_INSTRUCTIONS[self.read_addr(pc) as usize];
+                pc += 1;
+            }
+            Opcode::Iy => {
+                opcode = IY_INSTRUCTIONS[self.read_addr(pc) as usize];
+                pc += 1;
+            }
+            Opcode::Misc => {
+                opcode = MISC_INSTRUCTIONS[self.read_addr(pc) as usize];
+                pc += 1;
+            }
+            _ => {}
+        }
+        match opcode {
+            Opcode::IxBit => {
+                opcode = IX_BIT_INSTRUCTIONS[self.read_addr(pc) as usize];
+                pc += 1;
+            }
+            Opcode::IyBit => {
+                opcode = IY_BIT_INSTRUCTIONS[self.read_addr(pc) as usize];
+                pc += 1;
+            }
+            _ => {}
+        }
+        (opcode, pc)
+    }
+
     fn af(&mut self) -> u16 {
         ((self.a[self.af_bank] as u16) << 8) | (self.f[self.af_bank] as u16)
     }
@@ -835,6 +842,16 @@ impl Cpu<'_> {
             AddrMode::Extended | AddrMode::RegisterPair(_) => panic!(),
         }
     }
+
+    fn overflow_8(op1: u8, op2: u8, result: u8) -> bool {
+        let result_sign = result & 0x80 > 0;
+        ((op1 & 0x80 > 0) ^ result_sign) && ((op2 & 0x80 > 0) ^ result_sign)
+    }
+
+    fn overflow_16(op1: u16, op2: u16, result: u16) -> bool {
+        let result_sign = result & 0x8000 > 0;
+        ((op1 & 0x8000 > 0) ^ result_sign) && ((op2 & 0x8000 > 0) ^ result_sign)
+    }
 }
 
 #[cfg(feature = "test")]
@@ -843,6 +860,7 @@ pub mod testing {
     use std::borrow::Borrow;
 
     use gen::z80::Cpu;
+    use gen::z80::opcodes::Opcode;
 
     impl Cpu<'_> {
         pub fn get_de(&self) -> u16 {
@@ -861,13 +879,119 @@ pub mod testing {
             self.pc = pc;
         }
 
+        pub fn peek_opcode(&mut self) -> Opcode {
+            self.opcode_pc().0
+        }
+
         pub fn load_ram(&mut self, start: usize, src: &[u8]) {
             let mut ram = vec![0; start + src.len() + 0x100];
             ram[start..start + src.len()].copy_from_slice(src);
             self.sp = (ram.len() - 1) as u16;
             self.test_ram = Some(ram.into_boxed_slice());
+        }
+
+        pub fn init_zex_test_vectors(&mut self) {
             self.write_addr(0x5, 0xC9);
             self.write_word(0x6, self.sp);
+        }
+
+        pub fn init_state(
+            &mut self,
+            af: [u16; 2],
+            bc: [u16; 2],
+            de: [u16; 2],
+            hl: [u16; 2],
+            ix: u16,
+            iy: u16,
+            sp: u16,
+            pc: u16,
+            i: u8,
+            r: u8,
+            interupt_enabled: bool,
+        ) {
+            self.a[0] = (af[0] >> 8) as u8;
+            self.a[1] = (af[1] >> 8) as u8;
+            self.f[0] = (af[0] & 0xFF) as u8;
+            self.f[1] = (af[1] & 0xFF) as u8;
+            self.bc = bc;
+            self.de = de;
+            self.hl = hl;
+            self.ix = ix;
+            self.iy = iy;
+            self.sp = sp;
+            self.pc = pc;
+            self.i = i;
+            self.r = r;
+            self.interrupt_enabled = interupt_enabled;
+        }
+
+        pub fn verify_state(
+            &mut self,
+            af: [u16; 2],
+            bc: [u16; 2],
+            de: [u16; 2],
+            hl: [u16; 2],
+            ix: u16,
+            iy: u16,
+            sp: u16,
+            pc: u16,
+            i: u8,
+            r: u8,
+            interupt_enabled: bool,
+            test_id: &str,
+        ) {
+            let flags_mask = 0b11010111;
+            assert_eq!(self.a[self.af_bank], (af[0] >> 8) as u8, "{}   A", test_id);
+            assert_eq!(self.a[1 - self.af_bank], (af[1] >> 8) as u8, "{}   A'", test_id);
+            assert_eq!(
+                self.f[self.af_bank] & flags_mask,
+                (af[0] & 0xFF) as u8 & flags_mask,
+                "{}   F exp {:08b} act {:08b}",
+                test_id,
+                af[0] & 0xFF,
+                self.f[0]
+            );
+            assert_eq!(
+                self.f[1 - self.af_bank] & flags_mask,
+                (af[1] & 0xFF) as u8 & flags_mask,
+                "{}   F' exp {:08b} act {:08b}",
+                test_id,
+                af[1] & 0xFF,
+                self.f[1]
+            );
+            assert_eq!(self.bc[self.register_bank], bc[0], "{}   BC", test_id);
+            assert_eq!(self.bc[1 - self.register_bank], bc[1], "{}   BC'", test_id);
+            assert_eq!(self.de[self.register_bank], de[0], "{}   DE", test_id);
+            assert_eq!(self.de[1 - self.register_bank], de[1], "{}   DE'", test_id);
+            assert_eq!(self.hl[self.register_bank], hl[0], "{}   HL", test_id);
+            assert_eq!(self.hl[1 - self.register_bank], hl[1], "{}   HL'", test_id);
+            assert_eq!(self.ix, ix, "{}   IX", test_id);
+            assert_eq!(self.iy, iy, "{}   IY", test_id);
+            assert_eq!(self.sp, sp, "{}   SP", test_id);
+            assert_eq!(self.pc, pc, "{}   PC", test_id);
+            assert_eq!(self.i, i, "{}   I", test_id);
+            assert_eq!(self.r, r, "{}   R", test_id);
+            assert_eq!(
+                self.interrupt_enabled, interupt_enabled,
+                "{}   IFF",
+                test_id
+            );
+        }
+
+        pub fn poke_ram(&mut self, addr: usize, data: &[u8]) {
+            self.test_ram.as_mut().unwrap()[addr..addr + data.len()].copy_from_slice(data);
+        }
+
+        pub fn verify_ram(&mut self, addr: usize, data: &[u8], test_id: &str) {
+            for (i, &d) in data.iter().enumerate() {
+                assert_eq!(
+                    self.test_ram.as_ref().unwrap()[addr + i],
+                    d,
+                    "{}   {:04X}",
+                    test_id,
+                    addr + i
+                );
+            }
         }
 
         pub fn step(&mut self) {
@@ -877,13 +1001,16 @@ pub mod testing {
         }
 
         pub fn output_test_string(&self) {
-            let mut n = self.de[self.register_bank] as usize;
-            let test_ram: &[u8] = self.test_ram.as_ref().unwrap().borrow();
-            while test_ram[n] != '$' as u8 {
-                print!("{}", test_ram[n] as char);
-                n += 1;
+            if self.bc[self.register_bank] & 0xFF == 2 {
+                print!("{}", (self.de[self.register_bank] & 0xFF) as u8 as char)
+            } else {
+                let mut n = self.de[self.register_bank] as usize;
+                let test_ram: &[u8] = self.test_ram.as_ref().unwrap().borrow();
+                while test_ram[n] != '$' as u8 {
+                    print!("{}", test_ram[n] as char);
+                    n += 1;
+                }
             }
-            println!()
         }
     }
 }
