@@ -385,7 +385,7 @@ impl Cpu<'_> {
                     self.set_flag(PARITY_OVERFLOW, Self::overflow_16(val, operand, result));
                     self.set_flag(SIGN, result & 0x8000 > 1);
                     self.set_flag(SUBTRACT, false);
-                    self.set_flag(HALF_CARRY, (result & 0xF) < (val & 0xF));
+                    self.set_flag(HALF_CARRY, (result & 0xF00) < (val & 0xF00));
                     self.write_byte_or_word(dest, None, Some(result));
                     self.cycles_to_next += 15;
                 }
@@ -415,7 +415,7 @@ impl Cpu<'_> {
                         let result = val.wrapping_add(operand);
                         self.set_flag(CARRY, result < val);
                         self.set_flag(SUBTRACT, false);
-                        self.set_flag(HALF_CARRY, (result & 0xF) < (val & 0xF));
+                        self.set_flag(HALF_CARRY, (result & 0xF00) < (val & 0xF00));
                         self.write_byte_or_word(dest, None, Some(result));
                         self.cycles_to_next += match dest {
                             AddrMode::RegisterPair(RegisterPair::IXP)
@@ -764,7 +764,7 @@ impl Cpu<'_> {
                     self.set_flag(PARITY_OVERFLOW, Self::overflow_16(val, operand, result));
                     self.set_flag(SIGN, result & 0x8000 > 1);
                     self.set_flag(SUBTRACT, true);
-                    self.set_flag(HALF_CARRY, (result & 0xF) > (val & 0xF));
+                    self.set_flag(HALF_CARRY, (result & 0xF00) > (val & 0xF00));
                     self.write_byte_or_word(dest, None, Some(result));
                     self.cycles_to_next += 15;
                 }
