@@ -495,6 +495,10 @@ impl Cpu<'_> {
                     _ => panic!(),
                 };
             }
+            Opcode::DI => {
+                self.interrupt_enabled = false;
+                self.cycles_to_next += 4;
+            }
             Opcode::DJNZ => {
                 let displacement = self.read_addr(self.pc) as i8;
                 self.pc += 1;
@@ -520,6 +524,10 @@ impl Cpu<'_> {
                     (AddrMode::RegisterIndirect(_), AddrMode::RegisterPair(_)) => 19,
                     _ => panic!(),
                 }
+            }
+            Opcode::EI => {
+                self.interrupt_enabled = true;
+                self.cycles_to_next += 4;
             }
             Opcode::EX_AF => {
                 self.af_bank = 1 - self.af_bank;
