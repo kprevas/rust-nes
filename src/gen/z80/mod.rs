@@ -411,7 +411,11 @@ impl Cpu<'_> {
                         self.set_flag(CARRY, result < val);
                         self.set_flag(SUBTRACT, false);
                         self.write_byte_or_word(dest, None, Some(result));
-                        self.cycles_to_next += 11;
+                        self.cycles_to_next += match dest {
+                            AddrMode::RegisterPair(RegisterPair::IXP)
+                            | AddrMode::RegisterPair(RegisterPair::IYP) => 15,
+                            _ => 11,
+                        };
                     }
                     _ => {
                         let val = self.read_byte(dest).unwrap();
@@ -722,6 +726,41 @@ impl Cpu<'_> {
                 self.set_flag(HALF_CARRY, false);
                 self.cycles_to_next += 4;
             }
+            Opcode::SBC(dest, src) => match (dest, src) {
+                (AddrMode::RegisterPair(_), AddrMode::RegisterPair(_)) => {
+                    let val = self.read_word(dest).unwrap();
+                    let operand = self.read_word(src).unwrap();
+                    let result = val.wrapping_sub(operand).wrapping_sub(if self.flag(CARRY) {
+                        1
+                    } else {
+                        0
+                    });
+                    self.set_flag(CARRY, result > val);
+                    self.set_flag(ZERO, result == 0);
+                    self.set_flag(PARITY_OVERFLOW, (result as i8) > (val as i8));
+                    self.set_flag(SIGN, result & 0x8000 > 1);
+                    self.set_flag(SUBTRACT, true);
+                    self.write_byte_or_word(dest, None, Some(result));
+                    self.cycles_to_next += 15;
+                }
+                _ => {
+                    let val = self.read_byte(dest).unwrap();
+                    let operand = self.read_byte(src).unwrap();
+                    let result = val.wrapping_sub(operand).wrapping_sub(if self.flag(CARRY) {
+                        1
+                    } else {
+                        0
+                    });
+                    self.set_flag(CARRY, result > val);
+                    self.set_flag(ZERO, result == 0);
+                    self.set_flag(PARITY_OVERFLOW, (result as i8) > (val as i8));
+                    self.set_flag(SIGN, result & 0x80 > 1);
+                    self.set_flag(SUBTRACT, true);
+                    self.set_flag(HALF_CARRY, (result & 0xF) > (val & 0xF));
+                    self.write_byte_or_word(dest, Some(result), None);
+                    self.cycles_to_next += Self::arithmetic_cycles(src);
+                }
+            },
             _ => panic!("{:?}", opcode),
         }
     }
