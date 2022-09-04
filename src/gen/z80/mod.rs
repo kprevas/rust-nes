@@ -870,6 +870,12 @@ pub mod testing {
             self.write_word(0x6, self.sp);
         }
 
+        pub fn step(&mut self) {
+            self.next_operation();
+            self.cycle_count += self.cycles_to_next as u64;
+            self.cycles_to_next = 0;
+        }
+
         pub fn output_test_string(&self) {
             let mut n = self.de[self.register_bank] as usize;
             let test_ram: &[u8] = self.test_ram.as_ref().unwrap().borrow();

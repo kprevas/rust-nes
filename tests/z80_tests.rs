@@ -20,7 +20,7 @@ fn run_test(ram: &[u8], success_msg_addr: u16) {
     cpu.set_pc(0x100);
     cpu.load_ram(0x100, ram);
     let mut output = false;
-    while cpu.get_pc() != 0 && !cpu.stopped {
+    while cpu.get_pc() != 0 && !cpu.stopped && cpu.get_cycle_count() < 46734978649 {
         if cpu.get_pc() == 5 {
             if !output {
                 cpu.output_test_string();
@@ -29,7 +29,7 @@ fn run_test(ram: &[u8], success_msg_addr: u16) {
         } else {
             output = false;
         }
-        cpu.tick()
+        cpu.step()
     }
     assert_eq!(cpu.get_pc(), 0);
     assert_eq!(cpu.get_de(), success_msg_addr)
