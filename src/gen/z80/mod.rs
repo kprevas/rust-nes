@@ -698,6 +698,14 @@ impl Cpu<'_> {
                     5
                 };
             }
+            Opcode::RLCA => {
+                let result = self.a[self.af_bank].rotate_left(1);
+                self.a[self.af_bank] = result;
+                self.set_flag(CARRY, result & 0x1 > 0);
+                self.set_flag(SUBTRACT, false);
+                self.set_flag(HALF_CARRY, false);
+                self.cycles_to_next += 4;
+            }
             Opcode::RRCA => {
                 let result = self.a[self.af_bank].rotate_right(1);
                 self.a[self.af_bank] = result;
