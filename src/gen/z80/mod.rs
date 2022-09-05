@@ -797,7 +797,7 @@ impl Cpu<'_> {
             }
             Opcode::JP_Register(register) => {
                 self.pc = self.read_word(AddrMode::RegisterPair(register)).unwrap();
-                self.cycles_to_next += 4;
+                self.cycles_to_next += 4 + 4 * (opcode_reads - 1);
             }
             Opcode::JR(condition) => {
                 let displacement = self.read_addr(self.pc) as i8;
