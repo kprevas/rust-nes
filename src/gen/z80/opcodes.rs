@@ -44,6 +44,7 @@ pub enum AddrMode {
     Immediate,
     Extended,
     Indexed(IndexRegister),
+    IndexedDisplacement(IndexRegister, i8),
     Register(Register),
     RegisterPair(RegisterPair),
     RegisterIndirect(RegisterPair),

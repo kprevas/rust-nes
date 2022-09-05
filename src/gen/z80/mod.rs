@@ -109,6 +109,14 @@ impl Cpu<'_> {
                 self.pc += 1;
                 Some(self.read_addr(addr))
             }
+            AddrMode::IndexedDisplacement(register, displacement) => {
+                let addr = match register {
+                    IndexRegister::IX => self.ix,
+                    IndexRegister::IY => self.iy,
+                }
+                    .wrapping_add_signed(displacement as i16);
+                Some(self.read_addr(addr))
+            }
             AddrMode::Register(register) => Some(match register {
                 Register::A => self.a[self.af_bank],
                 Register::B => (self.bc[self.register_bank] >> 8) as u8,
@@ -202,7 +210,7 @@ impl Cpu<'_> {
         &mut self,
         mode: AddrMode,
         op: &mut dyn FnMut(&mut Self) -> (Option<u8>, Option<u16>),
-    ) {
+    ) -> (Option<u8>, Option<u16>) {
         self.write_with_addr(mode, &mut |cpu, _| op(cpu))
     }
 
@@ -210,7 +218,7 @@ impl Cpu<'_> {
         &mut self,
         mode: AddrMode,
         op: &mut dyn FnMut(&mut Self, u8) -> (Option<u8>, Option<u16>),
-    ) {
+    ) -> u8 {
         match mode {
             AddrMode::Register(_) => {
                 let val = self.read_byte(mode).unwrap();
@@ -221,19 +229,22 @@ impl Cpu<'_> {
                 op(cpu, val)
             }),
         }
+            .0
+            .unwrap()
     }
 
     fn write_with_addr(
         &mut self,
         mode: AddrMode,
         op: &mut dyn FnMut(&mut Self, u16) -> (Option<u8>, Option<u16>),
-    ) {
+    ) -> (Option<u8>, Option<u16>) {
         match mode {
             AddrMode::Extended => {
                 let addr = self.read_word_addr(self.pc);
                 self.pc += 2;
                 let (byte, word) = op(self, addr);
                 self.write_byte_or_word_addr(byte, word, addr);
+                (byte, word)
             }
             AddrMode::Indexed(register) => {
                 let addr = match register {
@@ -244,9 +255,20 @@ impl Cpu<'_> {
                 self.pc += 1;
                 let (byte, word) = op(self, addr);
                 self.write_byte_or_word_addr(byte, word, addr);
+                (byte, word)
+            }
+            AddrMode::IndexedDisplacement(register, displacement) => {
+                let addr = match register {
+                    IndexRegister::IX => self.ix,
+                    IndexRegister::IY => self.iy,
+                }
+                    .wrapping_add_signed(displacement as i16);
+                let (byte, word) = op(self, addr);
+                self.write_byte_or_word_addr(byte, word, addr);
+                (byte, word)
             }
             AddrMode::Register(register) => {
-                let (byte, _) = op(self, 0);
+                let (byte, word) = op(self, 0);
                 match register {
                     Register::A => {
                         let val = byte.unwrap();
@@ -283,9 +305,10 @@ impl Cpu<'_> {
                     Register::IYH => self.iy = (self.iy & 0xFF) | ((byte.unwrap() as u16) << 8),
                     Register::IYL => self.iy = (self.iy & 0xFF00) | (byte.unwrap() as u16),
                 }
+                (byte, word)
             }
             AddrMode::RegisterPair(register) => {
-                let (_, word) = op(self, 0);
+                let (byte, word) = op(self, 0);
                 match register {
                     RegisterPair::AF => {
                         self.a[self.af_bank] = (word.unwrap() >> 8) as u8;
@@ -298,11 +321,13 @@ impl Cpu<'_> {
                     RegisterPair::IXP => self.ix = word.unwrap(),
                     RegisterPair::IYP => self.iy = word.unwrap(),
                 }
+                (byte, word)
             }
             AddrMode::RegisterIndirect(register) => {
                 let addr = self.register_addr(register);
                 let (byte, word) = op(self, addr);
                 self.write_byte_or_word_addr(byte, word, addr);
+                (byte, word)
             }
             _ => panic!(),
         }
@@ -519,7 +544,8 @@ impl Cpu<'_> {
                             cpu.set_flag(HALF_CARRY, (result & 0xF) < (val & 0xF));
                             (Some(result), None)
                         });
-                        self.cycles_to_next += Self::arithmetic_cycles(src) + 4 * (opcode_reads - 1);
+                        self.cycles_to_next +=
+                            Self::arithmetic_cycles(src) + 4 * (opcode_reads - 1);
                     }
                 }
             }
@@ -557,7 +583,8 @@ impl Cpu<'_> {
                             cpu.set_flag(HALF_CARRY, (result & 0xF) < (val & 0xF));
                             (Some(result), None)
                         });
-                        self.cycles_to_next += Self::arithmetic_cycles(src) + 4 * (opcode_reads - 1);
+                        self.cycles_to_next +=
+                            Self::arithmetic_cycles(src) + 4 * (opcode_reads - 1);
                     }
                 };
             }
@@ -583,7 +610,8 @@ impl Cpu<'_> {
                 self.cycles_to_next += 10;
             }
             Opcode::BIT(bit, mode) => {
-                let val = (self.read_byte(mode).unwrap() >> bit) & 0b1;
+                let resolved_mode = self.resolve_index_for_bit_op(mode);
+                let val = (self.read_byte(resolved_mode).unwrap() >> bit) & 0b1;
                 self.set_flag(ZERO, val == 0);
                 self.set_flag(PARITY_OVERFLOW, val == 0);
                 self.set_flag(SIGN, bit == 7 && val == 1);
@@ -894,12 +922,20 @@ impl Cpu<'_> {
                 };
             }
             Opcode::RES(bit, src, dest) => {
-                self.write(dest, &mut |cpu| {
-                    let val = cpu.read_byte(src).unwrap();
+                let resolved_src = self.resolve_index_for_bit_op(src);
+                let result = self.read_write_byte(resolved_src, &mut |_: &mut Cpu, val: u8| {
                     let mask = 1 << bit;
                     let result = val & !mask;
                     (Some(result), None)
                 });
+                if src != dest {
+                    let resolved_dest = self.resolve_index_for_bit_op(dest);
+                    self.write_byte_or_word(
+                        resolved_dest,
+                        Some(result),
+                        None,
+                    );
+                }
                 self.cycles_to_next += Self::bit_op_cycles(src);
             }
             Opcode::RET(condition) => {
@@ -915,8 +951,9 @@ impl Cpu<'_> {
                     5
                 };
             }
-            Opcode::RL(dest, src) => {
-                let rl = &mut |cpu: &mut Cpu, val: u8| {
+            Opcode::RL(src, dest) => {
+                let resolved_src = self.resolve_index_for_bit_op(src);
+                let result = self.read_write_byte(resolved_src, &mut |cpu: &mut Cpu, val: u8| {
                     let carry_bit = val >> 7;
                     let result = val << 1 | if cpu.flag(CARRY) { 1 } else { 0 };
                     cpu.set_flag(CARRY, carry_bit > 0);
@@ -926,14 +963,10 @@ impl Cpu<'_> {
                     cpu.set_flag(SUBTRACT, false);
                     cpu.set_flag(HALF_CARRY, false);
                     (Some(result), None)
-                };
-                if src == dest {
-                    self.read_write_byte(dest, rl);
-                } else {
-                    self.write(dest, &mut |cpu| {
-                        let val = cpu.read_byte(src).unwrap();
-                        rl(cpu, val)
-                    });
+                });
+                if src != dest {
+                    let resolved_dest = self.resolve_index_for_bit_op(dest);
+                    self.write_byte_or_word(resolved_dest, Some(result), None);
                 }
                 self.cycles_to_next += Self::bit_op_cycles(src);
             }
@@ -946,9 +979,10 @@ impl Cpu<'_> {
                 self.set_flag(HALF_CARRY, false);
                 self.cycles_to_next += 4;
             }
-            Opcode::RLC(dest, src) => {
-                self.write(dest, &mut |cpu| {
-                    let result = cpu.read_byte(src).unwrap().rotate_left(1);
+            Opcode::RLC(src, dest) => {
+                let resolved_src = self.resolve_index_for_bit_op(src);
+                let result = self.read_write_byte(resolved_src, &mut |cpu: &mut Cpu, val: u8| {
+                    let result = val.rotate_left(1);
                     cpu.set_flag(CARRY, result & 0x1 > 0);
                     cpu.set_flag(ZERO, result == 0);
                     cpu.set_flag(PARITY_OVERFLOW, Self::parity(result));
@@ -957,6 +991,10 @@ impl Cpu<'_> {
                     cpu.set_flag(HALF_CARRY, false);
                     (Some(result), None)
                 });
+                if src != dest {
+                    let resolved_dest = self.resolve_index_for_bit_op(dest);
+                    self.write_byte_or_word(resolved_dest, Some(result), None);
+                }
                 self.cycles_to_next += Self::bit_op_cycles(src);
             }
             Opcode::RLCA => {
@@ -967,8 +1005,9 @@ impl Cpu<'_> {
                 self.set_flag(HALF_CARRY, false);
                 self.cycles_to_next += 4;
             }
-            Opcode::RR(dest, src) => {
-                let rr = &mut |cpu: &mut Cpu, val: u8| {
+            Opcode::RR(src, dest) => {
+                let resolved_src = self.resolve_index_for_bit_op(src);
+                let result = self.read_write_byte(resolved_src, &mut |cpu: &mut Cpu, val: u8| {
                     let carry_bit = val & 0x1;
                     let result = val >> 1 | if cpu.flag(CARRY) { 0x80 } else { 0 };
                     cpu.set_flag(CARRY, carry_bit > 0);
@@ -978,14 +1017,10 @@ impl Cpu<'_> {
                     cpu.set_flag(SUBTRACT, false);
                     cpu.set_flag(HALF_CARRY, false);
                     (Some(result), None)
-                };
-                if src == dest {
-                    self.read_write_byte(dest, rr);
-                } else {
-                    self.write(dest, &mut |cpu| {
-                        let val = cpu.read_byte(src).unwrap();
-                        rr(cpu, val)
-                    });
+                });
+                if src != dest {
+                    let resolved_dest = self.resolve_index_for_bit_op(dest);
+                    self.write_byte_or_word(resolved_dest, Some(result), None);
                 }
                 self.cycles_to_next += Self::bit_op_cycles(src);
             }
@@ -998,9 +1033,10 @@ impl Cpu<'_> {
                 self.set_flag(HALF_CARRY, false);
                 self.cycles_to_next += 4;
             }
-            Opcode::RRC(dest, src) => {
-                self.write(dest, &mut |cpu| {
-                    let result = cpu.read_byte(src).unwrap().rotate_right(1);
+            Opcode::RRC(src, dest) => {
+                let resolved_src = self.resolve_index_for_bit_op(src);
+                let result = self.read_write_byte(resolved_src, &mut |cpu: &mut Cpu, val: u8| {
+                    let result = val.rotate_right(1);
                     cpu.set_flag(CARRY, result & 0x80 > 0);
                     cpu.set_flag(ZERO, result == 0);
                     cpu.set_flag(PARITY_OVERFLOW, Self::parity(result));
@@ -1009,6 +1045,10 @@ impl Cpu<'_> {
                     cpu.set_flag(HALF_CARRY, false);
                     (Some(result), None)
                 });
+                if src != dest {
+                    let resolved_dest = self.resolve_index_for_bit_op(dest);
+                    self.write_byte_or_word(resolved_dest, Some(result), None);
+                }
                 self.cycles_to_next += Self::bit_op_cycles(src);
             }
             Opcode::RRCA => {
@@ -1024,50 +1064,50 @@ impl Cpu<'_> {
                 self.pc = pc as u16;
                 self.cycles_to_next += 11;
             }
-            Opcode::SBC(dest, src) => {
-                match (dest, src) {
-                    (AddrMode::RegisterPair(_), AddrMode::RegisterPair(_)) => {
-                        let val = self.read_word(dest).unwrap();
-                        let operand = self.read_word(src).unwrap();
-                        let result = val.wrapping_sub(operand).wrapping_sub(if self.flag(CARRY) {
+            Opcode::SBC(dest, src) => match (dest, src) {
+                (AddrMode::RegisterPair(_), AddrMode::RegisterPair(_)) => {
+                    let val = self.read_word(dest).unwrap();
+                    let operand = self.read_word(src).unwrap();
+                    let result = val.wrapping_sub(operand).wrapping_sub(if self.flag(CARRY) {
+                        1
+                    } else {
+                        0
+                    });
+                    self.set_flag(CARRY, result > val);
+                    self.set_flag(ZERO, result == 0);
+                    self.set_flag(
+                        PARITY_OVERFLOW,
+                        Self::overflow_16(val, operand, result, true),
+                    );
+                    self.set_flag(SIGN, result & 0x8000 > 1);
+                    self.set_flag(SUBTRACT, true);
+                    self.set_flag(HALF_CARRY, (result & 0xF00) > (val & 0xF00));
+                    self.write_byte_or_word(dest, None, Some(result));
+                    self.cycles_to_next += 15;
+                }
+                _ => {
+                    self.write(dest, &mut |cpu| {
+                        let val = cpu.read_byte(dest).unwrap();
+                        let operand = cpu.read_byte(src).unwrap();
+                        let result = val.wrapping_sub(operand).wrapping_sub(if cpu.flag(CARRY) {
                             1
                         } else {
                             0
                         });
-                        self.set_flag(CARRY, result > val);
-                        self.set_flag(ZERO, result == 0);
-                        self.set_flag(
+                        cpu.set_flag(CARRY, result > val);
+                        cpu.set_flag(ZERO, result == 0);
+                        cpu.set_flag(
                             PARITY_OVERFLOW,
-                            Self::overflow_16(val, operand, result, true),
+                            Self::overflow_8(val, operand, result, true),
                         );
-                        self.set_flag(SIGN, result & 0x8000 > 1);
-                        self.set_flag(SUBTRACT, true);
-                        self.set_flag(HALF_CARRY, (result & 0xF00) > (val & 0xF00));
-                        self.write_byte_or_word(dest, None, Some(result));
-                        self.cycles_to_next += 15;
-                    }
-                    _ => {
-                        self.write(dest, &mut |cpu| {
-                            let val = cpu.read_byte(dest).unwrap();
-                            let operand = cpu.read_byte(src).unwrap();
-                            let result = val
-                                .wrapping_sub(operand)
-                                .wrapping_sub(if cpu.flag(CARRY) { 1 } else { 0 });
-                            cpu.set_flag(CARRY, result > val);
-                            cpu.set_flag(ZERO, result == 0);
-                            cpu.set_flag(
-                                PARITY_OVERFLOW,
-                                Self::overflow_8(val, operand, result, true),
-                            );
-                            cpu.set_flag(SIGN, result & 0x80 > 1);
-                            cpu.set_flag(SUBTRACT, true);
-                            cpu.set_flag(HALF_CARRY, (result & 0xF) > (val & 0xF));
-                            (Some(result), None)
-                        });
-                        self.cycles_to_next += Self::arithmetic_cycles(src) + 4 * (opcode_reads - 1);
-                    }
+                        cpu.set_flag(SIGN, result & 0x80 > 1);
+                        cpu.set_flag(SUBTRACT, true);
+                        cpu.set_flag(HALF_CARRY, (result & 0xF) > (val & 0xF));
+                        (Some(result), None)
+                    });
+                    self.cycles_to_next += Self::arithmetic_cycles(src) + 4 * (opcode_reads - 1);
                 }
-            }
+            },
             Opcode::SCF => {
                 self.set_flag(CARRY, true);
                 self.set_flag(SUBTRACT, false);
@@ -1075,16 +1115,25 @@ impl Cpu<'_> {
                 self.cycles_to_next += 4;
             }
             Opcode::SET(bit, src, dest) => {
-                self.write(dest, &mut |cpu| {
-                    let val = cpu.read_byte(src).unwrap();
+                let resolved_src = self.resolve_index_for_bit_op(src);
+                let result = self.read_write_byte(resolved_src, &mut |_: &mut Cpu, val: u8| {
                     let mask = 1 << bit;
                     let result = (val & !mask) | mask;
                     (Some(result), None)
                 });
+                if src != dest {
+                    let resolved_dest = self.resolve_index_for_bit_op(dest);
+                    self.write_byte_or_word(
+                        resolved_dest,
+                        Some(result),
+                        None,
+                    );
+                }
                 self.cycles_to_next += Self::bit_op_cycles(src);
             }
-            Opcode::SLA(dest, src) => {
-                let sla = &mut |cpu: &mut Cpu, val: u8| {
+            Opcode::SLA(src, dest) => {
+                let resolved_src = self.resolve_index_for_bit_op(src);
+                let result = self.read_write_byte(resolved_src, &mut |cpu: &mut Cpu, val: u8| {
                     let carry_bit = val >> 7;
                     let result = val << 1;
                     cpu.set_flag(CARRY, carry_bit > 0);
@@ -1094,19 +1143,16 @@ impl Cpu<'_> {
                     cpu.set_flag(SUBTRACT, false);
                     cpu.set_flag(HALF_CARRY, false);
                     (Some(result), None)
-                };
-                if src == dest {
-                    self.read_write_byte(dest, sla);
-                } else {
-                    self.write(dest, &mut |cpu| {
-                        let val = cpu.read_byte(src).unwrap();
-                        sla(cpu, val)
-                    });
+                });
+                if src != dest {
+                    let resolved_dest = self.resolve_index_for_bit_op(dest);
+                    self.write_byte_or_word(resolved_dest, Some(result), None);
                 }
                 self.cycles_to_next += Self::bit_op_cycles(src);
             }
-            Opcode::SLL(dest, src) => {
-                let sll = &mut |cpu: &mut Cpu, val: u8| {
+            Opcode::SLL(src, dest) => {
+                let resolved_src = self.resolve_index_for_bit_op(src);
+                let result = self.read_write_byte(resolved_src, &mut |cpu: &mut Cpu, val: u8| {
                     let carry_bit = val >> 7;
                     let result = val << 1 | 0x1;
                     cpu.set_flag(CARRY, carry_bit > 0);
@@ -1116,19 +1162,16 @@ impl Cpu<'_> {
                     cpu.set_flag(SUBTRACT, false);
                     cpu.set_flag(HALF_CARRY, false);
                     (Some(result), None)
-                };
-                if src == dest {
-                    self.read_write_byte(dest, sll);
-                } else {
-                    self.write(dest, &mut |cpu| {
-                        let val = cpu.read_byte(src).unwrap();
-                        sll(cpu, val)
-                    });
+                });
+                if src != dest {
+                    let resolved_dest = self.resolve_index_for_bit_op(dest);
+                    self.write_byte_or_word(resolved_dest, Some(result), None);
                 }
                 self.cycles_to_next += Self::bit_op_cycles(src);
             }
-            Opcode::SRA(dest, src) => {
-                let sra = &mut |cpu: &mut Cpu, val: u8| {
+            Opcode::SRA(src, dest) => {
+                let resolved_src = self.resolve_index_for_bit_op(src);
+                let result = self.read_write_byte(resolved_src, &mut |cpu: &mut Cpu, val: u8| {
                     let carry_bit = val & 0x1;
                     let result = ((val as i8) >> 1) as u8;
                     cpu.set_flag(CARRY, carry_bit > 0);
@@ -1138,20 +1181,16 @@ impl Cpu<'_> {
                     cpu.set_flag(SUBTRACT, false);
                     cpu.set_flag(HALF_CARRY, false);
                     (Some(result), None)
-                };
-                if src == dest {
-                    self.read_write_byte(dest, sra);
-                } else {
-                    self.write(dest, &mut |cpu| {
-                        let val = cpu.read_byte(src).unwrap();
-                        sra(cpu, val)
-                    });
+                });
+                if src != dest {
+                    let resolved_dest = self.resolve_index_for_bit_op(dest);
+                    self.write_byte_or_word(resolved_dest, Some(result), None);
                 }
                 self.cycles_to_next += Self::bit_op_cycles(src);
             }
-            Opcode::SRL(dest, src) => {
-                self.write(dest, &mut |cpu| {
-                    let val = cpu.read_byte(src).unwrap();
+            Opcode::SRL(src, dest) => {
+                let resolved_src = self.resolve_index_for_bit_op(src);
+                let result = self.read_write_byte(resolved_src, &mut |cpu: &mut Cpu, val: u8| {
                     let carry_bit = val & 0x1;
                     let result = val >> 1;
                     cpu.set_flag(CARRY, carry_bit > 0);
@@ -1162,6 +1201,10 @@ impl Cpu<'_> {
                     cpu.set_flag(HALF_CARRY, false);
                     (Some(result), None)
                 });
+                if src != dest {
+                    let resolved_dest = self.resolve_index_for_bit_op(dest);
+                    self.write_byte_or_word(resolved_dest, Some(result), None);
+                }
                 self.cycles_to_next += Self::bit_op_cycles(src);
             }
             Opcode::SUB(src) => {
@@ -1194,7 +1237,7 @@ impl Cpu<'_> {
             _ => panic!("{:?}", opcode),
         }
 
-        self.r += opcode_reads as u8;
+        self.r += if opcode_reads == 4 { 2 } else { opcode_reads } as u8;
         self.r &= 0b1111111;
     }
 
@@ -1236,12 +1279,12 @@ impl Cpu<'_> {
         }
         match opcode {
             Opcode::IxBit => {
-                opcode = IX_BIT_INSTRUCTIONS[self.read_addr(pc) as usize];
-                pc += 1;
+                opcode = IX_BIT_INSTRUCTIONS[self.read_addr(pc + 1) as usize];
+                pc += 2;
             }
             Opcode::IyBit => {
-                opcode = IY_BIT_INSTRUCTIONS[self.read_addr(pc) as usize];
-                pc += 1;
+                opcode = IY_BIT_INSTRUCTIONS[self.read_addr(pc + 1) as usize];
+                pc += 2;
             }
             _ => {}
         }
@@ -1252,12 +1295,21 @@ impl Cpu<'_> {
         ((self.a[self.af_bank] as u16) << 8) | (self.f[self.af_bank] as u16)
     }
 
+    fn resolve_index_for_bit_op(&mut self, mode: AddrMode) -> AddrMode {
+        match mode {
+            AddrMode::Indexed(register) => {
+                AddrMode::IndexedDisplacement(register, self.read_addr(self.pc - 2) as i8)
+            }
+            _ => mode,
+        }
+    }
+
     fn arithmetic_cycles(mode: AddrMode) -> u16 {
         match mode {
             AddrMode::Register(_) => 4,
             AddrMode::Immediate | AddrMode::RegisterIndirect(_) => 7,
             AddrMode::Indexed(_) => 19,
-            AddrMode::Extended | AddrMode::RegisterPair(_) => panic!(),
+            _ => panic!(),
         }
     }
 
@@ -1266,7 +1318,7 @@ impl Cpu<'_> {
             AddrMode::Register(_) => 8,
             AddrMode::RegisterIndirect(_) => 12,
             AddrMode::Indexed(_) => 20,
-            AddrMode::Immediate | AddrMode::Extended | AddrMode::RegisterPair(_) => panic!(),
+            _ => panic!(),
         }
     }
 
@@ -1275,7 +1327,7 @@ impl Cpu<'_> {
             AddrMode::Register(_) => 8,
             AddrMode::RegisterIndirect(_) => 15,
             AddrMode::Indexed(_) => 23,
-            AddrMode::Immediate | AddrMode::Extended | AddrMode::RegisterPair(_) => panic!(),
+            _ => panic!(),
         }
     }
 
