@@ -342,15 +342,13 @@ impl Cpu<'_> {
             self.cycles_to_next = 0;
         } else {
             self.execute_opcode();
-            self.r += 1;
-            self.r &= 0b1111111;
         }
     }
 
     fn execute_opcode(&mut self) {
         let opcode_pc = self.pc;
-        let (opcode, pc) = self.opcode_pc();
-        self.pc = pc;
+        let (opcode, opcode_reads) = self.get_opcode();
+        self.pc += opcode_reads;
 
         if self.instrumented {
             debug!(target: "z80", "{:04X} {:?} A:{:02X} F:{:08b} BC:{:04X} DE:{:04X} HL:{:04X} IX:{:04X} IY:{:04X} I:{:02X} R:{:02X} SP:{:04X} {}",
@@ -885,6 +883,9 @@ impl Cpu<'_> {
             }
             _ => panic!("{:?}", opcode),
         }
+
+        self.r += opcode_reads as u8;
+        self.r &= 0b1111111;
     }
 
     fn register_addr(&mut self, register: RegisterPair) -> u16 {
@@ -899,7 +900,7 @@ impl Cpu<'_> {
         }
     }
 
-    fn opcode_pc(&mut self) -> (Opcode, u16) {
+    fn get_opcode(&mut self) -> (Opcode, u16) {
         let mut pc = self.pc;
         let opcode_hex = self.read_addr(pc) as usize;
         let mut opcode = OPCODES[opcode_hex];
@@ -934,7 +935,7 @@ impl Cpu<'_> {
             }
             _ => {}
         }
-        (opcode, pc)
+        (opcode, pc - self.pc)
     }
 
     fn af(&mut self) -> u16 {
@@ -1004,7 +1005,7 @@ pub mod testing {
         }
 
         pub fn peek_opcode(&mut self) -> Opcode {
-            self.opcode_pc().0
+            self.get_opcode().0
         }
 
         pub fn load_ram(&mut self, start: usize, src: &[u8]) {
