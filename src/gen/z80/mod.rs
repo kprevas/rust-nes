@@ -459,6 +459,12 @@ impl Cpu<'_> {
                 }
                 self.cycles_to_next += 10;
             }
+            Opcode::CCF => {
+                self.set_flag(CARRY, !self.flag(CARRY));
+                self.set_flag(SUBTRACT, false);
+                self.set_flag(HALF_CARRY, true);
+                self.cycles_to_next += 4;
+            }
             Opcode::CP(mode) => {
                 let val = self.a[self.af_bank] as i8;
                 let operand = self.read_byte(mode).unwrap() as i8;
@@ -593,6 +599,7 @@ impl Cpu<'_> {
             }
             Opcode::HALT => {
                 self.stopped = true;
+                self.pc = opcode_pc;
             }
             Opcode::INC(mode) => {
                 match mode {
@@ -830,6 +837,12 @@ impl Cpu<'_> {
                     self.cycles_to_next += Self::arithmetic_cycles(src);
                 }
             },
+            Opcode::SCF => {
+                self.set_flag(CARRY, true);
+                self.set_flag(SUBTRACT, false);
+                self.set_flag(HALF_CARRY, false);
+                self.cycles_to_next += 4;
+            }
             Opcode::XOR(mode) => {
                 let result = self.a[self.af_bank] ^ self.read_byte(mode).unwrap();
                 self.a[self.af_bank] = result;
@@ -1007,6 +1020,7 @@ pub mod testing {
             i: u8,
             r: u8,
             interupt_enabled: bool,
+            halted: bool,
             test_id: &str,
         ) {
             let flags_mask = 0b11010111;
@@ -1043,6 +1057,11 @@ pub mod testing {
             assert_eq!(
                 self.interrupt_enabled, interupt_enabled,
                 "{}   IFF",
+                test_id
+            );
+            assert_eq!(
+                self.stopped, halted,
+                "{}   HALT",
                 test_id
             );
         }

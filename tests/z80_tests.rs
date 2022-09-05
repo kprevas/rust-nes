@@ -98,7 +98,7 @@ fn run_json_test(initial: &JsonValue, expected: &JsonValue) {
     let test_id = format!("{} - {:?}", initial["name"].as_str().unwrap(), cpu.peek_opcode());
     let cycles = expected["state"]["tStates"].as_u64().unwrap();
 
-    while cpu.get_cycle_count() < cycles {
+    while cpu.get_cycle_count() < cycles && !cpu.stopped {
         cpu.step();
     }
 
@@ -127,6 +127,7 @@ fn run_json_test(initial: &JsonValue, expected: &JsonValue) {
         expected_state["i"].as_u8().unwrap(),
         expected_state["r"].as_u8().unwrap(),
         expected_state["iff1"].as_bool().unwrap(),
+        expected_state["halted"].as_bool().unwrap(),
         &test_id,
     );
     for mem in expected["memory"].members() {
