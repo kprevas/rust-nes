@@ -761,6 +761,13 @@ impl Cpu<'_> {
                     _ => 11,
                 };
             }
+            Opcode::RES(bit, src, dest) => {
+                let val = self.read_byte(src).unwrap();
+                let mask = 1 << bit;
+                let result = val & !mask;
+                self.write_byte_or_word(dest, Some(result), None);
+                self.cycles_to_next += Self::bit_op_cycles(src);
+            }
             Opcode::RET(condition) => {
                 let condition_val = self.condition(condition);
                 if condition_val {
@@ -902,6 +909,13 @@ impl Cpu<'_> {
                 self.set_flag(SUBTRACT, false);
                 self.set_flag(HALF_CARRY, false);
                 self.cycles_to_next += 4;
+            }
+            Opcode::SET(bit, src, dest) => {
+                let val = self.read_byte(src).unwrap();
+                let mask = 1 << bit;
+                let result = (val & !mask) | mask;
+                self.write_byte_or_word(dest, Some(result), None);
+                self.cycles_to_next += Self::bit_op_cycles(src);
             }
             Opcode::SLA(dest, src) => {
                 let val = self.read_byte(src).unwrap();
