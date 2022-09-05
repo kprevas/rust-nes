@@ -806,6 +806,19 @@ impl Cpu<'_> {
                 self.set_flag(HALF_CARRY, false);
                 self.cycles_to_next += 4;
             }
+            Opcode::RR(dest, src) => {
+                let val = self.read_byte(src).unwrap();
+                let carry_bit = val & 0x1;
+                let result = val >> 1 | if self.flag(CARRY) { 0x80 } else { 0 };
+                self.write_byte_or_word(dest, Some(result), None);
+                self.set_flag(CARRY, carry_bit > 0);
+                self.set_flag(ZERO, result == 0);
+                self.set_flag(PARITY_OVERFLOW, Self::parity(result));
+                self.set_flag(SIGN, result & 0x80 > 0);
+                self.set_flag(SUBTRACT, false);
+                self.set_flag(HALF_CARRY, false);
+                self.cycles_to_next += Self::bit_op_cycles(src);
+            }
             Opcode::RRA => {
                 let carry_bit = self.a[self.af_bank] & 0x1;
                 let result = self.a[self.af_bank] >> 1 | if self.flag(CARRY) { 0x80 } else { 0 };
