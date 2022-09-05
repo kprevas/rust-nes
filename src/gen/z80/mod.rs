@@ -382,7 +382,7 @@ impl Cpu<'_> {
                     });
                     self.set_flag(CARRY, result < val);
                     self.set_flag(ZERO, result == 0);
-                    self.set_flag(PARITY_OVERFLOW, Self::overflow_16(val, operand, result));
+                    self.set_flag(PARITY_OVERFLOW, Self::overflow_16(val, operand, result, false));
                     self.set_flag(SIGN, result & 0x8000 > 1);
                     self.set_flag(SUBTRACT, false);
                     self.set_flag(HALF_CARRY, (result & 0xF00) < (val & 0xF00));
@@ -399,7 +399,7 @@ impl Cpu<'_> {
                     });
                     self.set_flag(CARRY, result < val);
                     self.set_flag(ZERO, result == 0);
-                    self.set_flag(PARITY_OVERFLOW, Self::overflow_8(val, operand, result));
+                    self.set_flag(PARITY_OVERFLOW, Self::overflow_8(val, operand, result, false));
                     self.set_flag(SIGN, result & 0x80 > 1);
                     self.set_flag(SUBTRACT, false);
                     self.set_flag(HALF_CARRY, (result & 0xF) < (val & 0xF));
@@ -429,7 +429,7 @@ impl Cpu<'_> {
                         let result = val.wrapping_add(operand);
                         self.set_flag(CARRY, result < val);
                         self.set_flag(ZERO, result == 0);
-                        self.set_flag(PARITY_OVERFLOW, Self::overflow_8(val, operand, result));
+                        self.set_flag(PARITY_OVERFLOW, Self::overflow_8(val, operand, result, false));
                         self.set_flag(SIGN, result & 0x80 > 1);
                         self.set_flag(SUBTRACT, false);
                         self.set_flag(HALF_CARRY, (result & 0xF) < (val & 0xF));
@@ -812,7 +812,7 @@ impl Cpu<'_> {
                     });
                     self.set_flag(CARRY, result > val);
                     self.set_flag(ZERO, result == 0);
-                    self.set_flag(PARITY_OVERFLOW, Self::overflow_16(val, operand, result));
+                    self.set_flag(PARITY_OVERFLOW, Self::overflow_16(val, operand, result, true));
                     self.set_flag(SIGN, result & 0x8000 > 1);
                     self.set_flag(SUBTRACT, true);
                     self.set_flag(HALF_CARRY, (result & 0xF00) > (val & 0xF00));
@@ -829,7 +829,7 @@ impl Cpu<'_> {
                     });
                     self.set_flag(CARRY, result > val);
                     self.set_flag(ZERO, result == 0);
-                    self.set_flag(PARITY_OVERFLOW, Self::overflow_8(val, operand, result));
+                    self.set_flag(PARITY_OVERFLOW, Self::overflow_8(val, operand, result, true));
                     self.set_flag(SIGN, result & 0x80 > 1);
                     self.set_flag(SUBTRACT, true);
                     self.set_flag(HALF_CARRY, (result & 0xF) > (val & 0xF));
@@ -842,6 +842,19 @@ impl Cpu<'_> {
                 self.set_flag(SUBTRACT, false);
                 self.set_flag(HALF_CARRY, false);
                 self.cycles_to_next += 4;
+            }
+            Opcode::SUB(src) => {
+                let val = self.read_byte(AddrMode::Register(Register::A)).unwrap();
+                let operand = self.read_byte(src).unwrap();
+                let result = val.wrapping_sub(operand);
+                self.set_flag(CARRY, result > val);
+                self.set_flag(ZERO, result == 0);
+                self.set_flag(PARITY_OVERFLOW, Self::overflow_8(val, operand, result, true));
+                self.set_flag(SIGN, result & 0x80 > 1);
+                self.set_flag(SUBTRACT, true);
+                self.set_flag(HALF_CARRY, (result & 0xF) > (val & 0xF));
+                self.write_byte_or_word(AddrMode::Register(Register::A), Some(result), None);
+                self.cycles_to_next += Self::arithmetic_cycles(src);
             }
             Opcode::XOR(mode) => {
                 let result = self.a[self.af_bank] ^ self.read_byte(mode).unwrap();
@@ -921,14 +934,18 @@ impl Cpu<'_> {
         }
     }
 
-    fn overflow_8(op1: u8, op2: u8, result: u8) -> bool {
+    fn overflow_8(op1: u8, op2: u8, result: u8, subtract: bool) -> bool {
         let result_sign = result & 0x80 > 0;
-        ((op1 & 0x80 > 0) ^ result_sign) && ((op2 & 0x80 > 0) ^ result_sign)
+        let op1_sign = op1 & 0x80 > 0;
+        let op2_sign = op2 & 0x80 > 0;
+        ((op1_sign ^ op2_sign) ^ (!subtract)) & (op1_sign ^ result_sign)
     }
 
-    fn overflow_16(op1: u16, op2: u16, result: u16) -> bool {
+    fn overflow_16(op1: u16, op2: u16, result: u16, subtract: bool) -> bool {
         let result_sign = result & 0x8000 > 0;
-        ((op1 & 0x8000 > 0) ^ result_sign) && ((op2 & 0x8000 > 0) ^ result_sign)
+        let op1_sign = op1 & 0x8000 > 0;
+        let op2_sign = op2 & 0x8000 > 0;
+        ((op1_sign ^ op2_sign) ^ (!subtract)) & (op1_sign ^ result_sign)
     }
 
     fn parity(val: u8) -> bool {
@@ -1025,7 +1042,12 @@ pub mod testing {
         ) {
             let flags_mask = 0b11010111;
             assert_eq!(self.a[self.af_bank], (af[0] >> 8) as u8, "{}   A", test_id);
-            assert_eq!(self.a[1 - self.af_bank], (af[1] >> 8) as u8, "{}   A'", test_id);
+            assert_eq!(
+                self.a[1 - self.af_bank],
+                (af[1] >> 8) as u8,
+                "{}   A'",
+                test_id
+            );
             assert_eq!(
                 self.f[self.af_bank] & flags_mask,
                 (af[0] & 0xFF) as u8 & flags_mask,
@@ -1059,11 +1081,7 @@ pub mod testing {
                 "{}   IFF",
                 test_id
             );
-            assert_eq!(
-                self.stopped, halted,
-                "{}   HALT",
-                test_id
-            );
+            assert_eq!(self.stopped, halted, "{}   HALT", test_id);
         }
 
         pub fn poke_ram(&mut self, addr: usize, data: &[u8]) {
