@@ -457,6 +457,15 @@ impl Cpu<'_> {
                 }
                 self.cycles_to_next += 10;
             }
+            Opcode::BIT(bit, mode) => {
+                let val = (self.read_byte(mode).unwrap() >> bit) & 0b1;
+                self.set_flag(ZERO, val == 0);
+                self.set_flag(PARITY_OVERFLOW, val == 0);
+                self.set_flag(SIGN, bit == 7 && val == 1);
+                self.set_flag(SUBTRACT, false);
+                self.set_flag(HALF_CARRY, true);
+                self.cycles_to_next += Self::bit_test_cycles(mode);
+            }
             Opcode::CCF => {
                 self.set_flag(CARRY, !self.flag(CARRY));
                 self.set_flag(SUBTRACT, false);
@@ -1037,6 +1046,15 @@ impl Cpu<'_> {
             AddrMode::Immediate | AddrMode::RegisterIndirect(_) => 7,
             AddrMode::Indexed(_) => 19,
             AddrMode::Extended | AddrMode::RegisterPair(_) => panic!(),
+        }
+    }
+
+    fn bit_test_cycles(mode: AddrMode) -> u16 {
+        match mode {
+            AddrMode::Register(_) => 8,
+            AddrMode::RegisterIndirect(_) => 12,
+            AddrMode::Indexed(_) => 20,
+            AddrMode::Immediate | AddrMode::Extended | AddrMode::RegisterPair(_) => panic!(),
         }
     }
 
