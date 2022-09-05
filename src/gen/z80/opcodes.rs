@@ -5,7 +5,7 @@ use gen::z80::opcodes::Opcode::*;
 use gen::z80::opcodes::Register::*;
 use gen::z80::opcodes::RegisterPair::*;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Register {
     A,
     B,
@@ -22,7 +22,7 @@ pub enum Register {
     IYL,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum RegisterPair {
     AF,
     BC,
@@ -33,13 +33,13 @@ pub enum RegisterPair {
     IYP,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum IndexRegister {
     IX,
     IY,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum AddrMode {
     Immediate,
     Extended,
