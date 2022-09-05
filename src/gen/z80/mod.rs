@@ -380,7 +380,10 @@ impl Cpu<'_> {
                     });
                     self.set_flag(CARRY, result < val);
                     self.set_flag(ZERO, result == 0);
-                    self.set_flag(PARITY_OVERFLOW, Self::overflow_16(val, operand, result, false));
+                    self.set_flag(
+                        PARITY_OVERFLOW,
+                        Self::overflow_16(val, operand, result, false),
+                    );
                     self.set_flag(SIGN, result & 0x8000 > 1);
                     self.set_flag(SUBTRACT, false);
                     self.set_flag(HALF_CARRY, (result & 0xF00) < (val & 0xF00));
@@ -397,7 +400,10 @@ impl Cpu<'_> {
                     });
                     self.set_flag(CARRY, result < val);
                     self.set_flag(ZERO, result == 0);
-                    self.set_flag(PARITY_OVERFLOW, Self::overflow_8(val, operand, result, false));
+                    self.set_flag(
+                        PARITY_OVERFLOW,
+                        Self::overflow_8(val, operand, result, false),
+                    );
                     self.set_flag(SIGN, result & 0x80 > 1);
                     self.set_flag(SUBTRACT, false);
                     self.set_flag(HALF_CARRY, (result & 0xF) < (val & 0xF));
@@ -427,7 +433,10 @@ impl Cpu<'_> {
                         let result = val.wrapping_add(operand);
                         self.set_flag(CARRY, result < val);
                         self.set_flag(ZERO, result == 0);
-                        self.set_flag(PARITY_OVERFLOW, Self::overflow_8(val, operand, result, false));
+                        self.set_flag(
+                            PARITY_OVERFLOW,
+                            Self::overflow_8(val, operand, result, false),
+                        );
                         self.set_flag(SIGN, result & 0x80 > 1);
                         self.set_flag(SUBTRACT, false);
                         self.set_flag(HALF_CARRY, (result & 0xF) < (val & 0xF));
@@ -537,7 +546,9 @@ impl Cpu<'_> {
                     AddrMode::Indexed(_)
                     | AddrMode::Register(_)
                     | AddrMode::RegisterIndirect(_) => {
+                        let pc = self.pc;
                         let operand = self.read_byte(mode).unwrap();
+                        self.pc = pc;
                         let val = operand.wrapping_sub(1);
                         self.set_flag(ZERO, val == 0);
                         self.set_flag(PARITY_OVERFLOW, val == 0x7F);
@@ -552,15 +563,7 @@ impl Cpu<'_> {
                     }
                     _ => panic!(),
                 }
-                self.cycles_to_next += match mode {
-                    AddrMode::Indexed(_) => 23,
-                    AddrMode::Register(_) => 4,
-                    AddrMode::RegisterPair(RegisterPair::IXP)
-                    | AddrMode::RegisterPair(RegisterPair::IYP) => 10,
-                    AddrMode::RegisterPair(_) => 6,
-                    AddrMode::RegisterIndirect(_) => 11,
-                    _ => panic!(),
-                };
+                self.cycles_to_next += Self::inc_dec_cycles(mode) + 4 * (opcode_reads - 1);
             }
             Opcode::DI => {
                 self.interrupt_enabled = false;
@@ -622,7 +625,9 @@ impl Cpu<'_> {
                     AddrMode::Indexed(_)
                     | AddrMode::Register(_)
                     | AddrMode::RegisterIndirect(_) => {
+                        let pc = self.pc;
                         let operand = self.read_byte(mode).unwrap();
+                        self.pc = pc;
                         let val = operand.wrapping_add(1);
                         self.set_flag(ZERO, val == 0);
                         self.set_flag(PARITY_OVERFLOW, val == 0x80);
@@ -637,15 +642,7 @@ impl Cpu<'_> {
                     }
                     _ => panic!(),
                 }
-                self.cycles_to_next += match mode {
-                    AddrMode::Indexed(_) => 23,
-                    AddrMode::Register(_) => 4,
-                    AddrMode::RegisterPair(RegisterPair::IXP)
-                    | AddrMode::RegisterPair(RegisterPair::IYP) => 10,
-                    AddrMode::RegisterPair(_) => 6,
-                    AddrMode::RegisterIndirect(_) => 11,
-                    _ => panic!(),
-                };
+                self.cycles_to_next += Self::inc_dec_cycles(mode) + 4 * (opcode_reads - 1);
             }
             Opcode::JP(condition) => {
                 let addr = self.read_word_addr(self.pc);
@@ -712,7 +709,7 @@ impl Cpu<'_> {
                     (AddrMode::RegisterPair(_), AddrMode::Extended)
                     | (AddrMode::Extended, AddrMode::RegisterPair(_)) => 20,
                     _ => panic!("{:?}", opcode),
-                };
+                } + 4 * (opcode_reads - 1);
             }
             Opcode::LDD | Opcode::LDDR | Opcode::LDI | Opcode::LDIR => {
                 let val = self.read_byte(AddrMode::RegisterIndirect(RegisterPair::HL));
@@ -739,7 +736,7 @@ impl Cpu<'_> {
                 self.set_flag(HALF_CARRY, false);
             }
             Opcode::NOP => {
-                self.cycles_to_next += 4;
+                self.cycles_to_next += 4 * opcode_reads;
             }
             Opcode::OR(mode) => {
                 let result = self.a[self.af_bank] | self.read_byte(mode).unwrap();
@@ -897,7 +894,10 @@ impl Cpu<'_> {
                     });
                     self.set_flag(CARRY, result > val);
                     self.set_flag(ZERO, result == 0);
-                    self.set_flag(PARITY_OVERFLOW, Self::overflow_16(val, operand, result, true));
+                    self.set_flag(
+                        PARITY_OVERFLOW,
+                        Self::overflow_16(val, operand, result, true),
+                    );
                     self.set_flag(SIGN, result & 0x8000 > 1);
                     self.set_flag(SUBTRACT, true);
                     self.set_flag(HALF_CARRY, (result & 0xF00) > (val & 0xF00));
@@ -914,7 +914,10 @@ impl Cpu<'_> {
                     });
                     self.set_flag(CARRY, result > val);
                     self.set_flag(ZERO, result == 0);
-                    self.set_flag(PARITY_OVERFLOW, Self::overflow_8(val, operand, result, true));
+                    self.set_flag(
+                        PARITY_OVERFLOW,
+                        Self::overflow_8(val, operand, result, true),
+                    );
                     self.set_flag(SIGN, result & 0x80 > 1);
                     self.set_flag(SUBTRACT, true);
                     self.set_flag(HALF_CARRY, (result & 0xF) > (val & 0xF));
@@ -993,7 +996,10 @@ impl Cpu<'_> {
                 let result = val.wrapping_sub(operand);
                 self.set_flag(CARRY, result > val);
                 self.set_flag(ZERO, result == 0);
-                self.set_flag(PARITY_OVERFLOW, Self::overflow_8(val, operand, result, true));
+                self.set_flag(
+                    PARITY_OVERFLOW,
+                    Self::overflow_8(val, operand, result, true),
+                );
                 self.set_flag(SIGN, result & 0x80 > 1);
                 self.set_flag(SUBTRACT, true);
                 self.set_flag(HALF_CARRY, (result & 0xF) > (val & 0xF));
@@ -1096,6 +1102,16 @@ impl Cpu<'_> {
             AddrMode::RegisterIndirect(_) => 15,
             AddrMode::Indexed(_) => 23,
             AddrMode::Immediate | AddrMode::Extended | AddrMode::RegisterPair(_) => panic!(),
+        }
+    }
+
+    fn inc_dec_cycles(mode: AddrMode) -> u16 {
+        match mode {
+            AddrMode::Indexed(_) => 19,
+            AddrMode::Register(_) => 4,
+            AddrMode::RegisterPair(_) => 6,
+            AddrMode::RegisterIndirect(_) => 11,
+            _ => panic!(),
         }
     }
 
