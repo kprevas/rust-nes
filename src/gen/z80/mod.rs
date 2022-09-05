@@ -598,17 +598,14 @@ impl Cpu<'_> {
                 self.cycles_to_next += 4;
             }
             Opcode::CP(mode) => {
-                let val = self.a[self.af_bank] as i8;
-                let operand = self.read_byte(mode).unwrap() as i8;
-                let (carry, result) = match val.checked_sub(operand) {
-                    Some(result) => (false, result),
-                    None => (true, val.wrapping_sub(operand)),
-                };
-                let overflow = (operand < 0) == (result < 0) && (operand < 0) != (val < 0);
-                self.set_flag(CARRY, carry);
+                let val = self.a[self.af_bank];
+                let operand = self.read_byte(mode).unwrap();
+                let result = val.wrapping_sub(operand);
+                let overflow = Self::overflow_8(val, operand, result, true);
+                self.set_flag(CARRY, operand > val);
                 self.set_flag(ZERO, result == 0);
                 self.set_flag(PARITY_OVERFLOW, overflow);
-                self.set_flag(SIGN, result < 0);
+                self.set_flag(SIGN, result & 0x80 > 0);
                 self.set_flag(SUBTRACT, true);
                 self.set_flag(HALF_CARRY, operand & 0xF > val & 0xF);
                 self.cycles_to_next += Self::arithmetic_cycles(mode) + 4 * (opcode_reads - 1);
