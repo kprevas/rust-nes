@@ -475,6 +475,12 @@ impl Cpu<'_> {
                 self.set_flag(HALF_CARRY, operand & 0xF > val & 0xF);
                 self.cycles_to_next += Self::arithmetic_cycles(mode);
             }
+            Opcode::CPL => {
+                self.a[self.af_bank] = self.a[self.af_bank] ^ 0xFF;
+                self.set_flag(SUBTRACT, true);
+                self.set_flag(HALF_CARRY, true);
+                self.cycles_to_next += 4;
+            }
             Opcode::DAA => {
                 let mut a = self.a[self.af_bank];
                 let adj_lo = self.flag(HALF_CARRY) || a & 0xF > 0x9;
