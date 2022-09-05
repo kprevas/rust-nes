@@ -608,6 +608,15 @@ impl Cpu<'_> {
                 self.stopped = true;
                 self.pc = opcode_pc;
             }
+            Opcode::IN(dest, src) => {
+                self.read_byte(src);
+                self.read_byte(dest);
+                self.cycles_to_next += match dest {
+                    AddrMode::Immediate => 10,
+                    AddrMode::Register(_) => 11,
+                    _ => panic!(),
+                }
+            }
             Opcode::INC(mode) => {
                 match mode {
                     AddrMode::Indexed(_)
@@ -742,6 +751,15 @@ impl Cpu<'_> {
                 self.set_flag(SUBTRACT, false);
                 self.set_flag(HALF_CARRY, false);
                 self.cycles_to_next += Self::arithmetic_cycles(mode);
+            }
+            Opcode::OUT(dest, src) => {
+                self.read_byte(src);
+                self.read_byte(dest);
+                self.cycles_to_next += match dest {
+                    AddrMode::Immediate => 11,
+                    AddrMode::Register(_) => 12,
+                    _ => panic!(),
+                }
             }
             Opcode::POP(mode) => {
                 let val = self.pop();
