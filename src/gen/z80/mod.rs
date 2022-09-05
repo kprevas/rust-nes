@@ -907,10 +907,36 @@ impl Cpu<'_> {
                 self.set_flag(HALF_CARRY, false);
                 self.cycles_to_next += Self::bit_op_cycles(src);
             }
+            Opcode::SLL(dest, src) => {
+                let val = self.read_byte(src).unwrap();
+                let carry_bit = val >> 7;
+                let result = val << 1 | 0x1;
+                self.write_byte_or_word(dest, Some(result), None);
+                self.set_flag(CARRY, carry_bit > 0);
+                self.set_flag(ZERO, result == 0);
+                self.set_flag(PARITY_OVERFLOW, Self::parity(result));
+                self.set_flag(SIGN, result & 0x80 > 0);
+                self.set_flag(SUBTRACT, false);
+                self.set_flag(HALF_CARRY, false);
+                self.cycles_to_next += Self::bit_op_cycles(src);
+            }
             Opcode::SRA(dest, src) => {
                 let val = self.read_byte(src).unwrap();
                 let carry_bit = val & 0x1;
                 let result = ((val as i8) >> 1) as u8;
+                self.write_byte_or_word(dest, Some(result), None);
+                self.set_flag(CARRY, carry_bit > 0);
+                self.set_flag(ZERO, result == 0);
+                self.set_flag(PARITY_OVERFLOW, Self::parity(result));
+                self.set_flag(SIGN, result & 0x80 > 0);
+                self.set_flag(SUBTRACT, false);
+                self.set_flag(HALF_CARRY, false);
+                self.cycles_to_next += Self::bit_op_cycles(src);
+            }
+            Opcode::SRL(dest, src) => {
+                let val = self.read_byte(src).unwrap();
+                let carry_bit = val & 0x1;
+                let result = val >> 1;
                 self.write_byte_or_word(dest, Some(result), None);
                 self.set_flag(CARRY, carry_bit > 0);
                 self.set_flag(ZERO, result == 0);
