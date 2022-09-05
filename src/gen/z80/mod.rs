@@ -223,17 +223,6 @@ impl Cpu<'_> {
         }
     }
 
-    fn read_write_word(
-        &mut self,
-        mode: AddrMode,
-        op: &mut dyn FnMut(&mut Self, u16) -> (Option<u8>, Option<u16>),
-    ) {
-        self.write_with_addr(mode, &mut |cpu, addr| {
-            let val = cpu.read_word_addr(addr);
-            op(cpu, val)
-        })
-    }
-
     fn write_with_addr(
         &mut self,
         mode: AddrMode,
@@ -510,7 +499,7 @@ impl Cpu<'_> {
                             cpu.set_flag(HALF_CARRY, (result & 0xF00) < (val & 0xF00));
                             (None, Some(result))
                         });
-                        self.cycles_to_next += 15;
+                        self.cycles_to_next += 15 + 4 * (opcode_reads - 1);
                     }
                     _ => {
                         self.write(dest, &mut |cpu| {
@@ -530,7 +519,7 @@ impl Cpu<'_> {
                             cpu.set_flag(HALF_CARRY, (result & 0xF) < (val & 0xF));
                             (Some(result), None)
                         });
-                        self.cycles_to_next += Self::arithmetic_cycles(src);
+                        self.cycles_to_next += Self::arithmetic_cycles(src) + 4 * (opcode_reads - 1);
                     }
                 }
             }
@@ -550,7 +539,7 @@ impl Cpu<'_> {
                             AddrMode::RegisterPair(RegisterPair::IXP)
                             | AddrMode::RegisterPair(RegisterPair::IYP) => 15,
                             _ => 11,
-                        };
+                        } + 4 * (opcode_reads - 1);
                     }
                     _ => {
                         self.write(dest, &mut |cpu| {
@@ -568,7 +557,7 @@ impl Cpu<'_> {
                             cpu.set_flag(HALF_CARRY, (result & 0xF) < (val & 0xF));
                             (Some(result), None)
                         });
-                        self.cycles_to_next += Self::arithmetic_cycles(src);
+                        self.cycles_to_next += Self::arithmetic_cycles(src) + 4 * (opcode_reads - 1);
                     }
                 };
             }
@@ -581,7 +570,7 @@ impl Cpu<'_> {
                 self.set_flag(SIGN, result & 0x80 > 0);
                 self.set_flag(SUBTRACT, false);
                 self.set_flag(HALF_CARRY, true);
-                self.cycles_to_next += Self::arithmetic_cycles(mode);
+                self.cycles_to_next += Self::arithmetic_cycles(mode) + 4 * (opcode_reads - 1);
             }
             Opcode::CALL(condition) => {
                 let addr = self.read_word_addr(self.pc);
@@ -622,7 +611,7 @@ impl Cpu<'_> {
                 self.set_flag(SIGN, result < 0);
                 self.set_flag(SUBTRACT, true);
                 self.set_flag(HALF_CARRY, operand & 0xF > val & 0xF);
-                self.cycles_to_next += Self::arithmetic_cycles(mode);
+                self.cycles_to_next += Self::arithmetic_cycles(mode) + 4 * (opcode_reads - 1);
             }
             Opcode::CPL => {
                 self.a[self.af_bank] = self.a[self.af_bank] ^ 0xFF;
@@ -878,7 +867,7 @@ impl Cpu<'_> {
                 self.set_flag(SIGN, result & 0x80 > 0);
                 self.set_flag(SUBTRACT, false);
                 self.set_flag(HALF_CARRY, false);
-                self.cycles_to_next += Self::arithmetic_cycles(mode);
+                self.cycles_to_next += Self::arithmetic_cycles(mode) + 4 * (opcode_reads - 1);
             }
             Opcode::OUT(dest, src) => {
                 self.read_byte(src);
@@ -1078,7 +1067,7 @@ impl Cpu<'_> {
                             cpu.set_flag(HALF_CARRY, (result & 0xF) > (val & 0xF));
                             (Some(result), None)
                         });
-                        self.cycles_to_next += Self::arithmetic_cycles(src);
+                        self.cycles_to_next += Self::arithmetic_cycles(src) + 4 * (opcode_reads - 1);
                     }
                 }
             }
@@ -1192,7 +1181,7 @@ impl Cpu<'_> {
                 self.set_flag(SUBTRACT, true);
                 self.set_flag(HALF_CARRY, (result & 0xF) > (val & 0xF));
                 self.write_byte_or_word(AddrMode::Register(Register::A), Some(result), None);
-                self.cycles_to_next += Self::arithmetic_cycles(src);
+                self.cycles_to_next += Self::arithmetic_cycles(src) + 4 * (opcode_reads - 1);
             }
             Opcode::XOR(mode) => {
                 let result = self.a[self.af_bank] ^ self.read_byte(mode).unwrap();
@@ -1203,7 +1192,7 @@ impl Cpu<'_> {
                 self.set_flag(SIGN, result & 0x80 > 0);
                 self.set_flag(SUBTRACT, false);
                 self.set_flag(HALF_CARRY, false);
-                self.cycles_to_next += Self::arithmetic_cycles(mode);
+                self.cycles_to_next += Self::arithmetic_cycles(mode) + 4 * (opcode_reads - 1);
             }
             _ => panic!("{:?}", opcode),
         }
