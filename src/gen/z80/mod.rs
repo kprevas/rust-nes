@@ -776,6 +776,17 @@ impl Cpu<'_> {
                 self.set_flag(HALF_CARRY, false);
                 self.cycles_to_next += 4;
             }
+            Opcode::RLC(src, dest) => {
+                let result = self.read_byte(src).unwrap().rotate_left(1);
+                self.write_byte_or_word(dest, Some(result), None);
+                self.set_flag(CARRY, result & 0x1 > 0);
+                self.set_flag(ZERO, result == 0);
+                self.set_flag(PARITY_OVERFLOW, Self::parity(result));
+                self.set_flag(SIGN, result & 0x80 > 0);
+                self.set_flag(SUBTRACT, false);
+                self.set_flag(HALF_CARRY, false);
+                self.cycles_to_next += Self::bit_op_cycles(src);
+            }
             Opcode::RLCA => {
                 let result = self.a[self.af_bank].rotate_left(1);
                 self.a[self.af_bank] = result;
@@ -936,6 +947,15 @@ impl Cpu<'_> {
             AddrMode::Immediate | AddrMode::RegisterIndirect(_) => 7,
             AddrMode::Indexed(_) => 19,
             AddrMode::Extended | AddrMode::RegisterPair(_) => panic!(),
+        }
+    }
+
+    fn bit_op_cycles(mode: AddrMode) -> u16 {
+        match mode {
+            AddrMode::Register(_) => 8,
+            AddrMode::RegisterIndirect(_) => 15,
+            AddrMode::Indexed(_) => 23,
+            AddrMode::Immediate | AddrMode::Extended | AddrMode::RegisterPair(_) => panic!(),
         }
     }
 
