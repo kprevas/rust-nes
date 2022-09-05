@@ -801,6 +801,11 @@ impl Cpu<'_> {
                 self.set_flag(HALF_CARRY, false);
                 self.cycles_to_next += 4;
             }
+            Opcode::RST(pc) => {
+                self.push(self.pc);
+                self.pc = pc as u16;
+                self.cycles_to_next += 11;
+            }
             Opcode::SBC(dest, src) => match (dest, src) {
                 (AddrMode::RegisterPair(_), AddrMode::RegisterPair(_)) => {
                     let val = self.read_word(dest).unwrap();
