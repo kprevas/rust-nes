@@ -802,6 +802,17 @@ impl Cpu<'_> {
                 self.set_flag(HALF_CARRY, false);
                 self.cycles_to_next += 4;
             }
+            Opcode::RRC(src, dest) => {
+                let result = self.read_byte(src).unwrap().rotate_right(1);
+                self.write_byte_or_word(dest, Some(result), None);
+                self.set_flag(CARRY, result & 0x80 > 0);
+                self.set_flag(ZERO, result == 0);
+                self.set_flag(PARITY_OVERFLOW, Self::parity(result));
+                self.set_flag(SIGN, result & 0x80 > 0);
+                self.set_flag(SUBTRACT, false);
+                self.set_flag(HALF_CARRY, false);
+                self.cycles_to_next += Self::bit_op_cycles(src);
+            }
             Opcode::RRCA => {
                 let result = self.a[self.af_bank].rotate_right(1);
                 self.a[self.af_bank] = result;
