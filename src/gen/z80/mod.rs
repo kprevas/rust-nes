@@ -446,7 +446,7 @@ impl Cpu<'_> {
                 self.set_flag(PARITY_OVERFLOW, Self::parity(result));
                 self.set_flag(SIGN, result & 0x80 > 0);
                 self.set_flag(SUBTRACT, false);
-                self.set_flag(HALF_CARRY, false);
+                self.set_flag(HALF_CARRY, true);
                 self.cycles_to_next += Self::arithmetic_cycles(mode);
             }
             Opcode::CALL(condition) => {
