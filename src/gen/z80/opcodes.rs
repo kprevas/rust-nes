@@ -405,7 +405,7 @@ pub const OPCODES: [Opcode; 256] = [
     RET(NoParityOverflow),
     POP(RegisterPair(HL)),
     JP(NoParityOverflow),
-    EX(RegisterPair(SP), RegisterPair(HL)),
+    EX(RegisterIndirect(SP), RegisterPair(HL)),
     CALL(NoParityOverflow),
     PUSH(RegisterPair(HL)),
     AND(Immediate),
