@@ -880,6 +880,22 @@ impl Cpu<'_> {
                 self.set_flag(SUBTRACT, false);
                 self.set_flag(HALF_CARRY, false);
             }
+            Opcode::NEG => {
+                let val = 0u8;
+                let operand = self.read_byte(AddrMode::Register(Register::A)).unwrap();
+                let result = val.wrapping_sub(operand);
+                self.set_flag(CARRY, result > val);
+                self.set_flag(ZERO, result == 0);
+                self.set_flag(
+                    PARITY_OVERFLOW,
+                    Self::overflow_8(val, operand, result, true),
+                );
+                self.set_flag(SIGN, result & 0x80 > 1);
+                self.set_flag(SUBTRACT, true);
+                self.set_flag(HALF_CARRY, (result & 0xF) > (val & 0xF));
+                self.write_byte_or_word(AddrMode::Register(Register::A), Some(result), None);
+                self.cycles_to_next += 8;
+            }
             Opcode::NOP => {
                 self.cycles_to_next += 4 * opcode_reads;
             }
