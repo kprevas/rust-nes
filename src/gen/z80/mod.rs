@@ -967,6 +967,15 @@ impl Cpu<'_> {
                     5
                 };
             }
+            Opcode::RETI => {
+                self.pc = self.pop();
+                self.cycles_to_next += 14;
+            }
+            Opcode::RETN => {
+                self.pc = self.pop();
+                self.interrupt_enabled = true;
+                self.cycles_to_next += 14;
+            }
             Opcode::RL(src, dest) => {
                 let resolved_src = self.resolve_index_for_bit_op(src);
                 let result = self.read_write_byte(resolved_src, &mut |cpu: &mut Cpu, val: u8| {
