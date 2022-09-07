@@ -1043,6 +1043,22 @@ impl Cpu<'_> {
                 self.set_flag(HALF_CARRY, false);
                 self.cycles_to_next += 4;
             }
+            Opcode::RLD => {
+                let left = self.a[self.af_bank];
+                let left_lo = left & 0xF;
+                let left_hi = left >> 4;
+                let right = self.read_addr(self.hl[self.register_bank]);
+                let right_lo = right & 0xF;
+                let right_hi = right >> 4;
+                self.a[self.af_bank] = (left_hi << 4) | right_hi;
+                self.write_addr(self.hl[self.register_bank], (right_lo << 4) | left_lo);
+                self.set_flag(ZERO, self.a[self.af_bank] == 0);
+                self.set_flag(SIGN, self.a[self.af_bank] & 0x80 > 0);
+                self.set_flag(PARITY_OVERFLOW, Self::parity(self.a[self.af_bank]));
+                self.set_flag(SUBTRACT, false);
+                self.set_flag(HALF_CARRY, false);
+                self.cycles_to_next += 18;
+            }
             Opcode::RR(src, dest) => {
                 let resolved_src = self.resolve_index_for_bit_op(src);
                 let result = self.read_write_byte(resolved_src, &mut |cpu: &mut Cpu, val: u8| {
@@ -1096,6 +1112,22 @@ impl Cpu<'_> {
                 self.set_flag(SUBTRACT, false);
                 self.set_flag(HALF_CARRY, false);
                 self.cycles_to_next += 4;
+            }
+            Opcode::RRD => {
+                let left = self.a[self.af_bank];
+                let left_lo = left & 0xF;
+                let left_hi = left >> 4;
+                let right = self.read_addr(self.hl[self.register_bank]);
+                let right_lo = right & 0xF;
+                let right_hi = right >> 4;
+                self.a[self.af_bank] = (left_hi << 4) | right_lo;
+                self.write_addr(self.hl[self.register_bank], (left_lo << 4) | right_hi);
+                self.set_flag(ZERO, self.a[self.af_bank] == 0);
+                self.set_flag(SIGN, self.a[self.af_bank] & 0x80 > 0);
+                self.set_flag(PARITY_OVERFLOW, Self::parity(self.a[self.af_bank]));
+                self.set_flag(SUBTRACT, false);
+                self.set_flag(HALF_CARRY, false);
+                self.cycles_to_next += 18;
             }
             Opcode::RST(pc) => {
                 self.push(self.pc);
