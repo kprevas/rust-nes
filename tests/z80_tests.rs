@@ -100,7 +100,19 @@ fn run_json_test(initial: &JsonValue, expected: &JsonValue) {
 
     let opcode = cpu.peek_opcode();
     // TODO
-    if let Opcode::IN(_, _) | Opcode::OUT(_, _) = opcode {
+    if let Opcode::IN(_, _)
+    | Opcode::OUT(_, _)
+    | Opcode::IN_Flags(_)
+    | Opcode::OUT_Zero(_)
+    | Opcode::INI
+    | Opcode::OUTI
+    | Opcode::IND
+    | Opcode::OUTD
+    | Opcode::INIR
+    | Opcode::OUTIR
+    | Opcode::INDR
+    | Opcode::OUTDR
+    = opcode {
         return;
     }
 
