@@ -89,6 +89,7 @@ fn run_json_test(initial: &JsonValue, expected: &JsonValue) {
         initial_state["i"].as_u8().unwrap(),
         initial_state["r"].as_u8().unwrap(),
         initial_state["iff1"].as_bool().unwrap(),
+        initial_state["iff2"].as_bool().unwrap(),
     );
     for mem in initial["memory"].members() {
         cpu.poke_ram(
@@ -135,6 +136,7 @@ fn run_json_test(initial: &JsonValue, expected: &JsonValue) {
         expected_state["i"].as_u8().unwrap(),
         expected_state["r"].as_u8().unwrap(),
         expected_state["iff1"].as_bool().unwrap(),
+        expected_state["iff2"].as_bool().unwrap(),
         expected_state["halted"].as_bool().unwrap(),
         &test_id,
     );

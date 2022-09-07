@@ -26,6 +26,7 @@ pub struct Cpu<'a> {
     af_bank: usize,
 
     interrupt_enabled: bool,
+    interrupt_enabled_tmp: bool,
     interrupt_mode: u8,
     pub stopped: bool,
 
@@ -56,6 +57,7 @@ impl Cpu<'_> {
             register_bank: 0,
             af_bank: 0,
             interrupt_enabled: false,
+            interrupt_enabled_tmp: false,
             interrupt_mode: 0,
             stopped: false,
             ram: [0; 0x2000],
@@ -980,7 +982,7 @@ impl Cpu<'_> {
             }
             Opcode::RETN => {
                 self.pc = self.pop();
-                self.interrupt_enabled = true;
+                self.interrupt_enabled = self.interrupt_enabled_tmp;
                 self.cycles_to_next += 14;
             }
             Opcode::RL(src, dest) => {
@@ -1443,6 +1445,7 @@ pub mod testing {
             i: u8,
             r: u8,
             interupt_enabled: bool,
+            interupt_enabled_tmp: bool,
         ) {
             self.a[0] = (af[0] >> 8) as u8;
             self.a[1] = (af[1] >> 8) as u8;
@@ -1458,6 +1461,7 @@ pub mod testing {
             self.i = i;
             self.r = r;
             self.interrupt_enabled = interupt_enabled;
+            self.interrupt_enabled_tmp = interupt_enabled_tmp;
         }
 
         pub fn verify_state(
@@ -1473,6 +1477,7 @@ pub mod testing {
             i: u8,
             r: u8,
             interupt_enabled: bool,
+            interupt_enabled_tmp: bool,
             halted: bool,
             test_id: &str,
         ) {
@@ -1514,7 +1519,12 @@ pub mod testing {
             assert_eq!(self.r, r, "{}   R", test_id);
             assert_eq!(
                 self.interrupt_enabled, interupt_enabled,
-                "{}   IFF",
+                "{}   IFF1",
+                test_id
+            );
+            assert_eq!(
+                self.interrupt_enabled_tmp, interupt_enabled_tmp,
+                "{}   IFF2",
                 test_id
             );
             assert_eq!(self.stopped, halted, "{}   HALT", test_id);
