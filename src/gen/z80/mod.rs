@@ -645,6 +645,29 @@ impl Cpu<'_> {
                 self.set_flag(HALF_CARRY, operand & 0xF > val & 0xF);
                 self.cycles_to_next += Self::arithmetic_cycles(mode) + 4 * (opcode_reads - 1);
             }
+            Opcode::CPI | Opcode::CPIR | Opcode::CPD | Opcode::CPDR => {
+                let val = self.a[self.af_bank];
+                let operand = self.read_addr(self.hl[self.register_bank]);
+                let result = val.wrapping_sub(operand);
+                if let Opcode::CPI | Opcode::CPIR = opcode {
+                    self.hl[self.register_bank] = self.hl[self.register_bank].wrapping_add(1);
+                } else {
+                    self.hl[self.register_bank] = self.hl[self.register_bank].wrapping_sub(1);
+                }
+                self.bc[self.register_bank] = self.bc[self.register_bank].wrapping_sub(1);
+                self.set_flag(ZERO, result == 0);
+                self.set_flag(PARITY_OVERFLOW, self.bc[self.register_bank] != 0);
+                self.set_flag(SIGN, result & 0x80 > 0);
+                self.set_flag(SUBTRACT, true);
+                self.set_flag(HALF_CARRY, operand & 0xF > val & 0xF);
+                if let Opcode::CPIR | Opcode::CPDR = opcode {
+                    if self.bc[self.register_bank] != 0 && result != 0 {
+                        self.pc = opcode_pc;
+                        self.cycles_to_next += 5;
+                    }
+                }
+                self.cycles_to_next += 16;
+            }
             Opcode::CPL => {
                 self.a[self.af_bank] = self.a[self.af_bank] ^ 0xFF;
                 self.set_flag(SUBTRACT, true);
@@ -880,7 +903,6 @@ impl Cpu<'_> {
                     self.hl[self.register_bank] = self.hl[self.register_bank].wrapping_sub(1);
                 }
                 self.bc[self.register_bank] = self.bc[self.register_bank].wrapping_sub(1);
-                self.cycles_to_next += 16;
                 if let Opcode::LDIR | Opcode::LDDR = opcode {
                     if self.bc[self.register_bank] != 0 {
                         self.pc = opcode_pc;
@@ -892,6 +914,7 @@ impl Cpu<'_> {
                 }
                 self.set_flag(SUBTRACT, false);
                 self.set_flag(HALF_CARRY, false);
+                self.cycles_to_next += 16;
             }
             Opcode::NEG => {
                 let val = 0u8;
