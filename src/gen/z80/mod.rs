@@ -503,6 +503,9 @@ impl Cpu<'_> {
             );
         }
 
+        self.r += if opcode_reads == 4 { 2 } else { opcode_reads } as u8;
+        self.r &= 0b1111111;
+
         match opcode {
             Opcode::ADC(dest, src) => {
                 match (dest, src) {
@@ -1265,9 +1268,6 @@ impl Cpu<'_> {
             }
             _ => panic!("{:?}", opcode),
         }
-
-        self.r += if opcode_reads == 4 { 2 } else { opcode_reads } as u8;
-        self.r &= 0b1111111;
     }
 
     fn register_addr(&mut self, register: RegisterPair) -> u16 {
