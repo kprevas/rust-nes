@@ -753,6 +753,10 @@ impl Cpu<'_> {
                 self.stopped = true;
                 self.pc = opcode_pc;
             }
+            Opcode::IM(mode) => {
+                self.interrupt_mode = mode;
+                self.cycles_to_next += 8;
+            }
             Opcode::IN(dest, src) => {
                 self.read_byte(src);
                 self.read_byte(dest);
