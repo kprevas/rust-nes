@@ -505,8 +505,10 @@ impl Cpu<'_> {
             );
         }
 
+        let r_high_bit = self.r >> 7;
         self.r += if opcode_reads == 4 { 2 } else { opcode_reads } as u8;
         self.r &= 0b1111111;
+        self.r |= r_high_bit << 7;
 
         match opcode {
             Opcode::ADC(dest, src) => {
