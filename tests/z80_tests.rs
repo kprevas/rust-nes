@@ -43,7 +43,6 @@ fn run_zex_test(ram: &[u8], success_msg_addr: u16) {
 }
 
 #[test]
-#[ignore]
 pub fn json_tests() {
     let initials = json::parse(include_str!("z80/tests.in.json"));
     let expecteds = json::parse(include_str!("z80/tests.expected.json"));

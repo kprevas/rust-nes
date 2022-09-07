@@ -739,6 +739,7 @@ impl Cpu<'_> {
             }
             Opcode::DI => {
                 self.interrupt_enabled = false;
+                self.interrupt_enabled_tmp = false;
                 self.cycles_to_next += 4;
             }
             Opcode::DJNZ => {
@@ -769,6 +770,7 @@ impl Cpu<'_> {
             }
             Opcode::EI => {
                 self.interrupt_enabled = true;
+                self.interrupt_enabled_tmp = true;
                 self.cycles_to_next += 4;
             }
             Opcode::EX_AF => {
