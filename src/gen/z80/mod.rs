@@ -830,8 +830,10 @@ impl Cpu<'_> {
                         | (AddrMode::Register(Register::A), AddrMode::Register(Register::R)) => {
                             let val = val_8.unwrap();
                             cpu.set_flag(ZERO, val == 0);
-                            cpu.set_flag(PARITY_OVERFLOW, cpu.interrupt_enabled);
+                            cpu.set_flag(PARITY_OVERFLOW, cpu.interrupt_enabled_tmp);
                             cpu.set_flag(SIGN, val & 0x80 > 0);
+                            cpu.set_flag(SUBTRACT, false);
+                            cpu.set_flag(HALF_CARRY, false);
                         }
                         _ => {}
                     }
