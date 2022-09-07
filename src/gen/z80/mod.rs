@@ -1,6 +1,6 @@
 use gen::z80::opcodes::*;
 
-mod opcodes;
+pub mod opcodes;
 
 const CARRY: u8 = 0b1;
 const SUBTRACT: u8 = 0b10;
