@@ -415,7 +415,7 @@ pub struct Cpu<'a> {
     vdp: Option<Vdp<'a>>,
     vdp_bus: &'a RefCell<VdpBus>,
 
-    _z80: z80::Cpu<'a>,
+    z80: z80::Cpu<'a>,
 
     test_ram_only: bool,
 
@@ -460,7 +460,7 @@ impl<'a> Cpu<'a> {
             speed_adj: 1.0,
             vdp,
             vdp_bus,
-            _z80: z80::Cpu::new(cartridge, instrumented),
+            z80: z80::Cpu::new(cartridge, instrumented),
             test_ram_only: false,
             phantom: PhantomData,
         };
@@ -478,6 +478,7 @@ impl<'a> Cpu<'a> {
                 self.vdp
                     .as_mut()
                     .map(|vdp| vdp.tick(cartridge, internal_ram));
+                self.z80.tick();
                 self.ticks -= 1.0;
             }
             self.cycle_count = self.cycle_count.wrapping_add(1);
@@ -564,11 +565,24 @@ impl<'a> Cpu<'a> {
                     }
                 }
                 0x400000..=0x7FFFFF => Size::from(0).unwrap(), // Expansion port
-                0xA00000..=0xA0FFFF => Size::from(0).unwrap(), // Z80 Area
+                0xA00000..=0xA0FFFF => {
+                    if !self.z80.has_bus {
+                        match size {
+                            8 => Size::from(self.z80.read_addr((addr - 0xA00000) as u16)).unwrap(),
+                            16 => Size::from(self.z80.read_word_addr((addr - 0xA00000) as u16)).unwrap(),
+                            _ => panic!()
+                        }
+                    } else {
+                        Size::from_memory_bytes(&[self.z80.next_op(), 0])
+                    }
+                },
                 0xA10001 => Size::from_byte(0b10100000),
                 0xA10003 => self.read_controller(0),
                 0xA10005 => self.read_controller(1),
                 0xA10000..=0xA10FFF => Size::from(0).unwrap(), // IO Registers
+                0xA11100 => {
+                    Size::from((if self.z80.has_bus { 1 } else { 0 }) << (Size::bits() - 8)).unwrap()
+                }
                 0xA11000..=0xA11FFF => Size::from(0).unwrap(), // Z80 Control
                 0xC00000..=0xDFFFFF => Size::read_from_vdp_bus(self.vdp_bus, addr),
                 0xE00000..=0xFFFFFF => {
@@ -637,7 +651,15 @@ impl<'a> Cpu<'a> {
             match addr {
                 0x000000..=0x3FFFFF => {} // Vector table, ROM Cartridge
                 0x400000..=0x7FFFFF => {} // Expansion port
-                0xA00000..=0xA0FFFF => {} // Z80 Area
+                0xA00000..=0xA0FFFF => {
+                    if !self.z80.has_bus {
+                        match size {
+                            8 => self.z80.write_addr((addr - 0xA00000) as u16, val.to_u8().unwrap()),
+                            16 => self.z80.write_word((addr - 0xA00000) as u16, val.to_u16().unwrap()),
+                            _ => panic!()
+                        }
+                    }
+                },
                 0xA10003 => {
                     let th_bit = (val.low_byte() >> 6) & 0b1;
                     if th_bit != self.controller_th_bit[0] {
@@ -657,6 +679,23 @@ impl<'a> Cpu<'a> {
                     }
                 }
                 0xA10000..=0xA10FFF => {} // IO Registers
+                0xA11100 => {
+                    let bus_req_bit = val >> (Size::bits() - 8);
+                    if bus_req_bit.is_zero() {
+                        self.z80.bus_req = false;
+                        self.z80.has_bus = true;
+                    } else {
+                        self.z80.bus_req = true;
+                    }
+                }
+                0xA11200 => {
+                    let reset_bit = val >> (Size::bits() - 8);
+                    if reset_bit.is_zero() {
+                        self.z80.reset = true;
+                    } else {
+                        self.z80.reset = false;
+                    }
+                }
                 0xA11000..=0xA11FFF => {} // Z80 Control
                 0xC00000..=0xDFFFFF => Size::write_to_vdp_bus(self.vdp_bus, addr, val),
                 0xE00000..=0xFFFFFF => {

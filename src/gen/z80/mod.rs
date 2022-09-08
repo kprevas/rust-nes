@@ -28,7 +28,10 @@ pub struct Cpu<'a> {
     interrupt_enabled: bool,
     interrupt_enabled_tmp: bool,
     interrupt_mode: u8,
+    pub reset: bool,
     pub stopped: bool,
+    pub bus_req: bool,
+    pub has_bus: bool,
 
     ram: [u8; 0x2000],
     _cartridge: &'a Box<[u8]>,
@@ -60,6 +63,9 @@ impl Cpu<'_> {
             interrupt_enabled_tmp: false,
             interrupt_mode: 0,
             stopped: false,
+            reset: true,
+            bus_req: false,
+            has_bus: true,
             ram: [0; 0x2000],
             _cartridge: cartridge,
             test_ram: None,
@@ -70,7 +76,7 @@ impl Cpu<'_> {
         }
     }
 
-    fn read_addr(&mut self, addr: u16) -> u8 {
+    pub fn read_addr(&mut self, addr: u16) -> u8 {
         match &self.test_ram {
             Some(ram) => ram[addr as usize],
             None => match addr {
@@ -86,7 +92,7 @@ impl Cpu<'_> {
         }
     }
 
-    fn read_word_addr(&mut self, addr: u16) -> u16 {
+    pub fn read_word_addr(&mut self, addr: u16) -> u16 {
         (self.read_addr(addr) as u16) | ((self.read_addr(addr + 1) as u16) << 8)
     }
 
@@ -187,7 +193,7 @@ impl Cpu<'_> {
         }
     }
 
-    fn write_addr(&mut self, addr: u16, val: u8) {
+    pub fn write_addr(&mut self, addr: u16, val: u8) {
         match &mut self.test_ram {
             Some(ram) => ram[addr as usize] = val,
             None => match addr {
@@ -203,7 +209,7 @@ impl Cpu<'_> {
         }
     }
 
-    fn write_word(&mut self, addr: u16, val: u16) {
+    pub fn write_word(&mut self, addr: u16, val: u16) {
         self.write_addr(addr, (val & 0xFF) as u8);
         self.write_addr(addr + 1, (val >> 8) as u8);
     }
@@ -454,7 +460,7 @@ impl Cpu<'_> {
         val
     }
 
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         self.pc = 0;
         self.i = 0;
         self.r = 0;
@@ -462,23 +468,27 @@ impl Cpu<'_> {
     }
 
     pub fn tick(&mut self) {
-        if self.ticks_to_next == 0 {
-            if self.cycles_to_next == 0 {
-                self.next_operation();
-            }
-            assert_ne!(self.cycles_to_next, 0);
-            self.cycles_to_next = self.cycles_to_next.saturating_sub(1);
-            self.ticks_to_next = 15;
-            self.cycle_count = self.cycle_count.wrapping_add(1);
-        }
-        self.ticks_to_next = self.ticks_to_next.saturating_sub(1);
-    }
-
-    fn next_operation(&mut self) {
         if self.stopped {
             self.cycles_to_next = 0;
-        } else {
-            self.execute_opcode();
+            self.ticks_to_next = 0;
+        } else if self.reset {
+            self.reset();
+        } else if self.has_bus {
+            if self.ticks_to_next == 0 {
+                if self.cycles_to_next == 0 {
+                    if self.bus_req {
+                        self.has_bus = false;
+                        self.bus_req = false;
+                    } else {
+                        self.execute_opcode();
+                        assert_ne!(self.cycles_to_next, 0);
+                    }
+                }
+                self.cycles_to_next = self.cycles_to_next.saturating_sub(1);
+                self.ticks_to_next = 15;
+                self.cycle_count = self.cycle_count.wrapping_add(1);
+            }
+            self.ticks_to_next = self.ticks_to_next.saturating_sub(1);
         }
     }
 
@@ -1396,6 +1406,10 @@ impl Cpu<'_> {
         }
     }
 
+    pub fn next_op(&mut self) -> u8 {
+        self.read_addr(self.pc)
+    }
+
     fn arithmetic_cycles(mode: AddrMode) -> u16 {
         match mode {
             AddrMode::Register(_) => 4,
@@ -1608,7 +1622,11 @@ pub mod testing {
         }
 
         pub fn step(&mut self) {
-            self.next_operation();
+            if self.stopped {
+                self.cycles_to_next = 0;
+            } else {
+                self.execute_opcode();
+            }
             self.cycle_count += self.cycles_to_next as u64;
             self.cycles_to_next = 0;
         }
