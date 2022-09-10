@@ -207,7 +207,7 @@ impl Cpu<'_> {
                 0x4000..=0x5FFF => {} // TODO: YM2612
                 0x6000 => {
                     self.bank_register = (self.bank_register & !(1 << self.bank_register_bit))
-                        | ((val & 0b1) << self.bank_register_bit) as u32;
+                        | (((val & 0b1) as u32) << self.bank_register_bit) as u32;
                     self.bank_register_bit += 1;
                     if self.bank_register_bit > 23 {
                         self.bank_register_bit = 15;
