@@ -2214,7 +2214,7 @@ impl<'a> Cpu<'a> {
             } => {
                 let displacement = self.read_extension::<i16>();
                 if !self.check_condition(condition) {
-                    let dec_value = ((self.d[register] & 0xFFFF) as i16).saturating_sub(1);
+                    let dec_value = ((self.d[register] & 0xFFFF) as i16).wrapping_sub(1);
                     self.d[register] = dec_value.apply_to_register(self.d[register]);
                     if dec_value != -1 {
                         self.pc = self.pc.wrapping_add_signed((displacement - 2) as i32);
