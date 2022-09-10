@@ -571,11 +571,7 @@ impl<'a> Cpu<'a> {
                 0x400000..=0x7FFFFF => Size::from(0).unwrap(), // Expansion port
                 0xA00000..=0xA0FFFF => {
                     if !self.z80.has_bus {
-                        match size {
-                            8 => Size::from(self.z80.read_addr((addr - 0xA00000) as u16)).unwrap(),
-                            16 => Size::from(self.z80.read_word_addr((addr - 0xA00000) as u16)).unwrap(),
-                            _ => panic!()
-                        }
+                        Size::from(self.z80.read_addr((addr - 0xA00000) as u16)).unwrap()
                     } else {
                         Size::from_memory_bytes(&[self.z80.next_op(), 0])
                     }
@@ -657,11 +653,7 @@ impl<'a> Cpu<'a> {
                 0x400000..=0x7FFFFF => {} // Expansion port
                 0xA00000..=0xA0FFFF => {
                     if !self.z80.has_bus {
-                        match size {
-                            8 => self.z80.write_addr((addr - 0xA00000) as u16, val.to_u8().unwrap()),
-                            16 => self.z80.write_word((addr - 0xA00000) as u16, val.to_u16().unwrap()),
-                            _ => panic!()
-                        }
+                        self.z80.write_addr((addr - 0xA00000) as u16, val.low_byte());
                     }
                 },
                 0xA10003 => {
