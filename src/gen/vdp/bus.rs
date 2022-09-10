@@ -246,6 +246,7 @@ pub struct VdpBus {
     pub write_data: VecDeque<WriteData>,
     pub horizontal_interrupt: bool,
     pub vertical_interrupt: bool,
+    pub z80_interrupt: bool,
 }
 
 impl VdpBus {
@@ -315,6 +316,7 @@ impl VdpBus {
             write_data: VecDeque::new(),
             horizontal_interrupt: false,
             vertical_interrupt: false,
+            z80_interrupt: false,
         }
     }
 

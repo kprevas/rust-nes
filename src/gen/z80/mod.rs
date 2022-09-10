@@ -480,7 +480,7 @@ impl Cpu<'_> {
         self.interrupt_mode = 0;
     }
 
-    pub fn tick(&mut self) {
+    pub fn tick(&mut self, interrupt: bool) {
         if self.stopped {
             self.cycles_to_next = 0;
             self.ticks_to_next = 0;
@@ -493,8 +493,21 @@ impl Cpu<'_> {
                         self.has_bus = false;
                         self.bus_req = false;
                     } else {
-                        self.execute_opcode();
-                        assert_ne!(self.cycles_to_next, 0);
+                        if interrupt && self.interrupt_enabled {
+                            match self.interrupt_mode {
+                                0 => {}
+                                1 => {
+                                    self.push(self.pc);
+                                    self.pc = 0x38;
+                                    self.cycles_to_next += 11;
+                                }
+                                2 => {}
+                                _ => panic!()
+                            }
+                        } else {
+                            self.execute_opcode();
+                            assert_ne!(self.cycles_to_next, 0);
+                        }
                     }
                 }
                 self.cycles_to_next = self.cycles_to_next.saturating_sub(1);

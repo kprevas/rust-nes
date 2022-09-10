@@ -478,7 +478,7 @@ impl<'a> Cpu<'a> {
                 self.vdp
                     .as_mut()
                     .map(|vdp| vdp.tick(cartridge, internal_ram));
-                self.z80.tick();
+                self.z80.tick(self.vdp_bus.borrow().z80_interrupt);
                 self.ticks -= 1.0;
             }
             self.cycle_count = self.cycle_count.wrapping_add(1);
@@ -521,6 +521,10 @@ impl<'a> Cpu<'a> {
             }
             Condition::Illegal => panic!(),
         }
+    }
+
+    fn get_interrupt_level(&self) -> u16 {
+        (self.status & INTERRUPT) >> INTERRUPT_SHIFT
     }
 
     fn set_interrupt_level(&mut self, level: u16) {
@@ -2899,19 +2903,19 @@ impl<'a> Cpu<'a> {
             self.ticks = 0.0;
         } else {
             if let Some((vdp_interrupt_vector, vdp_interrupt_level)) = {
-                let mut vdp_bus = self.vdp_bus.borrow_mut();
+                let vdp_bus = self.vdp_bus.borrow();
                 if vdp_bus.horizontal_interrupt {
-                    vdp_bus.horizontal_interrupt = false;
                     Some((28, 4))
                 } else if vdp_bus.vertical_interrupt {
-                    vdp_bus.vertical_interrupt = false;
                     Some((30, 6))
                 } else {
                     None
                 }
             } {
-                self.process_exception(vdp_interrupt_vector);
-                self.set_interrupt_level(vdp_interrupt_level);
+                if vdp_interrupt_level > self.get_interrupt_level() {
+                    self.process_exception(vdp_interrupt_vector);
+                    self.set_interrupt_level(vdp_interrupt_level);
+                }
             }
             self.execute_opcode();
         }

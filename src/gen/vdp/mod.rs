@@ -363,6 +363,7 @@ impl<'a> Vdp<'a> {
         }
         if self.h_counter == if bus.mode_4.h_40_wide_mode { 6 } else { 5 } {
             bus.status.hblank = false;
+            bus.horizontal_interrupt = false;
             bus.status.sprite_limit = false;
             bus.status.sprite_overlap = false;
             self.prev_line_dot_overflow = self.dot_overflow;
@@ -374,14 +375,18 @@ impl<'a> Vdp<'a> {
                 if bus.mode_2.enable_vertical_interrupt {
                     bus.vertical_interrupt = true;
                 }
+                bus.z80_interrupt = true;
                 self.image_buffer.publish();
                 let bg = self.get_color(bus.bg_palette, bus.bg_color, false, false);
                 self.image_buffer.input_buffer().fill(bg);
                 if self.dump_mode {
                     self.dump_sprite_table(bus.sprite_table_addr as usize);
                 }
+            } else if self.v_counter == 225 {
+                bus.z80_interrupt = false;
             } else if self.v_counter == 261 {
                 bus.status.vblank = false;
+                bus.vertical_interrupt = false;
             } else if self.v_counter == 262 {
                 self.v_counter = 0;
             }
