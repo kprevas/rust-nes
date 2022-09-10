@@ -235,6 +235,7 @@ impl<'a> Vdp<'a> {
 
         if self.h_counter >= active_display_h
             && self.h_counter <= active_display_h_end
+            && self.dot < width
             && self.scanline < 224
         {
             let mut pixel = None;

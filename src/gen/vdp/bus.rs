@@ -100,7 +100,7 @@ impl Mode1 {
 #[allow(dead_code)]
 pub struct Mode2 {
     use_128k_vram: bool,
-    enable_display: bool,
+    pub enable_display: bool,
     pub enable_vertical_interrupt: bool,
     enable_dma: bool,
     pal_mode: bool,
