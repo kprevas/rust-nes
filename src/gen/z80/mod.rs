@@ -37,6 +37,9 @@ pub struct Cpu<'a> {
     _cartridge: &'a Box<[u8]>,
     test_ram: Option<Box<[u8]>>,
 
+    bank_register: u32,
+    bank_register_bit: usize,
+
     cycles_to_next: u16,
     ticks_to_next: u16,
     cycle_count: u64,
@@ -69,6 +72,8 @@ impl Cpu<'_> {
             ram: [0; 0x2000],
             _cartridge: cartridge,
             test_ram: None,
+            bank_register: 0,
+            bank_register_bit: 15,
             cycles_to_next: 0,
             ticks_to_next: 0,
             cycle_count: 0,
@@ -87,7 +92,7 @@ impl Cpu<'_> {
                 0x6100..=0x7EFF => 0xFF,
                 0x7F00..=0x7F1F => 0, // TODO: VDP
                 0x7F20..=0x7FFF => 0xFF,
-                0x8000..=0xFFFF => 0, // TODO: M68k
+                0x8000..=0xFFFF => self._cartridge[self.bank_register as usize + addr as usize],
             },
         }
     }
@@ -200,7 +205,15 @@ impl Cpu<'_> {
                 0x0000..=0x1FFF => self.ram[addr as usize] = val,
                 0x2000..=0x3FFF => self.ram[(addr - 0x2000) as usize] = val,
                 0x4000..=0x5FFF => {} // TODO: YM2612
-                0x6000..=0x60FF => {} // TODO: bank addr register
+                0x6000 => {
+                    self.bank_register = (self.bank_register & !(1 << self.bank_register_bit))
+                        | ((val & 0b1) << self.bank_register_bit) as u32;
+                    self.bank_register_bit += 1;
+                    if self.bank_register_bit > 23 {
+                        self.bank_register_bit = 15;
+                    }
+                }
+                0x6001..=0x60FF => {}
                 0x6100..=0x7EFF => {}
                 0x7F00..=0x7F1F => {} // TODO: VDP
                 0x7F20..=0x7FFF => panic!(),
@@ -994,11 +1007,7 @@ impl Cpu<'_> {
                 });
                 if src != dest {
                     let resolved_dest = self.resolve_index_for_bit_op(dest);
-                    self.write_byte_or_word(
-                        resolved_dest,
-                        Some(result),
-                        None,
-                    );
+                    self.write_byte_or_word(resolved_dest, Some(result), None);
                 }
                 self.cycles_to_next += Self::bit_op_cycles(src);
             }
@@ -1228,11 +1237,7 @@ impl Cpu<'_> {
                 });
                 if src != dest {
                     let resolved_dest = self.resolve_index_for_bit_op(dest);
-                    self.write_byte_or_word(
-                        resolved_dest,
-                        Some(result),
-                        None,
-                    );
+                    self.write_byte_or_word(resolved_dest, Some(result), None);
                 }
                 self.cycles_to_next += Self::bit_op_cycles(src);
             }
