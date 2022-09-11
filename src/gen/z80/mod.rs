@@ -514,7 +514,7 @@ impl Cpu<'_> {
     fn execute_opcode(&mut self) {
         let opcode_pc = self.pc;
         let (opcode, opcode_reads) = self.get_opcode();
-        self.pc += opcode_reads;
+        self.pc = self.pc.wrapping_add(opcode_reads);
 
         if self.instrumented {
             debug!(target: "z80", "{:04X} {:?} A:{:02X} F:{:08b} BC:{:04X} DE:{:04X} HL:{:04X} IX:{:04X} IY:{:04X} I:{:02X} R:{:02X} SP:{:04X} {}",
@@ -1368,40 +1368,45 @@ impl Cpu<'_> {
 
     fn get_opcode(&mut self) -> (Opcode, u16) {
         let mut pc = self.pc;
+        let mut opcode_reads = 1;
         let opcode_hex = self.read_addr(pc) as usize;
         let mut opcode = OPCODES[opcode_hex];
-        pc += 1;
+        pc = pc.wrapping_add(1);
         match opcode {
             Opcode::Bit => {
                 opcode = BIT_INSTRUCTIONS[self.read_addr(pc) as usize];
-                pc += 1;
+                pc = pc.wrapping_add(1);
+                opcode_reads += 1;
             }
             Opcode::Ix => {
                 opcode = IX_INSTRUCTIONS[self.read_addr(pc) as usize];
-                pc += 1;
+                pc = pc.wrapping_add(1);
+                opcode_reads += 1;
             }
             Opcode::Iy => {
                 opcode = IY_INSTRUCTIONS[self.read_addr(pc) as usize];
-                pc += 1;
+                pc = pc.wrapping_add(1);
+                opcode_reads += 1;
             }
             Opcode::Misc => {
                 opcode = MISC_INSTRUCTIONS[self.read_addr(pc) as usize];
-                pc += 1;
+                pc = pc.wrapping_add(1);
+                opcode_reads += 1;
             }
             _ => {}
         }
         match opcode {
             Opcode::IxBit => {
                 opcode = IX_BIT_INSTRUCTIONS[self.read_addr(pc + 1) as usize];
-                pc += 2;
+                opcode_reads += 2;
             }
             Opcode::IyBit => {
                 opcode = IY_BIT_INSTRUCTIONS[self.read_addr(pc + 1) as usize];
-                pc += 2;
+                opcode_reads += 2;
             }
             _ => {}
         }
-        (opcode, pc - self.pc)
+        (opcode, opcode_reads)
     }
 
     fn af(&mut self) -> u16 {
