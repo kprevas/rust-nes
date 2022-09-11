@@ -2422,7 +2422,14 @@ impl<'a> Cpu<'a> {
                 dest_mode,
                 size,
             } => match size {
-                Size::Word => self.move_::<i16>(src_mode, dest_mode),
+                Size::Word => {
+                    let val = self.read::<i16>(src_mode).to_register_value();
+                    self.set_flag(NEGATIVE, val.is_negative());
+                    self.set_flag(ZERO, val.is_zero());
+                    self.set_flag(OVERFLOW, false);
+                    self.set_flag(CARRY, false);
+                    self.write(dest_mode, val);
+                }
                 Size::Long => self.move_::<i32>(src_mode, dest_mode),
                 Size::Byte | Size::Illegal => panic!(),
             },
