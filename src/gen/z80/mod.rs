@@ -38,7 +38,6 @@ pub struct Cpu<'a> {
     test_ram: Option<Box<[u8]>>,
 
     bank_register: u32,
-    bank_register_bit: usize,
 
     cycles_to_next: u16,
     ticks_to_next: u16,
@@ -73,7 +72,6 @@ impl Cpu<'_> {
             _cartridge: cartridge,
             test_ram: None,
             bank_register: 0,
-            bank_register_bit: 15,
             cycles_to_next: 0,
             ticks_to_next: 0,
             cycle_count: 0,
@@ -206,12 +204,7 @@ impl Cpu<'_> {
                 0x2000..=0x3FFF => self.ram[(addr - 0x2000) as usize] = val,
                 0x4000..=0x5FFF => {} // TODO: YM2612
                 0x6000 => {
-                    self.bank_register = (self.bank_register & !(1 << self.bank_register_bit))
-                        | (((val & 0b1) as u32) << self.bank_register_bit) as u32;
-                    self.bank_register_bit += 1;
-                    if self.bank_register_bit > 23 {
-                        self.bank_register_bit = 15;
-                    }
+                    self.bank_register = (self.bank_register >> 1) | (((val & 0b1) as u32) << 23);
                 }
                 0x6001..=0x60FF => {}
                 0x6100..=0x7EFF => {}
