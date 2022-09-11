@@ -497,10 +497,9 @@ impl Cpu<'_> {
                                 2 => {}
                                 _ => panic!()
                             }
-                        } else {
-                            self.execute_opcode();
-                            assert_ne!(self.cycles_to_next, 0);
                         }
+                        self.execute_opcode();
+                        assert_ne!(self.cycles_to_next, 0);
                     }
                 }
                 self.cycles_to_next = self.cycles_to_next.saturating_sub(1);
@@ -820,7 +819,7 @@ impl Cpu<'_> {
             }
             Opcode::IN(dest, src) => {
                 self.read_byte(src);
-                self.read_byte(dest);
+                self.write_byte_or_word(dest, Some(0xFF), None);
                 self.cycles_to_next += match dest {
                     AddrMode::Immediate => 10,
                     AddrMode::Register(_) => 11,
