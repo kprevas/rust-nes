@@ -1,3 +1,7 @@
+use std::collections::HashSet;
+
+use log::Level;
+
 use gen::z80::opcodes::*;
 
 pub mod opcodes;
@@ -43,6 +47,10 @@ pub struct Cpu<'a> {
     ticks_to_next: u16,
     cycle_count: u64,
     pub instrumented: bool,
+
+    pc_watches: Box<HashSet<u16>>,
+    pc_breaks: Box<HashSet<u16>>,
+    memory_watches: Box<HashSet<u16>>,
 }
 
 impl Cpu<'_> {
@@ -76,11 +84,14 @@ impl Cpu<'_> {
             ticks_to_next: 0,
             cycle_count: 0,
             instrumented,
+            pc_watches: Box::new(HashSet::new()),
+            pc_breaks: Box::new(HashSet::new()),
+            memory_watches: Box::new(HashSet::new()),
         }
     }
 
     pub fn read_addr(&mut self, addr: u16) -> u8 {
-        match &self.test_ram {
+        let val = match &self.test_ram {
             Some(ram) => ram[addr as usize],
             None => match addr {
                 0x0000..=0x1FFF => self.ram[addr as usize],
@@ -90,9 +101,35 @@ impl Cpu<'_> {
                 0x6100..=0x7EFF => 0xFF,
                 0x7F00..=0x7F1F => 0, // TODO: VDP
                 0x7F20..=0x7FFF => 0xFF,
-                0x8000..=0xFFFF => self._cartridge[self.bank_register as usize + addr as usize],
+                0x8000..=0xFFFF => self._cartridge[self.bank_register as usize + (addr - 0x8000) as usize],
             },
+        };
+        if self.instrumented
+            && (self.memory_watches.contains(&addr)
+            || self.memory_watches.contains(&(addr.saturating_sub(0x2000))))
+        {
+            if !self.has_bus {
+                info!(target: "z80", "read memory {:04X} {:02X} from m86k", addr, val);
+            } else {
+                info!(target: "z80", "read memory {:04X} {:02X} {:04X} A:{:02X} F:{:08b} BC:{:04X} DE:{:04X} HL:{:04X} IX:{:04X} IY:{:04X} I:{:02X} R:{:02X} SP:{:04X} {}",
+                    addr,
+                    val,
+                    self.pc,
+                    self.a[self.af_bank],
+                    self.f[self.af_bank],
+                    self.bc[self.register_bank],
+                    self.de[self.register_bank],
+                    self.hl[self.register_bank],
+                    self.ix,
+                    self.iy,
+                    self.i,
+                    self.r,
+                    self.sp,
+                    self.cycle_count,
+                );
+            }
         }
+        val
     }
 
     pub fn read_word_addr(&mut self, addr: u16) -> u16 {
@@ -197,6 +234,31 @@ impl Cpu<'_> {
     }
 
     pub fn write_addr(&mut self, addr: u16, val: u8) {
+        if self.instrumented
+            && (self.memory_watches.contains(&addr)
+            || self.memory_watches.contains(&(addr.saturating_sub(0x2000))))
+        {
+            if !self.has_bus {
+                warn!(target: "z80", "write memory {:04X} {:02X} from m86k", addr, val);
+            } else {
+                warn!(target: "z80", "write memory {:04X} {:02X} {:04X} A:{:02X} F:{:08b} BC:{:04X} DE:{:04X} HL:{:04X} IX:{:04X} IY:{:04X} I:{:02X} R:{:02X} SP:{:04X} {}",
+                    addr,
+                    val,
+                    self.pc,
+                    self.a[self.af_bank],
+                    self.f[self.af_bank],
+                    self.bc[self.register_bank],
+                    self.de[self.register_bank],
+                    self.hl[self.register_bank],
+                    self.ix,
+                    self.iy,
+                    self.i,
+                    self.r,
+                    self.sp,
+                    self.cycle_count,
+                );
+            }
+        }
         match &mut self.test_ram {
             Some(ram) => ram[addr as usize] = val,
             None => match addr {
@@ -495,7 +557,7 @@ impl Cpu<'_> {
                                     self.cycles_to_next += 11;
                                 }
                                 2 => {}
-                                _ => panic!()
+                                _ => panic!(),
                             }
                         }
                         self.execute_opcode();
@@ -516,7 +578,15 @@ impl Cpu<'_> {
         self.pc = self.pc.wrapping_add(opcode_reads);
 
         if self.instrumented {
-            debug!(target: "z80", "{:04X} {:?} A:{:02X} F:{:08b} BC:{:04X} DE:{:04X} HL:{:04X} IX:{:04X} IY:{:04X} I:{:02X} R:{:02X} SP:{:04X} {}",
+            log!(target: "z80",
+                if self.pc_breaks.contains(&opcode_pc) {
+                    Level::Error
+                } else if self.pc_watches.contains(&opcode_pc) {
+                    Level::Warn
+                } else {
+                    Level::Debug
+                },
+                "{:04X} {:?} A:{:02X} F:{:08b} BC:{:04X} DE:{:04X} HL:{:04X} IX:{:04X} IY:{:04X} I:{:02X} R:{:02X} SP:{:04X} {}",
                 opcode_pc,
                 opcode,
                 self.a[self.af_bank],
@@ -531,6 +601,9 @@ impl Cpu<'_> {
                 self.sp,
                 self.cycle_count,
             );
+            if self.pc_breaks.contains(&opcode_pc) {
+                panic!()
+            }
         }
 
         let r_high_bit = self.r >> 7;
@@ -1423,6 +1496,18 @@ impl Cpu<'_> {
 
     pub fn next_op(&mut self) -> u8 {
         self.read_addr(self.pc)
+    }
+
+    pub fn set_memory_watch(&mut self, addr: u16) {
+        self.memory_watches.insert(addr);
+    }
+
+    pub fn set_pc_watch(&mut self, addr: u16) {
+        self.pc_watches.insert(addr);
+    }
+
+    pub fn set_pc_break(&mut self, addr: u16) {
+        self.pc_breaks.insert(addr);
     }
 
     fn arithmetic_cycles(mode: AddrMode) -> u16 {
