@@ -51,6 +51,7 @@ pub struct Cpu<'a> {
     pc_watches: Box<HashSet<u16>>,
     pc_breaks: Box<HashSet<u16>>,
     memory_watches: Box<HashSet<u16>>,
+    memory_breaks: Box<HashSet<u16>>,
 }
 
 impl Cpu<'_> {
@@ -87,6 +88,7 @@ impl Cpu<'_> {
             pc_watches: Box::new(HashSet::new()),
             pc_breaks: Box::new(HashSet::new()),
             memory_watches: Box::new(HashSet::new()),
+            memory_breaks: Box::new(HashSet::new()),
         }
     }
 
@@ -101,7 +103,9 @@ impl Cpu<'_> {
                 0x6100..=0x7EFF => 0xFF,
                 0x7F00..=0x7F1F => 0, // TODO: VDP
                 0x7F20..=0x7FFF => 0xFF,
-                0x8000..=0xFFFF => self._cartridge[self.bank_register as usize + (addr - 0x8000) as usize],
+                0x8000..=0xFFFF => {
+                    self._cartridge[self.bank_register as usize + (addr - 0x8000) as usize]
+                }
             },
         };
         if self.instrumented
@@ -259,6 +263,13 @@ impl Cpu<'_> {
                 );
             }
         }
+        if self.instrumented
+            && self.has_bus
+            && (self.memory_breaks.contains(&addr)
+            || self.memory_breaks.contains(&(addr.saturating_sub(0x2000))))
+        {
+            panic!()
+        }
         match &mut self.test_ram {
             Some(ram) => ram[addr as usize] = val,
             None => match addr {
@@ -266,7 +277,8 @@ impl Cpu<'_> {
                 0x2000..=0x3FFF => self.ram[(addr - 0x2000) as usize] = val,
                 0x4000..=0x5FFF => {} // TODO: YM2612
                 0x6000 => {
-                    self.bank_register = (self.bank_register >> 1) | (((val & 0b1) as u32) << 23);
+                    self.bank_register =
+                        ((self.bank_register >> 1) & 0xFF8000) | (((val & 0b1) as u32) << 23);
                 }
                 0x6001..=0x60FF => {}
                 0x6100..=0x7EFF => {}
@@ -1500,6 +1512,10 @@ impl Cpu<'_> {
 
     pub fn set_memory_watch(&mut self, addr: u16) {
         self.memory_watches.insert(addr);
+    }
+
+    pub fn set_memory_break(&mut self, addr: u16) {
+        self.memory_breaks.insert(addr);
     }
 
     pub fn set_pc_watch(&mut self, addr: u16) {
