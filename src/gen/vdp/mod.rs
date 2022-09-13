@@ -579,6 +579,7 @@ impl<'a> Vdp<'a> {
                     };
 
                     match (&sprite_pixel, palette_color) {
+                        (_, 0) => {}
                         (SpritePixel::Transparent, _) => {
                             sprite_pixel = if enable_shadow_highlight
                                 && sprite.palette_line == 3
@@ -598,7 +599,6 @@ impl<'a> Vdp<'a> {
                             };
                             high_priority = sprite.high_priority;
                         }
-                        (_, 0) => {}
                         (_, _) => status.sprite_overlap = true,
                     }
                 }
