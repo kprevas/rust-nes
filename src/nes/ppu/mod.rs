@@ -4,10 +4,10 @@ use std::cell::RefCell;
 
 use bincode::{deserialize_from, serialize};
 use bytes::*;
+use gfx_device_gl::Device;
 use image::{GenericImage, Rgba};
 use piston_window::*;
 
-use gfx_device_gl::Device;
 use nes::cartridge::CartridgeBus;
 use window::renderer::Renderer;
 
@@ -45,7 +45,7 @@ impl Default for Sprite {
 
 pub struct Ppu<'a> {
     image_buffer: triple_buffer::Input<Box<[usize; 61440]>>,
-    renderer: Renderer,
+    renderer: Renderer<1>,
 
     scanline: u16,
     dot: u16,
@@ -95,7 +95,7 @@ impl<'a> Ppu<'a> {
     ) -> Ppu<'b> {
         let (image_buffer, image_buffer_out) =
             TripleBuffer::new(&Box::new([0usize; 61440])).split();
-        let renderer = Renderer::new(window, image_buffer_out, 256, |image_buffer_out, image| {
+        let renderer = Renderer::new(window, [image_buffer_out], 256, |image_buffer_out, image| {
             let pixels = image_buffer_out.output_buffer();
             let mut dot = 0;
             let mut scanline = 0;

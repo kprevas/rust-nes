@@ -1,4 +1,5 @@
 #![feature(mixed_integer_ops)]
+#![feature(array_methods)]
 
 extern crate bincode;
 extern crate bytes;

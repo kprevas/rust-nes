@@ -3,58 +3,67 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::thread::JoinHandle;
 
+use gfx_device_gl::Device;
 use image::{DynamicImage, GenericImage};
 use piston_window::*;
 use triple_buffer::Output;
 
-use gfx_device_gl::Device;
-
-pub struct Renderer {
-    image: Arc<Mutex<DynamicImage>>,
-    texture: Option<G2dTexture>,
+pub struct Renderer<const L: usize> {
+    background: [f32; 4],
+    images: [Arc<Mutex<DynamicImage>>; L],
+    textures: Option<[G2dTexture; L]>,
     join_handle: Option<JoinHandle<()>>,
     closed: Arc<AtomicBool>,
 }
 
-impl Renderer {
+impl<const L: usize> Renderer<L> {
     pub fn new<P: Send + 'static, const N: usize, W: Window>(
         window: Option<&mut PistonWindow<W>>,
-        mut image_buffer_out: Output<Box<[P; N]>>,
+        mut image_buffer_outs: [Output<Box<[P; N]>>; L],
         width: u32,
         fill: fn(&mut Output<Box<[P; N]>>, &mut DynamicImage),
-    ) -> Renderer {
+    ) -> Renderer<L> {
         let height = (N as u32) / width;
-        let image = Arc::new(Mutex::new(DynamicImage::new_rgba8(width, height)));
-        let image_clone = image.clone();
-        let texture = window.map(|window| {
-            G2dTexture::from_image(
+        let images = [0; L].map(|_| Arc::new(Mutex::new(DynamicImage::new_rgba8(width, height))));
+        let image_clones = images.each_ref().map(|image| image.clone());
+        let textures = window.map(|window| {
+            [0; L].map(|i| G2dTexture::from_image(
                 &mut window.create_texture_context(),
-                image.lock().unwrap().as_rgba8().unwrap(),
+                images[i].lock().unwrap().as_rgba8().unwrap(),
                 &TextureSettings::new(),
             )
-                .unwrap()
+                .unwrap())
         });
         let closed = Arc::new(AtomicBool::new(false));
         let closed_clone = closed.clone();
 
         let join_handle = thread::spawn(move || {
-            let mut image = DynamicImage::new_rgba8(width, height);
+            let mut images = [0; L].map(|_| DynamicImage::new_rgba8(width, height));
             loop {
-                image_buffer_out.update();
+                for buf in &mut image_buffer_outs {
+                    buf.update();
+                }
                 if closed_clone.load(Ordering::Relaxed) {
                     break;
                 }
-                fill(&mut image_buffer_out, &mut image);
-                image_clone.lock().unwrap().copy_from(&image, 0, 0).unwrap();
+                for i in 0..L {
+                    fill(&mut image_buffer_outs[i], &mut images[i]);
+                    image_clones[i].lock().unwrap().copy_from(&images[i], 0, 0).unwrap();
+                }
             }
         });
 
         Renderer {
-            image,
-            texture,
+            background: [0.0, 0.0, 0.0, 1.0],
+            images,
+            textures,
             join_handle: Some(join_handle),
             closed,
         }
+    }
+
+    pub fn set_background(&mut self, background: [f32; 4]) {
+        self.background = background;
     }
 
     pub fn render(
@@ -65,14 +74,17 @@ impl Renderer {
         device: &mut Device,
         x_scale: f64,
     ) {
-        if let Some(ref mut texture) = self.texture {
-            texture
-                .update(
-                    &mut texture_ctx,
-                    self.image.lock().unwrap().as_rgba8().unwrap(),
-                )
-                .unwrap();
-            image(texture, c.transform.scale(x_scale, 1.0), gl);
+        clear(self.background, gl);
+        if let Some(ref mut textures) = self.textures {
+            for (i, texture) in textures.iter_mut().enumerate() {
+                texture
+                    .update(
+                        &mut texture_ctx,
+                        self.images[i].lock().unwrap().as_rgba8().unwrap(),
+                    )
+                    .unwrap();
+                image(texture, c.transform.scale(x_scale, 1.0), gl);
+            }
             texture_ctx.encoder.flush(device);
         }
     }

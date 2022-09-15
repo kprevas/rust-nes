@@ -6,7 +6,7 @@ use gfx_device_gl::Device;
 use image::{GenericImage, Rgba};
 use num_integer::Integer;
 use piston_window::*;
-use triple_buffer::TripleBuffer;
+use triple_buffer::triple_buffer;
 
 use gen::vdp::bus::{
     Addr, AddrMode, AddrTarget, HorizontalScrollingMode, Status, VdpBus, VerticalScrollingMode,
@@ -19,6 +19,15 @@ pub mod bus;
 const BRIGHTNESS_VALS: [u8; 8] = [0, 52, 87, 116, 144, 172, 206, 255];
 const BRIGHTNESS_VALS_SHADOW: [u8; 8] = [0, 29, 52, 70, 87, 101, 116, 130];
 const BRIGHTNESS_VALS_HIGHLIGHT: [u8; 8] = [130, 144, 158, 172, 187, 206, 228, 255];
+
+const WINDOW_PRIORITY: usize = 7;
+const SPRITE_PRIORITY: usize = 6;
+const PLANE_A_PRIORITY: usize = 5;
+const PLANE_B_PRIORITY: usize = 4;
+const WINDOW: usize = 3;
+const SPRITE: usize = 2;
+const PLANE_A: usize = 1;
+const PLANE_B: usize = 0;
 
 #[derive(Copy, Clone)]
 enum SpritePixel {
@@ -44,8 +53,8 @@ struct Sprite {
 
 #[allow(dead_code)]
 pub struct Vdp<'a> {
-    image_buffer: triple_buffer::Input<Box<[[u8; 4]; 71680]>>,
-    renderer: Renderer,
+    image_buffers: [triple_buffer::Input<Box<[[u8; 4]; 71680]>>; 8],
+    renderer: Renderer<8>,
 
     scanline: u16,
     dot: u16,
@@ -76,9 +85,19 @@ impl<'a> Vdp<'a> {
         window: Option<&mut PistonWindow<W>>,
         dump_mode: bool,
     ) -> Vdp<'b> {
-        let (image_buffer, image_buffer_out) =
-            TripleBuffer::new(&Box::new([[0u8; 4]; 71680])).split();
-        let renderer = Renderer::new(window, image_buffer_out, 320, |image_buffer_out, image| {
+        let (buf0, buf0_out) = triple_buffer(&Box::new([[0u8; 4]; 71680]));
+        let (buf1, buf1_out) = triple_buffer(&Box::new([[0u8; 4]; 71680]));
+        let (buf2, buf2_out) = triple_buffer(&Box::new([[0u8; 4]; 71680]));
+        let (buf3, buf3_out) = triple_buffer(&Box::new([[0u8; 4]; 71680]));
+        let (buf4, buf4_out) = triple_buffer(&Box::new([[0u8; 4]; 71680]));
+        let (buf5, buf5_out) = triple_buffer(&Box::new([[0u8; 4]; 71680]));
+        let (buf6, buf6_out) = triple_buffer(&Box::new([[0u8; 4]; 71680]));
+        let (buf7, buf7_out) = triple_buffer(&Box::new([[0u8; 4]; 71680]));
+        let image_buffers = [buf0, buf1, buf2, buf3, buf4, buf5, buf6, buf7];
+        let image_buffer_outs = [
+            buf0_out, buf1_out, buf2_out, buf3_out, buf4_out, buf5_out, buf6_out, buf7_out,
+        ];
+        let renderer = Renderer::new(window, image_buffer_outs, 320, |image_buffer_out, image| {
             let pixels = image_buffer_out.output_buffer();
             let mut dot = 0;
             let mut scanline = 0;
@@ -93,7 +112,7 @@ impl<'a> Vdp<'a> {
         });
 
         Vdp {
-            image_buffer,
+            image_buffers,
             renderer,
             scanline: 0,
             dot: 0,
@@ -238,13 +257,14 @@ impl<'a> Vdp<'a> {
             && self.dot < width
             && self.scanline < 224
         {
-            let mut pixel = None;
             let x = self.dot;
             let y = self.scanline;
 
             if self.dump_mode {
                 self.draw_dump_pixel(x, y, width);
             } else {
+                let i = y as usize * 320 as usize + ((320 - width) / 2) as usize + x as usize;
+
                 let mut shadow = false;
                 let mut highlight = false;
 
@@ -263,11 +283,21 @@ impl<'a> Vdp<'a> {
                     WindowVPos::DrawToTop(window_height) => y < window_height as u16 * 8,
                     WindowVPos::DrawToBottom(window_height) => y > 224 - window_height as u16 * 8,
                 };
-                let window_pixel = if x_in_window || y_in_window {
-                    self.get_pixel(x, y, window_tile_data, false, false)
-                } else {
-                    None
-                };
+
+                self.image_buffers[WINDOW_PRIORITY].input_buffer()[i] =
+                    if window_priority && (x_in_window || y_in_window) {
+                        self.get_pixel(x, y, window_tile_data, false, false)
+                            .unwrap_or([0, 0, 0, 0])
+                    } else {
+                        [0, 0, 0, 0]
+                    };
+                self.image_buffers[WINDOW].input_buffer()[i] =
+                    if !window_priority && (x_in_window || y_in_window) {
+                        self.get_pixel(x, y, window_tile_data, false, false)
+                            .unwrap_or([0, 0, 0, 0])
+                    } else {
+                        [0, 0, 0, 0]
+                    };
 
                 let (plane_a_x, plane_a_y, plane_a_tile_data) = self.plane_scroll(
                     x,
@@ -315,46 +345,47 @@ impl<'a> Vdp<'a> {
                         }
                         None
                     }
-                    SpritePixel::Color { palette_line, palette_color } =>
-                        Some(self.get_color(palette_line, palette_color, shadow, highlight)),
+                    SpritePixel::Color {
+                        palette_line,
+                        palette_color,
+                    } => Some(self.get_color(palette_line, palette_color, shadow, highlight)),
+                };
+                self.image_buffers[SPRITE_PRIORITY].input_buffer()[i] = if sprite_priority {
+                    sprite_pixel.unwrap_or([0, 0, 0, 0])
+                } else {
+                    [0, 0, 0, 0]
+                };
+                self.image_buffers[SPRITE].input_buffer()[i] = if !sprite_priority {
+                    sprite_pixel.unwrap_or([0, 0, 0, 0])
+                } else {
+                    [0, 0, 0, 0]
                 };
 
                 let plane_a_pixel =
                     self.get_pixel(plane_a_x, plane_a_y, plane_a_tile_data, shadow, highlight);
+                self.image_buffers[PLANE_A_PRIORITY].input_buffer()[i] = if plane_a_priority {
+                    plane_a_pixel.unwrap_or([0, 0, 0, 0])
+                } else {
+                    [0, 0, 0, 0]
+                };
+                self.image_buffers[PLANE_A].input_buffer()[i] = if !plane_a_priority {
+                    plane_a_pixel.unwrap_or([0, 0, 0, 0])
+                } else {
+                    [0, 0, 0, 0]
+                };
+
                 let plane_b_pixel =
                     self.get_pixel(plane_b_x, plane_b_y, plane_b_tile_data, shadow, highlight);
-
-                if pixel.is_none() && window_priority {
-                    pixel = window_pixel;
-                }
-                if pixel.is_none() && sprite_priority {
-                    pixel = sprite_pixel;
-                }
-                if pixel.is_none() && plane_a_priority {
-                    pixel = plane_a_pixel;
-                }
-                if pixel.is_none() && plane_b_priority {
-                    pixel = plane_b_pixel;
-                }
-                if pixel.is_none() {
-                    pixel = window_pixel;
-                }
-                if pixel.is_none() {
-                    pixel = sprite_pixel;
-                }
-                if pixel.is_none() {
-                    pixel = plane_a_pixel;
-                }
-                if pixel.is_none() {
-                    pixel = plane_b_pixel;
-                }
-                if pixel.is_none() {
-                    pixel = Some(self.get_color(bus.bg_palette, bus.bg_color, false, false));
-                }
-
-                self.image_buffer.input_buffer()
-                    [y as usize * 320 as usize + ((320 - width) / 2) as usize + x as usize] =
-                    pixel.unwrap();
+                self.image_buffers[PLANE_B_PRIORITY].input_buffer()[i] = if plane_b_priority {
+                    plane_b_pixel.unwrap_or([0, 0, 0, 0])
+                } else {
+                    [0, 0, 0, 0]
+                };
+                self.image_buffers[PLANE_B].input_buffer()[i] = if !plane_b_priority {
+                    plane_b_pixel.unwrap_or([0, 0, 0, 0])
+                } else {
+                    [0, 0, 0, 0]
+                };
             }
         }
 
@@ -377,9 +408,14 @@ impl<'a> Vdp<'a> {
                     bus.vertical_interrupt = true;
                 }
                 bus.z80_interrupt = true;
-                self.image_buffer.publish();
+                for buf in &mut self.image_buffers {
+                    buf.publish();
+                }
                 let bg = self.get_color(bus.bg_palette, bus.bg_color, false, false);
-                self.image_buffer.input_buffer().fill(bg);
+                self.renderer.set_background(bg.map(|c| (c as f32) / 255.0));
+                for buf in &mut self.image_buffers {
+                    buf.input_buffer().fill([0, 0, 0, 0]);
+                }
                 if self.dump_mode {
                     self.dump_sprite_table(bus.sprite_table_addr as usize);
                 }
@@ -695,7 +731,7 @@ impl<'a> Vdp<'a> {
             };
             self.get_color(0, palette_color, false, false)
         };
-        self.image_buffer.input_buffer()
+        self.image_buffers[0].input_buffer()
             [y as usize * 320 as usize + ((320 - width) / 2) as usize + x as usize] = pixel;
     }
 
@@ -720,7 +756,9 @@ impl<'a> Vdp<'a> {
     }
 
     pub fn close(&mut self) {
-        self.image_buffer.publish();
+        for buf in &mut self.image_buffers {
+            buf.publish();
+        }
         self.renderer.close();
     }
 }
