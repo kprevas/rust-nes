@@ -48,6 +48,7 @@ impl<const B: usize> Control<B> {
         pause: &mut bool,
         step: &mut bool,
         input_overlay: &mut bool,
+        render_layers: &mut usize,
         recorder: &mut Recorder<B>,
         frame_count: u32,
     ) {
@@ -87,6 +88,12 @@ impl<const B: usize> Control<B> {
             }
             if key_pressed == Key::Minus {
                 cpu.decrease_speed();
+            }
+            if key_pressed == Key::LeftBracket {
+                *render_layers = render_layers.wrapping_sub(1);
+            }
+            if key_pressed == Key::RightBracket {
+                *render_layers = render_layers.wrapping_add(1);
             }
             if *pause && key_pressed == Key::Space {
                 *step = true;

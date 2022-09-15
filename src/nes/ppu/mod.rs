@@ -658,7 +658,7 @@ impl<'a> Ppu<'a> {
         gl: &mut G2d,
         device: &mut Device,
     ) {
-        self.renderer.render(c, texture_ctx, gl, device, 8.0 / 7.0);
+        self.renderer.render(c, texture_ctx, gl, device, 8.0 / 7.0, 0);
     }
 
     pub fn close(&mut self) {

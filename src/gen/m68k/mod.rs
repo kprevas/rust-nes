@@ -3036,10 +3036,11 @@ impl window::Cpu for Cpu<'_> {
         texture_ctx: &mut G2dTextureContext,
         gl: &mut G2d,
         device: &mut Device,
+        layers: usize,
     ) {
         self.vdp
             .as_mut()
-            .map(|vdp| vdp.render(c, texture_ctx, gl, device));
+            .map(|vdp| vdp.render(c, texture_ctx, gl, device, layers));
     }
 
     fn save_state(&self, _out: &mut Vec<u8>) {

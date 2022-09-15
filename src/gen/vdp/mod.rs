@@ -751,8 +751,9 @@ impl<'a> Vdp<'a> {
         texture_ctx: &mut G2dTextureContext,
         gl: &mut G2d,
         device: &mut Device,
+        layers: usize,
     ) {
-        self.renderer.render(c, texture_ctx, gl, device, 1.0);
+        self.renderer.render(c, texture_ctx, gl, device, 1.0, layers);
     }
 
     pub fn close(&mut self) {

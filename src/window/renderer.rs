@@ -73,17 +73,21 @@ impl<const L: usize> Renderer<L> {
         gl: &mut G2d,
         device: &mut Device,
         x_scale: f64,
+        layers: usize,
     ) {
-        clear(self.background, gl);
+        let layers = layers % (L + 1);
+        clear(if layers == 0 { self.background } else { [1.0, 0.0, 1.0, 1.0] }, gl);
         if let Some(ref mut textures) = self.textures {
             for (i, texture) in textures.iter_mut().enumerate() {
-                texture
-                    .update(
-                        &mut texture_ctx,
-                        self.images[i].lock().unwrap().as_rgba8().unwrap(),
-                    )
-                    .unwrap();
-                image(texture, c.transform.scale(x_scale, 1.0), gl);
+                if layers == 0 || layers - 1 == i {
+                    texture
+                        .update(
+                            &mut texture_ctx,
+                            self.images[i].lock().unwrap().as_rgba8().unwrap(),
+                        )
+                        .unwrap();
+                    image(texture, c.transform.scale(x_scale, 1.0), gl);
+                }
             }
             texture_ctx.encoder.flush(device);
         }

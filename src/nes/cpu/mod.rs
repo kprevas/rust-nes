@@ -6,9 +6,9 @@ use std::ops::Range;
 
 use bincode::{deserialize_from, serialize};
 use bytes::*;
+use gfx_device_gl::Device;
 use piston_window::{Context, G2d, G2dTextureContext};
 
-use gfx_device_gl::Device;
 use input::ControllerState;
 use nes::apu::*;
 use nes::apu::bus::*;
@@ -1230,6 +1230,7 @@ impl window::Cpu for Cpu<'_> {
         texture_ctx: &mut G2dTextureContext,
         gl: &mut G2d,
         device: &mut Device,
+        _: usize,
     ) {
         self.ppu.render(c, texture_ctx, gl, device);
     }
