@@ -9,7 +9,7 @@ fn main() {
     let matches = clap_app!(myapp =>
         (@subcommand disassemble =>
             (about: "disassemble a ROM file")
-            (@arg OUTPUT: -o "the output file (stdout if not provided)")
+            (@arg OUTPUT: -o +takes_value "the output file (stdout if not provided)")
         )
         (@subcommand run =>
             (about: "load and run a ROM")
