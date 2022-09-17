@@ -77,6 +77,7 @@ pub struct Vdp<'a> {
     bus: &'a RefCell<VdpBus>,
 
     dump_mode: bool,
+    instrumented: bool,
 }
 
 impl<'a> Vdp<'a> {
@@ -84,6 +85,7 @@ impl<'a> Vdp<'a> {
         bus: &'b RefCell<VdpBus>,
         window: Option<&mut PistonWindow<W>>,
         dump_mode: bool,
+        instrumented: bool,
     ) -> Vdp<'b> {
         let (buf0, buf0_out) = triple_buffer(&Box::new([[0u8; 4]; 71680]));
         let (buf1, buf1_out) = triple_buffer(&Box::new([[0u8; 4]; 71680]));
@@ -129,6 +131,7 @@ impl<'a> Vdp<'a> {
             pixel_clock_tick: false,
             bus,
             dump_mode,
+            instrumented,
         }
     }
 

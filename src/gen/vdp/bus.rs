@@ -1,19 +1,19 @@
 use std::collections::VecDeque;
+use std::fmt::{Debug, Formatter};
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum AddrMode {
     Read,
     Write,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum AddrTarget {
     VRAM,
     CRAM,
     VSRAM,
 }
 
-#[allow(dead_code)]
 #[derive(Copy, Clone)]
 pub struct Addr {
     pub mode: AddrMode,
@@ -21,6 +21,15 @@ pub struct Addr {
     pub addr: u16,
     pub vram_to_vram: bool,
     pub dma: bool,
+}
+
+impl Debug for Addr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!(
+            "{:?} {:?} {:04X} vram_to_vram: {} dma: {}",
+            self.mode, self.target, self.addr, self.vram_to_vram, self.dma,
+        ))
+    }
 }
 
 impl Addr {
@@ -77,6 +86,7 @@ impl Status {
 }
 
 #[allow(dead_code)]
+#[derive(Debug)]
 pub struct Mode1 {
     blank_leftmost_8: bool,
     pub enable_horizontal_interrupt: bool,
@@ -98,6 +108,7 @@ impl Mode1 {
 }
 
 #[allow(dead_code)]
+#[derive(Debug)]
 pub struct Mode2 {
     use_128k_vram: bool,
     pub enable_display: bool,
@@ -120,13 +131,13 @@ impl Mode2 {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum VerticalScrollingMode {
     Column16Pixels,
     FullScreen,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum HorizontalScrollingMode {
     Row1Pixel,
     Row8Pixel,
@@ -135,6 +146,7 @@ pub enum HorizontalScrollingMode {
 }
 
 #[allow(dead_code)]
+#[derive(Debug)]
 pub struct Mode3 {
     enable_external_interrupt: bool,
     pub vertical_scrolling_mode: VerticalScrollingMode,
@@ -161,6 +173,7 @@ impl Mode3 {
     }
 }
 
+#[derive(Debug)]
 enum InterlaceMode {
     NoInterlace,
     InterlaceNormal,
@@ -168,6 +181,7 @@ enum InterlaceMode {
 }
 
 #[allow(dead_code)]
+#[derive(Debug)]
 pub struct Mode4 {
     pub h_40_wide_mode: bool,
     freeze_hsync: bool,
@@ -195,22 +209,26 @@ impl Mode4 {
     }
 }
 
+#[derive(Debug)]
 pub enum WindowHPos {
     DrawToRight(u8),
     DrawToLeft(u8),
 }
 
+#[derive(Debug)]
 pub enum WindowVPos {
     DrawToTop(u8),
     DrawToBottom(u8),
 }
 
+#[derive(Debug)]
 enum DmaType {
     RamToVram,
     VramFill,
     VramToVram,
 }
 
+#[derive(Debug)]
 pub enum WriteData {
     Byte(u8),
     Word(u16),
@@ -247,10 +265,12 @@ pub struct VdpBus {
     pub horizontal_interrupt: bool,
     pub vertical_interrupt: bool,
     pub z80_interrupt: bool,
+
+    instrumented: bool,
 }
 
 impl VdpBus {
-    pub fn new() -> VdpBus {
+    pub fn new(instrumented: bool) -> VdpBus {
         VdpBus {
             control_high_word: None,
             status: Status {
@@ -317,6 +337,7 @@ impl VdpBus {
             horizontal_interrupt: false,
             vertical_interrupt: false,
             z80_interrupt: false,
+            instrumented,
         }
     }
 
@@ -397,10 +418,15 @@ impl VdpBus {
             0xC00000 => {
                 if let Some(Addr {
                                 mode: AddrMode::Write,
+                                addr,
+                                target,
                                 ..
                             }) = &self.addr
                 {
                     self.write_data.push_back(WriteData::Byte(data));
+                    if self.instrumented {
+                        debug!(target: "vdp", "write {:02X} {:08X} {:?}", data, addr, target)
+                    }
                 }
             }
             0xC00004 | 0xC00005 => panic!(), // TODO: allowed?
@@ -414,39 +440,105 @@ impl VdpBus {
             0xC00000 => {
                 if let Some(Addr {
                                 mode: AddrMode::Write,
+                                addr,
+                                target,
                                 ..
                             }) = &self.addr
                 {
                     self.write_data.push_back(WriteData::Word(data));
+                    if self.instrumented {
+                        debug!(target: "vdp", "write {:04X} {:08X} {:?}", data, addr, target)
+                    }
                 }
             }
             0xC00004 => {
                 if let Some(high_word) = self.control_high_word.take() {
                     self.addr = Some(Addr::from_u32(((high_word as u32) << 16) | (data as u32)));
+                    if self.instrumented {
+                        debug!(target: "vdp", "set addr {:?}", self.addr.unwrap())
+                    }
                 } else if (data >> 14) & 0b11 == 0b10 {
                     let (register_number, data) = ((data >> 8) & 0b11111, data & 0xFF);
                     match register_number {
-                        0x00 => self.mode_1 = Mode1::from_u8(data as u8),
-                        0x01 => self.mode_2 = Mode2::from_u8(data as u8),
-                        0x02 => self.plane_a_nametable_addr = data << 10,
+                        0x00 => {
+                            self.mode_1 = Mode1::from_u8(data as u8);
+                            if self.instrumented {
+                                debug!(target: "vdp", "set mode 1 {:?}", self.mode_1);
+                            }
+                        }
+                        0x01 => {
+                            self.mode_2 = Mode2::from_u8(data as u8);
+                            if self.instrumented {
+                                debug!(target: "vdp", "set mode 2 {:?}", self.mode_2);
+                            }
+                        }
+                        0x02 => {
+                            self.plane_a_nametable_addr = data << 10;
+                            if self.instrumented {
+                                debug!(target: "vdp", "set plane A nametable {:04X}", self.plane_a_nametable_addr);
+                            }
+                        }
                         // TODO ignore lsb in 320 pixel mode
-                        0x03 => self.window_nametable_addr = data << 10,
-                        0x04 => self.plane_b_nametable_addr = data << 13,
+                        0x03 => {
+                            self.window_nametable_addr = data << 10;
+                            if self.instrumented {
+                                debug!(target: "vdp", "set window nametable {:04X}", self.window_nametable_addr);
+                            }
+                        }
+                        0x04 => {
+                            self.plane_b_nametable_addr = data << 13;
+                            if self.instrumented {
+                                debug!(target: "vdp", "set plane B nametable {:04X}", self.plane_b_nametable_addr);
+                            }
+                        }
                         // TODO ignore lsb in 320 pixel mode
-                        0x05 => self.sprite_table_addr = data << 9,
+                        0x05 => {
+                            self.sprite_table_addr = data << 9;
+                            if self.instrumented {
+                                debug!(target: "vdp", "set sprite table {:04X}", self.sprite_table_addr);
+                            }
+                        }
                         0x06 => {} // 128k mode sprite table
                         0x07 => {
                             self.bg_palette = ((data >> 4) & 0b11) as u8;
                             self.bg_color = (data & 0b1111) as u8;
+                            if self.instrumented {
+                                debug!(target: "vdp", "set background {} {}", self.bg_palette, self.bg_color);
+                            }
                         }
                         0x08 => {} // Master System horizontal scroll
                         0x09 => {} // Master System vertical scroll
-                        0x0A => self.horizontal_interrupt_counter = data,
-                        0x0B => self.mode_3 = Mode3::from_u8(data as u8),
-                        0x0C => self.mode_4 = Mode4::from_u8(data as u8),
-                        0x0D => self.horizontal_scroll_data_addr = data << 10,
+                        0x0A => {
+                            self.horizontal_interrupt_counter = data;
+                            if self.instrumented {
+                                debug!(target: "vdp", "set horizontal interrupt counter {}", self.horizontal_interrupt);
+                            }
+                        }
+                        0x0B => {
+                            self.mode_3 = Mode3::from_u8(data as u8);
+                            if self.instrumented {
+                                debug!(target: "vdp", "set mode 3 {:?}", self.mode_3);
+                            }
+                        }
+                        0x0C => {
+                            self.mode_4 = Mode4::from_u8(data as u8);
+                            if self.instrumented {
+                                debug!(target: "vdp", "set mode 4 {:?}", self.mode_4);
+                            }
+                        }
+                        0x0D => {
+                            self.horizontal_scroll_data_addr = data << 10;
+                            if self.instrumented {
+                                debug!(target: "vdp", "set horizontal scroll data {:04X}", self.horizontal_scroll_data_addr);
+                            }
+                        }
                         0x0E => {} // 128k mode plane nametables
-                        0x0F => self.auto_increment = data as u8,
+                        0x0F => {
+                            self.auto_increment = data as u8;
+                            if self.instrumented {
+                                debug!(target: "vdp", "set auto-increment {}", self.auto_increment);
+                            }
+                        }
                         0x10 => {
                             self.plane_height = match (data >> 4) & 0b11 {
                                 0b00 => 256,
@@ -462,12 +554,18 @@ impl VdpBus {
                                 0b11 => 1024,
                                 _ => panic!(),
                             };
+                            if self.instrumented {
+                                debug!(target: "vdp", "set plane size {}x{}", self.plane_width, self.plane_height);
+                            }
                         }
                         0x11 => {
                             self.window_h_pos = if (data & 0b10000000) > 0 {
                                 WindowHPos::DrawToRight((data & 0b11111) as u8)
                             } else {
                                 WindowHPos::DrawToLeft((data & 0b11111) as u8)
+                            };
+                            if self.instrumented {
+                                debug!(target: "vdp", "set window horizontal {:?}", self.window_h_pos);
                             }
                         }
                         0x12 => {
@@ -475,17 +573,36 @@ impl VdpBus {
                                 WindowVPos::DrawToBottom((data & 0b11111) as u8)
                             } else {
                                 WindowVPos::DrawToTop((data & 0b11111) as u8)
+                            };
+                            if self.instrumented {
+                                debug!(target: "vdp", "set window vertical {:?}", self.window_v_pos);
                             }
                         }
-                        0x13 => self.dma_length_half = (self.dma_length_half & 0xFF00) | data,
-                        0x14 => self.dma_length_half = (self.dma_length_half & 0xFF) | (data << 8),
+                        0x13 => {
+                            self.dma_length_half = (self.dma_length_half & 0xFF00) | data;
+                            if self.instrumented {
+                                debug!(target: "vdp", "set DMA length {}", self.dma_length_half as u32 * 2);
+                            }
+                        }
+                        0x14 => {
+                            self.dma_length_half = (self.dma_length_half & 0xFF) | (data << 8);
+                            if self.instrumented {
+                                debug!(target: "vdp", "set DMA length {}", self.dma_length_half as u32 * 2);
+                            }
+                        }
                         0x15 => {
                             self.dma_source_addr_half =
-                                (self.dma_source_addr_half & 0xFFFF00) | data as u32
+                                (self.dma_source_addr_half & 0xFFFF00) | data as u32;
+                            if self.instrumented {
+                                debug!(target: "vdp", "set DMA source {:06X}", self.dma_source_addr_half * 2);
+                            }
                         }
                         0x16 => {
                             self.dma_source_addr_half =
-                                (self.dma_source_addr_half & 0xFF00FF) | ((data as u32) << 8)
+                                (self.dma_source_addr_half & 0xFF00FF) | ((data as u32) << 8);
+                            if self.instrumented {
+                                debug!(target: "vdp", "set DMA source {:06X}", self.dma_source_addr_half * 2);
+                            }
                         }
                         0x17 => {
                             self.dma_type = match (data & 0b11000000) >> 6 {
@@ -500,6 +617,9 @@ impl VdpBus {
                             };
                             self.dma_source_addr_half = (self.dma_source_addr_half & 0x00FFFF)
                                 | (((data & addr_mask) as u32) << 16);
+                            if self.instrumented {
+                                debug!(target: "vdp", "set DMA source {:06X} {:?}", self.dma_source_addr_half * 2, self.dma_type);
+                            }
                         }
                         _ => panic!(),
                     }
@@ -563,23 +683,28 @@ impl VdpBus {
         } else {
             0
         };
+        if self.instrumented {
+            debug!(target: "vdp", "DMA {:?} {:06X} to {:04X}, length {}",
+                self.dma_type,
+                self.dma_source_addr_half * 2,
+                self.addr.unwrap().addr,
+                self.dma_length_half as u32 * 2);
+        }
         while len > 0 {
             let source = self.dma_source_addr_half as usize * 2;
             let addr = self.addr.unwrap().addr as usize;
             match self.dma_type {
-                DmaType::RamToVram => {
-                    match source {
-                        0x000000..=0x3FFFFF => {
-                            target[addr] = m68k_cartridge[source];
-                            target[addr + 1] = m68k_cartridge[source + 1];
-                        }
-                        0xE00000..=0xFFFFFF => {
-                            target[addr] = m68k_ram[source & 0xFFFF];
-                            target[addr + 1] = m68k_ram[(source & 0xFFFF) + 1];
-                        }
-                        _ => panic!(),
+                DmaType::RamToVram => match source {
+                    0x000000..=0x3FFFFF => {
+                        target[addr] = m68k_cartridge[source];
+                        target[addr + 1] = m68k_cartridge[source + 1];
                     }
-                }
+                    0xE00000..=0xFFFFFF => {
+                        target[addr] = m68k_ram[source & 0xFFFF];
+                        target[addr + 1] = m68k_ram[(source & 0xFFFF) + 1];
+                    }
+                    _ => panic!(),
+                },
                 DmaType::VramFill => {
                     target[addr] = fill_val;
                     target[addr + 1] = fill_val;
