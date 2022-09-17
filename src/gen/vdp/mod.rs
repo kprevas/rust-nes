@@ -279,12 +279,12 @@ impl<'a> Vdp<'a> {
                 let window_priority = (window_tile_data >> 15) & 0b1 > 0;
 
                 let x_in_window = match bus.window_h_pos {
-                    WindowHPos::DrawToRight(window_width) => x > width - window_width as u16 * 8,
-                    WindowHPos::DrawToLeft(window_width) => x < window_width as u16 * 8,
+                    WindowHPos::DrawToRight(window_base) => x > window_base as u16 * 8,
+                    WindowHPos::DrawToLeft(window_base) => x < window_base as u16 * 8,
                 };
                 let y_in_window = match bus.window_v_pos {
-                    WindowVPos::DrawToTop(window_height) => y < window_height as u16 * 8,
-                    WindowVPos::DrawToBottom(window_height) => y > 224 - window_height as u16 * 8,
+                    WindowVPos::DrawToTop(window_base) => y < window_base as u16 * 8,
+                    WindowVPos::DrawToBottom(window_base) => y > window_base as u16 * 8,
                 };
 
                 self.image_buffers[WINDOW_PRIORITY].input_buffer()[i] =
