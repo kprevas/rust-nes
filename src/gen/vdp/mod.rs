@@ -366,12 +366,17 @@ impl<'a> Vdp<'a> {
 
                 let plane_a_pixel =
                     self.get_pixel(plane_a_x, plane_a_y, plane_a_tile_data, shadow, highlight);
-                self.image_buffers[PLANE_A_PRIORITY].input_buffer()[i] = if plane_a_priority {
-                    plane_a_pixel.unwrap_or([0, 0, 0, 0])
-                } else {
+                self.image_buffers[PLANE_A_PRIORITY].input_buffer()[i] =
+                    if x_in_window || y_in_window {
+                        [0, 0, 0, 0]
+                    } else if plane_a_priority {
+                        plane_a_pixel.unwrap_or([0, 0, 0, 0])
+                    } else {
+                        [0, 0, 0, 0]
+                    };
+                self.image_buffers[PLANE_A].input_buffer()[i] = if x_in_window || y_in_window {
                     [0, 0, 0, 0]
-                };
-                self.image_buffers[PLANE_A].input_buffer()[i] = if !plane_a_priority {
+                } else if !plane_a_priority {
                     plane_a_pixel.unwrap_or([0, 0, 0, 0])
                 } else {
                     [0, 0, 0, 0]
@@ -756,7 +761,8 @@ impl<'a> Vdp<'a> {
         device: &mut Device,
         layers: usize,
     ) {
-        self.renderer.render(c, texture_ctx, gl, device, 1.0, layers);
+        self.renderer
+            .render(c, texture_ctx, gl, device, 1.0, layers);
     }
 
     pub fn close(&mut self) {
