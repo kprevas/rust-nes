@@ -201,7 +201,7 @@ fn run_json_test(test_cases: JsonValue) {
             continue;
         }
         let cartridge = vec![0; 8].into_boxed_slice();
-        let vdp_bus = RefCell::new(VdpBus::new());
+        let vdp_bus = RefCell::new(VdpBus::new(false));
         let mut cpu = emu::gen::m68k::Cpu::boot(&cartridge, None, &vdp_bus, true);
         cpu.expand_ram(0x1000000);
         cpu.reset(false);
@@ -297,7 +297,7 @@ fn test_all_opcodes() {
     let _ = env_logger::try_init();
     let rom = include_bytes!("m68k/opcodes.bin");
     let cartridge = vec![0; 8].into_boxed_slice();
-    let vdp_bus = RefCell::new(VdpBus::new());
+    let vdp_bus = RefCell::new(VdpBus::new(false));
     let mut cpu = emu::gen::m68k::Cpu::boot(&cartridge, None, &vdp_bus, true);
     cpu.set_ram(rom);
     cpu.reset(false);
@@ -321,7 +321,7 @@ fn test_bcd_verifier() {
     let cartridge = include_bytes!("m68k/bcd-verifier-u1.bin")
         .to_vec()
         .into_boxed_slice();
-    let vdp_bus = RefCell::new(VdpBus::new());
+    let vdp_bus = RefCell::new(VdpBus::new(false));
     let mut cpu = emu::gen::m68k::Cpu::boot(&cartridge, None, &vdp_bus, true);
     cpu.reset(false);
     while cpu.pc_for_test() != 0x123a {
