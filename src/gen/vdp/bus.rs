@@ -425,7 +425,7 @@ impl VdpBus {
                 {
                     self.write_data.push_back(WriteData::Byte(data));
                     if self.instrumented {
-                        debug!(target: "vdp", "write {:02X} {:08X} {:?}", data, addr, target)
+                        debug!(target: "vdp", "{} {} write {:02X} {:08X} {:?}", self.beam_vpos, self.beam_hpos, data, addr, target)
                     }
                 }
             }
@@ -447,7 +447,7 @@ impl VdpBus {
                 {
                     self.write_data.push_back(WriteData::Word(data));
                     if self.instrumented {
-                        debug!(target: "vdp", "write {:04X} {:08X} {:?}", data, addr, target)
+                        debug!(target: "vdp", "{} {} write {:04X} {:08X} {:?}", self.beam_vpos, self.beam_hpos, data, addr, target)
                     }
                 }
             }
@@ -455,7 +455,7 @@ impl VdpBus {
                 if let Some(high_word) = self.control_high_word.take() {
                     self.addr = Some(Addr::from_u32(((high_word as u32) << 16) | (data as u32)));
                     if self.instrumented {
-                        debug!(target: "vdp", "set addr {:?}", self.addr.unwrap())
+                        debug!(target: "vdp", "{} {} set addr {:?}", self.beam_vpos, self.beam_hpos, self.addr.unwrap())
                     }
                 } else if (data >> 14) & 0b11 == 0b10 {
                     let (register_number, data) = ((data >> 8) & 0b11111, data & 0xFF);
@@ -463,39 +463,39 @@ impl VdpBus {
                         0x00 => {
                             self.mode_1 = Mode1::from_u8(data as u8);
                             if self.instrumented {
-                                debug!(target: "vdp", "set mode 1 {:?}", self.mode_1);
+                                debug!(target: "vdp", "{} {} set mode 1 {:?}", self.beam_vpos, self.beam_hpos, self.mode_1);
                             }
                         }
                         0x01 => {
                             self.mode_2 = Mode2::from_u8(data as u8);
                             if self.instrumented {
-                                debug!(target: "vdp", "set mode 2 {:?}", self.mode_2);
+                                debug!(target: "vdp", "{} {} set mode 2 {:?}", self.beam_vpos, self.beam_hpos, self.mode_2);
                             }
                         }
                         0x02 => {
                             self.plane_a_nametable_addr = data << 10;
                             if self.instrumented {
-                                debug!(target: "vdp", "set plane A nametable {:04X}", self.plane_a_nametable_addr);
+                                debug!(target: "vdp", "{} {} set plane A nametable {:04X}", self.beam_vpos, self.beam_hpos, self.plane_a_nametable_addr);
                             }
                         }
                         // TODO ignore lsb in 320 pixel mode
                         0x03 => {
                             self.window_nametable_addr = data << 10;
                             if self.instrumented {
-                                debug!(target: "vdp", "set window nametable {:04X}", self.window_nametable_addr);
+                                debug!(target: "vdp", "{} {} set window nametable {:04X}", self.beam_vpos, self.beam_hpos, self.window_nametable_addr);
                             }
                         }
                         0x04 => {
                             self.plane_b_nametable_addr = data << 13;
                             if self.instrumented {
-                                debug!(target: "vdp", "set plane B nametable {:04X}", self.plane_b_nametable_addr);
+                                debug!(target: "vdp", "{} {} set plane B nametable {:04X}", self.beam_vpos, self.beam_hpos, self.plane_b_nametable_addr);
                             }
                         }
                         // TODO ignore lsb in 320 pixel mode
                         0x05 => {
                             self.sprite_table_addr = data << 9;
                             if self.instrumented {
-                                debug!(target: "vdp", "set sprite table {:04X}", self.sprite_table_addr);
+                                debug!(target: "vdp", "{} {} set sprite table {:04X}", self.beam_vpos, self.beam_hpos, self.sprite_table_addr);
                             }
                         }
                         0x06 => {} // 128k mode sprite table
@@ -503,7 +503,7 @@ impl VdpBus {
                             self.bg_palette = ((data >> 4) & 0b11) as u8;
                             self.bg_color = (data & 0b1111) as u8;
                             if self.instrumented {
-                                debug!(target: "vdp", "set background {} {}", self.bg_palette, self.bg_color);
+                                debug!(target: "vdp", "{} {} set background {} {}", self.beam_vpos, self.beam_hpos, self.bg_palette, self.bg_color);
                             }
                         }
                         0x08 => {} // Master System horizontal scroll
@@ -511,32 +511,32 @@ impl VdpBus {
                         0x0A => {
                             self.horizontal_interrupt_counter = data;
                             if self.instrumented {
-                                debug!(target: "vdp", "set horizontal interrupt counter {}", self.horizontal_interrupt);
+                                debug!(target: "vdp", "{} {} set horizontal interrupt counter {}", self.beam_vpos, self.beam_hpos, self.horizontal_interrupt);
                             }
                         }
                         0x0B => {
                             self.mode_3 = Mode3::from_u8(data as u8);
                             if self.instrumented {
-                                debug!(target: "vdp", "set mode 3 {:?}", self.mode_3);
+                                debug!(target: "vdp", "{} {} set mode 3 {:?}", self.beam_vpos, self.beam_hpos, self.mode_3);
                             }
                         }
                         0x0C => {
                             self.mode_4 = Mode4::from_u8(data as u8);
                             if self.instrumented {
-                                debug!(target: "vdp", "set mode 4 {:?}", self.mode_4);
+                                debug!(target: "vdp", "{} {} set mode 4 {:?}", self.beam_vpos, self.beam_hpos, self.mode_4);
                             }
                         }
                         0x0D => {
                             self.horizontal_scroll_data_addr = data << 10;
                             if self.instrumented {
-                                debug!(target: "vdp", "set horizontal scroll data {:04X}", self.horizontal_scroll_data_addr);
+                                debug!(target: "vdp", "{} {} set horizontal scroll data {:04X}", self.beam_vpos, self.beam_hpos, self.horizontal_scroll_data_addr);
                             }
                         }
                         0x0E => {} // 128k mode plane nametables
                         0x0F => {
                             self.auto_increment = data as u8;
                             if self.instrumented {
-                                debug!(target: "vdp", "set auto-increment {}", self.auto_increment);
+                                debug!(target: "vdp", "{} {} set auto-increment {}", self.beam_vpos, self.beam_hpos, self.auto_increment);
                             }
                         }
                         0x10 => {
@@ -555,7 +555,7 @@ impl VdpBus {
                                 _ => panic!(),
                             };
                             if self.instrumented {
-                                debug!(target: "vdp", "set plane size {}x{}", self.plane_width, self.plane_height);
+                                debug!(target: "vdp", "{} {} set plane size {}x{}", self.beam_vpos, self.beam_hpos, self.plane_width, self.plane_height);
                             }
                         }
                         0x11 => {
@@ -565,7 +565,7 @@ impl VdpBus {
                                 WindowHPos::DrawToLeft((data & 0b11111) as u8)
                             };
                             if self.instrumented {
-                                debug!(target: "vdp", "set window horizontal {:?}", self.window_h_pos);
+                                debug!(target: "vdp", "{} {} set window horizontal {:?}", self.beam_vpos, self.beam_hpos, self.window_h_pos);
                             }
                         }
                         0x12 => {
@@ -575,33 +575,33 @@ impl VdpBus {
                                 WindowVPos::DrawToTop((data & 0b11111) as u8)
                             };
                             if self.instrumented {
-                                debug!(target: "vdp", "set window vertical {:?}", self.window_v_pos);
+                                debug!(target: "vdp", "{} {} set window vertical {:?}", self.beam_vpos, self.beam_hpos, self.window_v_pos);
                             }
                         }
                         0x13 => {
                             self.dma_length_half = (self.dma_length_half & 0xFF00) | data;
                             if self.instrumented {
-                                debug!(target: "vdp", "set DMA length {}", self.dma_length_half as u32 * 2);
+                                debug!(target: "vdp", "{} {} set DMA length {}", self.beam_vpos, self.beam_hpos, self.dma_length_half as u32 * 2);
                             }
                         }
                         0x14 => {
                             self.dma_length_half = (self.dma_length_half & 0xFF) | (data << 8);
                             if self.instrumented {
-                                debug!(target: "vdp", "set DMA length {}", self.dma_length_half as u32 * 2);
+                                debug!(target: "vdp", "{} {} set DMA length {}", self.beam_vpos, self.beam_hpos, self.dma_length_half as u32 * 2);
                             }
                         }
                         0x15 => {
                             self.dma_source_addr_half =
                                 (self.dma_source_addr_half & 0xFFFF00) | data as u32;
                             if self.instrumented {
-                                debug!(target: "vdp", "set DMA source {:06X}", self.dma_source_addr_half * 2);
+                                debug!(target: "vdp", "{} {} set DMA source {:06X}", self.beam_vpos, self.beam_hpos, self.dma_source_addr_half * 2);
                             }
                         }
                         0x16 => {
                             self.dma_source_addr_half =
                                 (self.dma_source_addr_half & 0xFF00FF) | ((data as u32) << 8);
                             if self.instrumented {
-                                debug!(target: "vdp", "set DMA source {:06X}", self.dma_source_addr_half * 2);
+                                debug!(target: "vdp", "{} {} set DMA source {:06X}", self.beam_vpos, self.beam_hpos, self.dma_source_addr_half * 2);
                             }
                         }
                         0x17 => {
@@ -618,7 +618,7 @@ impl VdpBus {
                             self.dma_source_addr_half = (self.dma_source_addr_half & 0x00FFFF)
                                 | (((data & addr_mask) as u32) << 16);
                             if self.instrumented {
-                                debug!(target: "vdp", "set DMA source {:06X} {:?}", self.dma_source_addr_half * 2, self.dma_type);
+                                debug!(target: "vdp", "{} {} set DMA source {:06X} {:?}", self.beam_vpos, self.beam_hpos, self.dma_source_addr_half * 2, self.dma_type);
                             }
                         }
                         _ => panic!(),
@@ -684,7 +684,8 @@ impl VdpBus {
             0
         };
         if self.instrumented {
-            debug!(target: "vdp", "DMA {:?} {:06X} to {:04X}, length {}",
+            debug!(target: "vdp", "{} {} DMA {:?} {:06X} to {:04X}, length {}",
+                self.beam_vpos, self.beam_hpos,
                 self.dma_type,
                 self.dma_source_addr_half * 2,
                 self.addr.unwrap().addr,

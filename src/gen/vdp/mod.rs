@@ -438,7 +438,9 @@ impl<'a> Vdp<'a> {
         } else if self.h_counter == if bus.mode_4.h_40_wide_mode { 358 } else { 294 } {
             bus.status.hblank = true;
             if bus.mode_1.enable_horizontal_interrupt {
-                if self.hblank_counter == 0 {
+                if self.scanline == 0 || self.scanline > 224 {
+                    self.hblank_counter = bus.horizontal_interrupt_counter;
+                } else if self.hblank_counter == 0 {
                     bus.horizontal_interrupt = true;
                     self.hblank_counter = bus.horizontal_interrupt_counter;
                 } else {
