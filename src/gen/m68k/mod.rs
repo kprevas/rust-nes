@@ -1,10 +1,13 @@
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::convert::TryFrom;
+use std::fmt::UpperHex;
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Shl, Shr, Sub, SubAssign};
 
 use bytes::Buf;
 use gfx_device_gl::Device;
+use log::Level;
 use num_integer::Integer;
 use num_traits::{PrimInt, Signed, WrappingAdd, WrappingSub};
 use piston_window::*;
@@ -25,7 +28,7 @@ pub mod opcodes;
 
 const MASTER_CLOCK_TICKS_PER_SECOND: f64 = 53_693_175.0;
 
-trait DataSize: TryFrom<u32> + PrimInt {
+trait DataSize: TryFrom<u32> + PrimInt + UpperHex {
     fn address_size() -> u32;
     fn bits() -> usize;
     fn word_aligned_address_size() -> u32;
@@ -404,6 +407,7 @@ pub struct Cpu<'a> {
     inputs: [u8; 2],
     controller_th_bit: [u8; 4],
     controller_read_state: [u8; 4],
+    controller_decay: u32,
 
     ticks: f64,
     instrumented: bool,
@@ -416,6 +420,11 @@ pub struct Cpu<'a> {
     vdp_bus: &'a RefCell<VdpBus>,
 
     z80: z80::Cpu<'a>,
+
+    pc_watches: Box<HashSet<u32>>,
+    pc_breaks: Box<HashSet<u32>>,
+    memory_watches: Box<HashSet<u32>>,
+    memory_breaks: Box<HashSet<u32>>,
 
     test_ram_only: bool,
 
@@ -453,6 +462,7 @@ impl<'a> Cpu<'a> {
             inputs: [0, 0],
             controller_th_bit: [0, 0, 0, 0],
             controller_read_state: [0, 0, 0, 0],
+            controller_decay: 0,
             ticks: 0.0,
             instrumented,
             cycle_count: 0,
@@ -461,6 +471,10 @@ impl<'a> Cpu<'a> {
             vdp,
             vdp_bus,
             z80: z80::Cpu::new(cartridge, instrumented),
+            pc_watches: Box::new(HashSet::new()),
+            pc_breaks: Box::new(HashSet::new()),
+            memory_watches: Box::new(HashSet::new()),
+            memory_breaks: Box::new(HashSet::new()),
             test_ram_only: false,
             phantom: PhantomData,
         };
@@ -482,6 +496,13 @@ impl<'a> Cpu<'a> {
                 self.ticks -= 1.0;
             }
             self.cycle_count = self.cycle_count.wrapping_add(1);
+            if self.controller_decay > 0 {
+                self.controller_decay -= 1;
+                if self.controller_decay == 0 {
+                    self.controller_read_state = [0, 0, 0, 0];
+                    self.controller_th_bit = [0, 0, 0, 0];
+                }
+            }
         }
     }
 
@@ -553,7 +574,7 @@ impl<'a> Cpu<'a> {
     }
 
     fn read_addr_offset_size<Size: DataSize>(&mut self, addr: u32, offset: u32, size: u32) -> Size {
-        if self.test_ram_only {
+        let val = if self.test_ram_only {
             Size::from_memory_bytes(
                 &self.internal_ram[((addr + offset) as usize)..((addr + size) as usize)],
             )
@@ -594,7 +615,11 @@ impl<'a> Cpu<'a> {
                 }
                 _ => panic!(),
             }
+        };
+        if self.instrumented && self.memory_watches.contains(&addr) {
+            info!(target: "cpu", "read memory {:06X} {:08X} {:06X}", addr, val, self.pc);
         }
+        val
     }
 
     fn read_controller<Size: DataSize>(&mut self, controller: usize) -> Size {
@@ -609,7 +634,7 @@ impl<'a> Cpu<'a> {
         let c = !(self.inputs[controller] >> 2) & 0b1;
         let start = !(self.inputs[controller] >> 3) & 0b1;
         match self.controller_read_state[controller] {
-            0 | 2 | 4 | 6 => {
+            1 | 3 | 5 | 7 => {
                 val |= up;
                 val |= down << 1;
                 val |= left << 2;
@@ -617,7 +642,7 @@ impl<'a> Cpu<'a> {
                 val |= b << 4;
                 val |= c << 5;
             }
-            1 | 3 | 5 | 7 => {
+            0 | 2 | 4 | 6 => {
                 val |= up;
                 val |= down << 1;
                 val |= a << 4;
@@ -643,6 +668,12 @@ impl<'a> Cpu<'a> {
         size: u32,
         val: Size,
     ) {
+        if self.instrumented && self.memory_watches.contains(&addr) {
+            info!(target: "cpu", "write memory {:06X} {:08X} {:06X}", addr, val, self.pc);
+        }
+        if self.instrumented && self.memory_breaks.contains(&addr) {
+            panic!()
+        }
         if self.test_ram_only {
             val.set_memory_bytes(
                 &mut self.internal_ram[((addr + offset) as usize)..((addr + size) as usize)],
@@ -660,19 +691,17 @@ impl<'a> Cpu<'a> {
                     let th_bit = (val.low_byte() >> 6) & 0b1;
                     if th_bit != self.controller_th_bit[0] {
                         self.controller_th_bit[0] = th_bit;
-                        if self.controller_read_state[0] != 0 || th_bit == 0 {
-                            self.controller_read_state[0] = (self.controller_read_state[0] + 1) % 8;
-                        }
+                        self.controller_read_state[0] = (self.controller_read_state[0] + 1) % 8;
                     }
+                    self.controller_decay = (MASTER_CLOCK_TICKS_PER_SECOND / 7000.0 * 1.5) as u32;
                 }
                 0xA10005 => {
                     let th_bit = (val.low_byte() >> 6) & 0b1;
                     if th_bit != self.controller_th_bit[1] {
                         self.controller_th_bit[1] = th_bit;
-                        if self.controller_read_state[1] != 0 || th_bit == 0 {
-                            self.controller_read_state[1] = (self.controller_read_state[1] + 1) % 8;
-                        }
+                        self.controller_read_state[1] = (self.controller_read_state[1] + 1) % 8;
                     }
+                    self.controller_decay = (MASTER_CLOCK_TICKS_PER_SECOND / 7000.0 * 1.5) as u32;
                 }
                 0xA10000..=0xA10FFF => {} // IO Registers
                 0xA11100 => {
@@ -1852,7 +1881,15 @@ impl<'a> Cpu<'a> {
         let opcode = opcode(opcode_hex);
 
         if self.instrumented {
-            debug!(target: "cpu", "{:08X}\t{:04X}\t{}\t\tD {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X}\t\tA {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} ({:08X})",
+            log!(target: "cpu",
+                if self.pc_breaks.contains(&opcode_pc) {
+                    Level::Error
+                } else if self.pc_watches.contains(&opcode_pc) {
+                    Level::Warn
+                } else {
+                    Level::Debug
+                },
+                "{:08X}\t{:04X}\t{}\t\tD {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X}\t\tA {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} ({:08X})",
             opcode_pc,
             opcode_hex,
             opcode.disassemble(Some(if self.pc < 0x400000 {
@@ -1879,6 +1916,9 @@ impl<'a> Cpu<'a> {
             self.a[7],
             self.ssp,
             );
+            if self.pc_breaks.contains(&opcode_pc) {
+                panic!()
+            }
         }
 
         match opcode {
@@ -2928,6 +2968,22 @@ impl<'a> Cpu<'a> {
     pub fn close(&mut self) {
         self.vdp.as_mut().map(|vdp| vdp.close());
     }
+
+    pub fn set_memory_watch(&mut self, addr: u32) {
+        self.memory_watches.insert(addr);
+    }
+
+    pub fn set_memory_break(&mut self, addr: u32) {
+        self.memory_breaks.insert(addr);
+    }
+
+    pub fn set_pc_watch(&mut self, addr: u32) {
+        self.pc_watches.insert(addr);
+    }
+
+    pub fn set_pc_break(&mut self, addr: u32) {
+        self.pc_breaks.insert(addr);
+    }
 }
 
 #[cfg(feature = "test")]
@@ -3021,8 +3077,6 @@ impl window::Cpu for Cpu<'_> {
     }
 
     fn do_frame(&mut self, time_secs: f64, inputs: &[ControllerState<8>; 2]) {
-        self.controller_read_state = [0, 0, 0, 0];
-        self.controller_th_bit = [0, 0, 0, 0];
         self.ticks += time_secs * MASTER_CLOCK_TICKS_PER_SECOND * self.speed_adj;
 
         while self.ticks > 0.0 {

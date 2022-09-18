@@ -52,6 +52,8 @@ pub fn run(
     );
     let mut cpu = m68k::Cpu::boot(&cartridge, Some(vdp), &vdp_bus, instrument_cpu);
 
+    cpu.set_memory_watch(0xFFB144);
+
     window_loop(
         window,
         &mut inputs,
