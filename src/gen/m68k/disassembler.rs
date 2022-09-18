@@ -4,7 +4,9 @@ use std::io::prelude::*;
 use gen::m68k::opcodes::opcode;
 
 pub fn disassemble(cartridge: Box<[u8]>, out: &mut dyn Write) -> Result<(), Box<dyn Error>> {
-    let mut pc = ((cartridge[4] as u32) << 24)
+    let mut pc = 0x200;
+
+    let boot = ((cartridge[4] as u32) << 24)
         | ((cartridge[5] as u32) << 16)
         | ((cartridge[6] as u32) << 8)
         | cartridge[7] as u32;
@@ -23,7 +25,9 @@ pub fn disassemble(cartridge: Box<[u8]>, out: &mut dyn Write) -> Result<(), Box<
             ((cartridge[pc as usize] as u16) << 8) as u16 | cartridge[pc as usize + 1] as u16;
         let opcode = opcode(opcode_hex);
 
-        if pc == hblank {
+        if pc == boot {
+            writeln!(out, "BOOT:")?;
+        } else if pc == hblank {
             writeln!(out, "HBLANK:")?;
         } else if pc == vblank {
             writeln!(out, "VBLANK:")?;
