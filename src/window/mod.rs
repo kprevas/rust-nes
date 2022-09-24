@@ -98,7 +98,7 @@ pub fn window_loop(
                     input_changed = false;
                 }
                 recorder.set_frame_inputs(&mut inputs, frame_count);
-                cpu.do_frame(u.dt, &inputs);
+                cpu.do_frame(if step { 1.0 / 60.0 } else { u.dt }, &inputs);
                 frame_count += 1;
             }
         }

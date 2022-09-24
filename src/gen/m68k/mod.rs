@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use std::convert::TryFrom;
 use std::fmt::UpperHex;
 use std::marker::PhantomData;
-use std::ops::{AddAssign, Shl, Shr, Sub, SubAssign};
+use std::ops::{AddAssign, Range, Shl, Shr, Sub, SubAssign};
 
 use bytes::Buf;
 use gfx_device_gl::Device;
@@ -423,6 +423,7 @@ pub struct Cpu<'a> {
 
     pc_watches: Box<HashSet<u32>>,
     pc_breaks: Box<HashSet<u32>>,
+    pc_ignores: Box<Vec<Range<u32>>>,
     memory_watches: Box<HashSet<u32>>,
     memory_breaks: Box<HashSet<u32>>,
 
@@ -473,6 +474,7 @@ impl<'a> Cpu<'a> {
             z80: z80::Cpu::new(cartridge, instrumented),
             pc_watches: Box::new(HashSet::new()),
             pc_breaks: Box::new(HashSet::new()),
+            pc_ignores: Box::new(vec![]),
             memory_watches: Box::new(HashSet::new()),
             memory_breaks: Box::new(HashSet::new()),
             test_ram_only: false,
@@ -669,7 +671,7 @@ impl<'a> Cpu<'a> {
         val: Size,
     ) {
         if self.instrumented && self.memory_watches.contains(&addr) {
-            info!(target: "cpu", "write memory {:06X} {:08X} {:06X}", addr, val, self.pc);
+            warn!(target: "cpu", "write memory {:06X} {:08X} {:06X}", addr, val, self.pc);
         }
         if self.instrumented && self.memory_breaks.contains(&addr) {
             panic!()
@@ -980,6 +982,9 @@ impl<'a> Cpu<'a> {
         self.push(self.pc);
         self.push(self.status);
         self.pc = self.read_addr(vector * 4);
+        if self.instrumented {
+            debug!(target: "cpu", "exception {} {:06X}", vector, self.pc);
+        }
         self.set_flag(SUPERVISOR_MODE, true);
         self.tick(match vector {
             2 | 3 => 50,
@@ -1881,43 +1886,52 @@ impl<'a> Cpu<'a> {
         let opcode = opcode(opcode_hex);
 
         if self.instrumented {
-            log!(target: "cpu",
+            let mut ignore = false;
+            for ignore_range in self.pc_ignores.iter() {
+                if ignore_range.start <= opcode_pc && ignore_range.end >= opcode_pc {
+                    ignore = true;
+                    break;
+                }
+            }
+            if !ignore {
+                log!(target: "cpu",
+                    if self.pc_breaks.contains(&opcode_pc) {
+                        Level::Error
+                    } else if self.pc_watches.contains(&opcode_pc) {
+                        Level::Warn
+                    } else {
+                        Level::Debug
+                    },
+                    "{:08X}\t{:04X}\t{}\t\tD {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X}\t\tA {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} ({:08X})",
+                opcode_pc,
+                opcode_hex,
+                opcode.disassemble(Some(if self.pc < 0x400000 {
+                        &self.cartridge[self.pc as usize..self.pc as usize + 8]
+                    } else {
+                        let ram_addr = self.pc as usize - 0xFFFF0000;
+                        &self.internal_ram[ram_addr..ram_addr + 8]
+                    })),
+                self.d[0],
+                self.d[1],
+                self.d[2],
+                self.d[3],
+                self.d[4],
+                self.d[5],
+                self.d[6],
+                self.d[7],
+                self.a[0],
+                self.a[1],
+                self.a[2],
+                self.a[3],
+                self.a[4],
+                self.a[5],
+                self.a[6],
+                self.a[7],
+                self.ssp,
+                );
                 if self.pc_breaks.contains(&opcode_pc) {
-                    Level::Error
-                } else if self.pc_watches.contains(&opcode_pc) {
-                    Level::Warn
-                } else {
-                    Level::Debug
-                },
-                "{:08X}\t{:04X}\t{}\t\tD {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X}\t\tA {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} ({:08X})",
-            opcode_pc,
-            opcode_hex,
-            opcode.disassemble(Some(if self.pc < 0x400000 {
-                    &self.cartridge[self.pc as usize..self.pc as usize + 8]
-                } else {
-                    let ram_addr = self.pc as usize - 0xFFFF0000;
-                    &self.internal_ram[ram_addr..ram_addr + 8]
-                })),
-            self.d[0],
-            self.d[1],
-            self.d[2],
-            self.d[3],
-            self.d[4],
-            self.d[5],
-            self.d[6],
-            self.d[7],
-            self.a[0],
-            self.a[1],
-            self.a[2],
-            self.a[3],
-            self.a[4],
-            self.a[5],
-            self.a[6],
-            self.a[7],
-            self.ssp,
-            );
-            if self.pc_breaks.contains(&opcode_pc) {
-                panic!()
+                    panic!()
+                }
             }
         }
 
@@ -2947,10 +2961,12 @@ impl<'a> Cpu<'a> {
             self.ticks = 0.0;
         } else {
             if let Some((vdp_interrupt_vector, vdp_interrupt_level)) = {
-                let vdp_bus = self.vdp_bus.borrow();
+                let mut vdp_bus = self.vdp_bus.borrow_mut();
                 if vdp_bus.horizontal_interrupt {
+                    vdp_bus.horizontal_interrupt = false;
                     Some((28, 4))
                 } else if vdp_bus.vertical_interrupt {
+                    vdp_bus.vertical_interrupt = false;
                     Some((30, 6))
                 } else {
                     None
@@ -2983,6 +2999,10 @@ impl<'a> Cpu<'a> {
 
     pub fn set_pc_break(&mut self, addr: u32) {
         self.pc_breaks.insert(addr);
+    }
+
+    pub fn add_pc_ignore_range(&mut self, range: Range<u32>) {
+        self.pc_ignores.push(range);
     }
 }
 
