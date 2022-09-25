@@ -719,7 +719,7 @@ impl<'a> Vdp<'a> {
         [
             brightness_vals[((palette_val_low & 0xF) / 2) as usize],
             brightness_vals[((palette_val_low >> 4) / 2) as usize],
-            brightness_vals[(palette_val_high / 2) as usize],
+            brightness_vals[((palette_val_high & 0xF) / 2) as usize],
             0xff,
         ]
     }
