@@ -27,6 +27,11 @@ pub struct Control<const B: usize> {
     right_shift_state: bool,
     left_ctrl_state: bool,
     right_ctrl_state: bool,
+    pub reset: bool,
+    pub pause: bool,
+    pub step: bool,
+    pub input_overlay: bool,
+    pub render_layers: usize,
 }
 
 impl<const B: usize> Control<B> {
@@ -37,6 +42,11 @@ impl<const B: usize> Control<B> {
             right_shift_state: false,
             left_ctrl_state: false,
             right_ctrl_state: false,
+            reset: false,
+            pause: false,
+            step: false,
+            input_overlay: false,
+            render_layers: 0,
         }
     }
 
@@ -44,11 +54,6 @@ impl<const B: usize> Control<B> {
         &mut self,
         event: &Event,
         cpu: &mut dyn Cpu,
-        reset: &mut bool,
-        pause: &mut bool,
-        step: &mut bool,
-        input_overlay: &mut bool,
-        render_layers: &mut usize,
         recorder: &mut Recorder<B>,
         frame_count: u32,
     ) {
@@ -67,7 +72,7 @@ impl<const B: usize> Control<B> {
                 }
             }
             if key_pressed == Key::R && (self.left_ctrl_state || self.right_ctrl_state) {
-                *reset = true;
+                self.reset = true;
             }
             if key_pressed == Key::S && (self.left_ctrl_state || self.right_ctrl_state) {
                 recorder.toggle(frame_count);
@@ -76,12 +81,12 @@ impl<const B: usize> Control<B> {
                 && (self.left_ctrl_state || self.right_ctrl_state)
                 && (self.left_shift_state || self.right_shift_state)
             {
-                *pause = !*pause;
+                self.pause = !self.pause;
             } else if key_pressed == Key::P && (self.left_ctrl_state || self.right_ctrl_state) {
                 recorder.toggle_playback(frame_count);
             }
             if key_pressed == Key::I && (self.left_ctrl_state || self.right_ctrl_state) {
-                *input_overlay = !*input_overlay;
+                self.input_overlay = !self.input_overlay;
             }
             if key_pressed == Key::Equals {
                 cpu.increase_speed();
@@ -90,13 +95,13 @@ impl<const B: usize> Control<B> {
                 cpu.decrease_speed();
             }
             if key_pressed == Key::LeftBracket {
-                *render_layers = render_layers.wrapping_sub(1);
+                self.render_layers = self.render_layers.wrapping_sub(1);
             }
             if key_pressed == Key::RightBracket {
-                *render_layers = render_layers.wrapping_add(1);
+                self.render_layers = self.render_layers.wrapping_add(1);
             }
-            if *pause && key_pressed == Key::Space {
-                *step = true;
+            if self.pause && key_pressed == Key::Space {
+                self.step = true;
             }
         }
 

@@ -35,12 +35,8 @@ pub fn window_loop(
     width: f64,
     height: f64,
     settings_path: &Path,
-    mut pause: bool,
+    pause: bool,
 ) {
-    let mut reset = false;
-    let mut step = false;
-    let mut input_overlay = false;
-    let mut render_layers = 0usize;
 
     let mut frame_count = 0u32;
     let mut last_frame = Instant::now();
@@ -58,6 +54,7 @@ pub fn window_loop(
     let mut y_trans = 0.0;
 
     let mut control = ::control::Control::new();
+    control.pause = pause;
 
     let mut input_changed = false;
 
@@ -74,11 +71,6 @@ pub fn window_loop(
             control.event(
                 &e,
                 cpu,
-                &mut reset,
-                &mut pause,
-                &mut step,
-                &mut input_overlay,
-                &mut render_layers,
                 &mut recorder,
                 frame_count,
             );
@@ -87,18 +79,18 @@ pub fn window_loop(
         }
 
         if let Some(u) = e.update_args() {
-            if reset {
-                reset = false;
+            if control.reset {
+                control.reset = false;
                 cpu.reset(true);
             }
-            if !pause || step {
-                step = false;
+            if !control.pause || control.step {
+                control.step = false;
                 if input_changed {
                     recorder.input_changed(&inputs, frame_count);
                     input_changed = false;
                 }
                 recorder.set_frame_inputs(&mut inputs, frame_count);
-                cpu.do_frame(if step { 1.0 / 60.0 } else { u.dt }, &inputs);
+                cpu.do_frame(if control.step { 1.0 / 60.0 } else { u.dt }, &inputs);
                 frame_count += 1;
             }
         }
@@ -106,9 +98,9 @@ pub fn window_loop(
         if let Some(_r) = e.render_args() {
             window.draw_2d(&e, |c, gl, device| {
                 let trans = c.trans(x_trans, y_trans).scale(scale, scale);
-                cpu.render(trans, &mut texture_ctx, gl, device, render_layers);
+                cpu.render(trans, &mut texture_ctx, gl, device, control.render_layers);
                 recorder.render_overlay(c, gl);
-                if input_overlay {
+                if control.input_overlay {
                     inputs[0].render_overlay(trans.trans(10.0, height - 10.0), gl, &mut glyphs);
                     inputs[1].render_overlay(trans.trans(170.0, height - 10.0), gl, &mut glyphs);
                     text(
