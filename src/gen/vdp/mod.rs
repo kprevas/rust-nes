@@ -328,7 +328,14 @@ impl<'a> Vdp<'a> {
 
                 let plane_a_priority = (plane_a_tile_data >> 15) & 0b1 > 0;
                 let plane_b_priority = (plane_b_tile_data >> 15) & 0b1 > 0;
-                if bus.mode_4.enable_shadow_highlight && !plane_a_priority && !plane_b_priority {
+                if bus.mode_4.enable_shadow_highlight
+                    && if x_in_window || y_in_window {
+                    !window_priority
+                } else {
+                    !plane_a_priority
+                }
+                    && !plane_b_priority
+                {
                     shadow = true;
                 }
 
