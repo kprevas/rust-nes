@@ -1231,6 +1231,7 @@ impl window::Cpu for Cpu<'_> {
         gl: &mut G2d,
         device: &mut Device,
         _: usize,
+        _: bool,
     ) {
         self.ppu.render(c, texture_ctx, gl, device);
     }

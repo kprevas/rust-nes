@@ -20,6 +20,7 @@ pub trait Cpu {
         gl: &mut G2d,
         device: &mut Device,
         layers: usize,
+        debug: bool,
     );
     fn save_state(&self, out: &mut Vec<u8>);
     fn load_state(&mut self, state: &mut dyn Buf);
@@ -98,7 +99,7 @@ pub fn window_loop(
         if let Some(_r) = e.render_args() {
             window.draw_2d(&e, |c, gl, device| {
                 let trans = c.trans(x_trans, y_trans).scale(scale, scale);
-                cpu.render(trans, &mut texture_ctx, gl, device, control.render_layers);
+                cpu.render(trans, &mut texture_ctx, gl, device, control.render_layers, control.debug_video);
                 recorder.render_overlay(c, gl);
                 if control.input_overlay {
                     inputs[0].render_overlay(trans.trans(10.0, height - 10.0), gl, &mut glyphs);

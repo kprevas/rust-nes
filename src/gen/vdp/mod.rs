@@ -424,7 +424,7 @@ impl<'a> Vdp<'a> {
                 for buf in &mut self.image_buffers {
                     buf.input_buffer().fill([0, 0, 0, 0]);
                 }
-                if self.dump_mode {
+                if self.dump_mode && self.instrumented {
                     self.dump_sprite_table(bus.sprite_table_addr as usize);
                 }
             } else if self.v_counter == 225 {
@@ -762,7 +762,9 @@ impl<'a> Vdp<'a> {
         gl: &mut G2d,
         device: &mut Device,
         layers: usize,
+        debug: bool,
     ) {
+        self.dump_mode = debug;
         self.renderer
             .render(c, texture_ctx, gl, device, 1.0, layers);
     }

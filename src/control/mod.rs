@@ -32,6 +32,7 @@ pub struct Control<const B: usize> {
     pub step: bool,
     pub input_overlay: bool,
     pub render_layers: usize,
+    pub debug_video: bool,
 }
 
 impl<const B: usize> Control<B> {
@@ -47,6 +48,7 @@ impl<const B: usize> Control<B> {
             step: false,
             input_overlay: false,
             render_layers: 0,
+            debug_video: false
         }
     }
 
@@ -102,6 +104,12 @@ impl<const B: usize> Control<B> {
             }
             if self.pause && key_pressed == Key::Space {
                 self.step = true;
+            }
+            if key_pressed == Key::V
+                && (self.left_ctrl_state || self.right_ctrl_state)
+                && (self.left_shift_state || self.right_shift_state)
+            {
+                self.debug_video = !self.debug_video;
             }
         }
 
