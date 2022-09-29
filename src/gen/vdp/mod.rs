@@ -772,8 +772,13 @@ impl<'a> Vdp<'a> {
         debug: bool,
     ) {
         self.dump_mode = debug;
-        self.renderer
-            .render(c, texture_ctx, gl, device, 1.0, layers);
+        let bus = self.bus.borrow();
+        if !bus.mode_1.disable_display && bus.mode_2.enable_display {
+            self.renderer
+                .render(c, texture_ctx, gl, device, 1.0, layers);
+        } else {
+            clear([0.0, 0.0, 0.0, 1.0], gl);
+        }
     }
 
     pub fn close(&mut self) {

@@ -92,7 +92,7 @@ pub struct Mode1 {
     pub enable_horizontal_interrupt: bool,
     use_high_color_bits: bool,
     freeze_hv_on_level_2_interrupt: bool,
-    disable_display: bool,
+    pub disable_display: bool,
 }
 
 impl Mode1 {
