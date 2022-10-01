@@ -2965,8 +2965,8 @@ impl<'a> Cpu<'a> {
                 if vdp_bus.horizontal_interrupt {
                     vdp_bus.horizontal_interrupt = false;
                     Some((28, 4))
-                } else if vdp_bus.vertical_interrupt {
-                    vdp_bus.vertical_interrupt = false;
+                } else if vdp_bus.status.vertical_interrupt {
+                    vdp_bus.status.vertical_interrupt = false;
                     Some((30, 6))
                 } else {
                     None

@@ -420,7 +420,7 @@ impl<'a> Vdp<'a> {
             if self.v_counter == 224 {
                 bus.status.vblank = true;
                 if bus.mode_2.enable_vertical_interrupt {
-                    bus.vertical_interrupt = true;
+                    bus.status.vertical_interrupt = true;
                 }
                 bus.z80_interrupt = true;
                 for buf in &mut self.image_buffers {
@@ -438,7 +438,7 @@ impl<'a> Vdp<'a> {
                 bus.z80_interrupt = false;
             } else if self.v_counter == 261 {
                 bus.status.vblank = false;
-                bus.vertical_interrupt = false;
+                bus.status.vertical_interrupt = false;
             } else if self.v_counter == 262 {
                 self.v_counter = 0;
             }

@@ -59,7 +59,7 @@ impl Addr {
 pub struct Status {
     fifo_empty: bool,
     fifo_full: bool,
-    vertical_interrupt: bool,
+    pub vertical_interrupt: bool,
     pub sprite_limit: bool,
     pub sprite_overlap: bool,
     interlaced_odd_frame: bool,
@@ -263,7 +263,6 @@ pub struct VdpBus {
     pub read_data: u32,
     pub write_data: VecDeque<WriteData>,
     pub horizontal_interrupt: bool,
-    pub vertical_interrupt: bool,
     pub z80_interrupt: bool,
 
     instrumented: bool,
@@ -335,7 +334,6 @@ impl VdpBus {
             read_data: 0,
             write_data: VecDeque::new(),
             horizontal_interrupt: false,
-            vertical_interrupt: false,
             z80_interrupt: false,
             instrumented,
         }
