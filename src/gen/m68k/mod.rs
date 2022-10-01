@@ -1908,7 +1908,7 @@ impl<'a> Cpu<'a> {
                 opcode.disassemble(Some(if self.pc < 0x400000 {
                         &self.cartridge[self.pc as usize..self.pc as usize + 8]
                     } else {
-                        let ram_addr = self.pc as usize - 0xFFFF0000;
+                        let ram_addr = self.pc as usize - 0xFF0000;
                         &self.internal_ram[ram_addr..ram_addr + 8]
                     })),
                 self.d[0],
