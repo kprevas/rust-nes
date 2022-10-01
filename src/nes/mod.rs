@@ -77,6 +77,7 @@ pub fn run(
         240.0,
         &Path::new("settings_nes.dat"),
         matches.is_present("pause"),
+        instrument_cpu,
     );
 
     cpu.close();

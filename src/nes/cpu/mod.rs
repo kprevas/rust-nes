@@ -1216,7 +1216,8 @@ impl window::Cpu for Cpu<'_> {
         }
     }
 
-    fn do_frame(&mut self, time_secs: f64, inputs: &[ControllerState<8>; 2]) {
+    fn do_frame(&mut self, time_secs: f64, inputs: &[ControllerState<8>; 2], debug: bool) {
+        self.instrumented = debug;
         self.ticks += time_secs * CPU_TICKS_PER_SECOND * self.speed_adj;
 
         while self.ticks > 0.0 {
