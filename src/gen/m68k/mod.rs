@@ -983,7 +983,13 @@ impl<'a> Cpu<'a> {
         self.push(self.status);
         self.pc = self.read_addr(vector * 4);
         if self.instrumented {
-            debug!(target: "cpu", "exception {} {:06X}", vector, self.pc);
+            if vector == 28 {
+                debug!(target: "cpu", "HBLANK {:06X}", self.pc);
+            } else if vector == 30 {
+                debug!(target: "cpu", "VBLANK {:06X}", self.pc);
+            } else {
+                debug!(target: "cpu", "exception {} {:06X}", vector, self.pc);
+            }
         }
         self.set_flag(SUPERVISOR_MODE, true);
         self.tick(match vector {
@@ -1902,7 +1908,7 @@ impl<'a> Cpu<'a> {
                     } else {
                         Level::Debug
                     },
-                    "{:08X}\t{:04X}\t{}\t\tD {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X}\t\tA {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} {:08X} ({:08X})",
+                    "{:06X}:  {:04X}  {:36}D0:{:08X} D1:{:08X} D2:{:08X} D3:{:08X} D4:{:08X} D5:{:08X} D6:{:08X} D7:{:08X} A0:{:08X} A1:{:08X} A2:{:08X} A3:{:08X} A4:{:08X} A5:{:08X} A6:{:08X} A7:{:08X} SR:{:04X} USP:{:08X} {}{}{}{}{}",
                 opcode_pc,
                 opcode_hex,
                 opcode.disassemble(Some(if self.pc < 0x400000 {
@@ -1910,7 +1916,7 @@ impl<'a> Cpu<'a> {
                     } else {
                         let ram_addr = self.pc as usize - 0xFF0000;
                         &self.internal_ram[ram_addr..ram_addr + 8]
-                    })),
+                    }), Some(opcode_pc)),
                 self.d[0],
                 self.d[1],
                 self.d[2],
@@ -1926,8 +1932,14 @@ impl<'a> Cpu<'a> {
                 self.a[4],
                 self.a[5],
                 self.a[6],
-                self.a[7],
                 self.ssp,
+                self.status,
+                self.a[7],
+                if self.flag(EXTEND) { "X" } else { "x" },
+                if self.flag(NEGATIVE) { "N" } else { "n" },
+                if self.flag(ZERO) { "Z" } else { "z" },
+                if self.flag(OVERFLOW) { "V" } else { "v" },
+                if self.flag(CARRY) { "C" } else { "c" },
                 );
                 if self.pc_breaks.contains(&opcode_pc) {
                     panic!()

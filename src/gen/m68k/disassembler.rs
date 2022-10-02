@@ -38,7 +38,7 @@ pub fn disassemble(cartridge: Box<[u8]>, out: &mut dyn Write) -> Result<(), Box<
             "{:06X}\t{:04X} {}",
             pc,
             opcode_hex,
-            opcode.disassemble(Some(&cartridge[pc as usize + 2..]))
+            opcode.disassemble(Some(&cartridge[pc as usize + 2..]), Some(pc))
         )?;
 
         pc += 2 + opcode.extension_bytes() as u32;

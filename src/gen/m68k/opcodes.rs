@@ -154,18 +154,18 @@ impl AddressingMode {
                 }
             },
             AddressingMode::AbsoluteShort => format!(
-                "({}).w",
+                "{}.w",
                 match ext {
                     None => "xxx".to_string(),
                     Some(val) => format!("${:02X}{:02X}", val[0], val[1]),
                 }
             ),
             AddressingMode::AbsoluteLong => format!(
-                "({}).l",
+                "{}.l",
                 match ext {
                     None => "xxx".to_string(),
                     Some(val) =>
-                        format!("${:02X}{:02X}{:02X}{:02X}", val[0], val[1], val[2], val[3]),
+                        format!("${:02X}{:02X}{:02X}", val[1], val[2], val[3]),
                 }
             ),
             AddressingMode::Immediate => match ext {
@@ -260,23 +260,23 @@ impl Condition {
 impl Display for Condition {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Condition::True => f.write_str("T"),
-            Condition::False => f.write_str("F"),
-            Condition::Higher => f.write_str("HI"),
-            Condition::LowerOrSame => f.write_str("LS"),
-            Condition::CarryClear => f.write_str("CC"),
-            Condition::CarrySet => f.write_str("CS"),
-            Condition::NotEqual => f.write_str("NE"),
-            Condition::Equal => f.write_str("EQ"),
-            Condition::OverflowClear => f.write_str("VC"),
-            Condition::OverflowSet => f.write_str("VS"),
-            Condition::Plus => f.write_str("PL"),
-            Condition::Minus => f.write_str("MI"),
-            Condition::GreaterOrEqual => f.write_str("GE"),
-            Condition::LessThan => f.write_str("LT"),
-            Condition::GreaterThan => f.write_str("GT"),
-            Condition::LessOrEqual => f.write_str("LE"),
-            Condition::Illegal => f.write_str("XX"),
+            Condition::True => f.write_str("t"),
+            Condition::False => f.write_str("f"),
+            Condition::Higher => f.write_str("hi"),
+            Condition::LowerOrSame => f.write_str("ls"),
+            Condition::CarryClear => f.write_str("cc"),
+            Condition::CarrySet => f.write_str("cs"),
+            Condition::NotEqual => f.write_str("ne"),
+            Condition::Equal => f.write_str("eq"),
+            Condition::OverflowClear => f.write_str("vc"),
+            Condition::OverflowSet => f.write_str("vs"),
+            Condition::Plus => f.write_str("pl"),
+            Condition::Minus => f.write_str("mi"),
+            Condition::GreaterOrEqual => f.write_str("ge"),
+            Condition::LessThan => f.write_str("lt"),
+            Condition::GreaterThan => f.write_str("gt"),
+            Condition::LessOrEqual => f.write_str("le"),
+            Condition::Illegal => f.write_str("xx"),
         }
     }
 }
@@ -1585,7 +1585,7 @@ pub fn brief_extension_word(extension: u16) -> (AddressingMode, Size, i8) {
 }
 
 impl Opcode {
-    pub fn disassemble(&self, ext: Option<&[u8]>) -> String {
+    pub fn disassemble(&self, ext: Option<&[u8]>, pc: Option<u32>) -> String {
         match self {
             Opcode::ABCD {
                 operand_mode,
@@ -1593,10 +1593,10 @@ impl Opcode {
                 dest_register,
             } => match operand_mode {
                 OperandMode::RegisterToRegister => {
-                    format!("ABCD D{}, D{}", src_register, dest_register)
+                    format!("abcd    D{}, D{}", src_register, dest_register)
                 }
                 OperandMode::MemoryToMemory => {
-                    format!("ABCD -(A{}), -(A{})", src_register, dest_register)
+                    format!("abcd    -(A{}), -(A{})", src_register, dest_register)
                 }
             },
             Opcode::ADD {
@@ -1607,7 +1607,7 @@ impl Opcode {
             } => match operand_direction {
                 OperandDirection::ToRegister => {
                     format!(
-                        "ADD{} {}, D{}",
+                        "add{}   {}, D{}",
                         size,
                         mode.disassemble(ext, *size),
                         register
@@ -1615,7 +1615,7 @@ impl Opcode {
                 }
                 OperandDirection::ToMemory => {
                     format!(
-                        "ADD{} D{}, {}",
+                        "add{}   D{}, {}",
                         size,
                         register,
                         mode.disassemble(ext, *size)
@@ -1627,14 +1627,14 @@ impl Opcode {
                 size,
                 register,
             } => format!(
-                "ADDA{} {}, A{}",
+                "adda{}  {}, A{}",
                 size,
                 mode.disassemble(ext, *size),
                 register
             ),
             Opcode::ADDI { mode, size } => {
                 format!(
-                    "ADDI{} {}, {}",
+                    "addi{}  {}, {}",
                     size,
                     size.display(ext),
                     mode.disassemble(
@@ -1644,7 +1644,7 @@ impl Opcode {
                 )
             }
             Opcode::ADDQ { mode, size, data } => {
-                format!("ADDQ{} {}, {}", size, data, mode.disassemble(ext, *size))
+                format!("addq{}  {}, {}", size, data, mode.disassemble(ext, *size))
             }
             Opcode::ADDX {
                 operand_mode,
@@ -1653,10 +1653,10 @@ impl Opcode {
                 dest_register,
             } => match operand_mode {
                 OperandMode::RegisterToRegister => {
-                    format!("ADDX{} D{}, D{}", size, src_register, dest_register)
+                    format!("addx{}  D{}, D{}", size, src_register, dest_register)
                 }
                 OperandMode::MemoryToMemory => {
-                    format!("ADDX{} -(A{}), -(A{})", size, src_register, dest_register)
+                    format!("addx{}  -(A{}), -(A{})", size, src_register, dest_register)
                 }
             },
             Opcode::AND {
@@ -1667,7 +1667,7 @@ impl Opcode {
             } => match operand_direction {
                 OperandDirection::ToRegister => {
                     format!(
-                        "AND{} {}, D{}",
+                        "and{}   {}, D{}",
                         size,
                         mode.disassemble(ext, *size),
                         register
@@ -1675,7 +1675,7 @@ impl Opcode {
                 }
                 OperandDirection::ToMemory => {
                     format!(
-                        "AND{} D{}, {}",
+                        "and{}   D{}, {}",
                         size,
                         register,
                         mode.disassemble(ext, *size)
@@ -1683,7 +1683,7 @@ impl Opcode {
                 }
             },
             Opcode::ANDI { mode, size } => format!(
-                "ANDI{} {}, {}",
+                "andi{}  {}, {}",
                 size,
                 size.display(ext),
                 mode.disassemble(
@@ -1691,8 +1691,8 @@ impl Opcode {
                     *size,
                 ),
             ),
-            Opcode::ANDI_to_CCR => format!("ANDI {}, CCR", Size::Byte.display(ext)),
-            Opcode::ANDI_to_SR => format!("ANDI {}, SR", Size::Word.display(ext)),
+            Opcode::ANDI_to_CCR => format!("andi    {}, CCR", Size::Byte.display(ext)),
+            Opcode::ANDI_to_SR => format!("andi    {}, SR", Size::Word.display(ext)),
             Opcode::ASL {
                 mode,
                 size,
@@ -1702,16 +1702,16 @@ impl Opcode {
             } => match mode {
                 AddressingMode::Illegal => match shift_count {
                     None => format!(
-                        "ASL{} D{}, D{}",
+                        "asl{}   D{}, D{}",
                         size,
                         shift_register.unwrap(),
                         register.unwrap()
                     ),
                     Some(shift_count) => {
-                        format!("ASL{} {}, D{}", size, shift_count, register.unwrap())
+                        format!("asl{}   {}, D{}", size, shift_count, register.unwrap())
                     }
                 },
-                _ => format!("ASL{} {}", size, mode.disassemble(ext, *size)),
+                _ => format!("asl{}   {}", size, mode.disassemble(ext, *size)),
             },
             Opcode::ASR {
                 mode,
@@ -1722,32 +1722,43 @@ impl Opcode {
             } => match mode {
                 AddressingMode::Illegal => match shift_count {
                     None => format!(
-                        "ASR{} D{}, D{}",
+                        "asr{}   D{}, D{}",
                         size,
                         shift_register.unwrap(),
                         register.unwrap()
                     ),
                     Some(shift_count) => {
-                        format!("ASR{} {}, D{}", size, shift_count, register.unwrap())
+                        format!("asr{}   {}, D{}", size, shift_count, register.unwrap())
                     }
                 },
-                _ => format!("ASR{} {}", size, mode.disassemble(ext, *size)),
+                _ => format!("asr{}   {}", size, mode.disassemble(ext, *size)),
             },
             Opcode::Bcc {
                 condition,
                 displacement,
             } => format!(
-                "B{} {}",
+                "b{:2}     ${:06X}",
                 condition,
-                if *displacement == 0 {
-                    Size::Word.display(ext)
-                } else {
-                    displacement.to_string()
+                {
+                    if let Some(ext) = ext {
+                        let displacement =
+                            if *displacement == 0 {
+                                i16::from_be_bytes([ext[0], ext[1]]) as i32
+                            } else {
+                                *displacement as i32
+                            };
+                        match pc {
+                            None => displacement as u32,
+                            Some(pc) => (pc + 2).wrapping_add_signed(displacement)
+                        }
+                    } else {
+                        0
+                    }
                 }
             ),
             Opcode::BCHG { bit_num, mode } => match bit_num {
                 BitNum::Immediate => format!(
-                    "BCHG {}, {}",
+                    "bchg    {}, {}",
                     Size::Word.display(ext),
                     mode.disassemble(
                         ext.map(|ext| &ext[(Size::Word.extension_bytes() as usize)..]),
@@ -1755,12 +1766,12 @@ impl Opcode {
                     )
                 ),
                 BitNum::DataRegister(register) => {
-                    format!("BCHG D{}, {}", register, mode.disassemble(ext, Size::Byte))
+                    format!("bchg    D{}, {}", register, mode.disassemble(ext, Size::Byte))
                 }
             },
             Opcode::BCLR { bit_num, mode } => match bit_num {
                 BitNum::Immediate => format!(
-                    "BCLR {}, {}",
+                    "bclr    {}, {}",
                     Size::Word.display(ext),
                     mode.disassemble(
                         ext.map(|ext| &ext[(Size::Word.extension_bytes() as usize)..]),
@@ -1768,21 +1779,32 @@ impl Opcode {
                     )
                 ),
                 BitNum::DataRegister(register) => {
-                    format!("BCLR D{}, {}", register, mode.disassemble(ext, Size::Byte))
+                    format!("bclr    D{}, {}", register, mode.disassemble(ext, Size::Byte))
                 }
             },
             Opcode::BRA { displacement } => format!(
-                "BRA {}",
-                if *displacement == 0 {
-                    Size::Word.display_signed(ext)
-                } else {
-                    displacement.to_string()
+                "bra     ${:06X}",
+                {
+                    if let Some(ext) = ext {
+                        let displacement =
+                            if *displacement == 0 {
+                                i16::from_be_bytes([ext[0], ext[1]]) as i32
+                            } else {
+                                *displacement as i32
+                            };
+                        match pc {
+                            None => displacement as u32,
+                            Some(pc) => (pc + 2).wrapping_add_signed(displacement)
+                        }
+                    } else {
+                        0
+                    }
                 }
             ),
             Opcode::BSET { bit_num, mode } => match bit_num {
                 BitNum::Immediate => {
                     format!(
-                        "BSET {}, {}",
+                        "bset    {}, {}",
                         Size::Word.display(ext),
                         mode.disassemble(
                             ext.map(|ext| &ext[(Size::Word.extension_bytes() as usize)..]),
@@ -1791,20 +1813,31 @@ impl Opcode {
                     )
                 }
                 BitNum::DataRegister(register) => {
-                    format!("BSET D{}, {}", register, mode.disassemble(ext, Size::Byte))
+                    format!("bset    D{}, {}", register, mode.disassemble(ext, Size::Byte))
                 }
             },
             Opcode::BSR { displacement } => format!(
-                "BSR {}",
-                if *displacement == 0 {
-                    Size::Word.display(ext)
-                } else {
-                    displacement.to_string()
+                "bsr     ${}",
+                {
+                    if let Some(ext) = ext {
+                        let displacement =
+                            if *displacement == 0 {
+                                i16::from_be_bytes([ext[0], ext[1]]) as i32
+                            } else {
+                                *displacement as i32
+                            };
+                        match pc {
+                            None => displacement as u32,
+                            Some(pc) => (pc + 2).wrapping_add_signed(displacement)
+                        }
+                    } else {
+                        0
+                    }
                 }
             ),
             Opcode::BTST { bit_num, mode } => match bit_num {
                 BitNum::Immediate => format!(
-                    "BTST {}, {}",
+                    "btst    {}, {}",
                     Size::Word.display(ext),
                     mode.disassemble(
                         ext.map(|ext| &ext[(Size::Word.extension_bytes() as usize)..]),
@@ -1812,21 +1845,21 @@ impl Opcode {
                     )
                 ),
                 BitNum::DataRegister(register) => {
-                    format!("BTST D{}, {}", register, mode.disassemble(ext, Size::Byte))
+                    format!("btst    D{}, {}", register, mode.disassemble(ext, Size::Byte))
                 }
             },
             Opcode::CHK { register, mode } => {
-                format!("CHK {}, D{}", mode.disassemble(ext, Size::Word), register)
+                format!("chk     {}, D{}", mode.disassemble(ext, Size::Word), register)
             }
             Opcode::CLR { mode, size } => {
-                format!("CLR{} {}", size, mode.disassemble(ext, *size))
+                format!("clr{}   {}", size, mode.disassemble(ext, *size))
             }
             Opcode::CMP {
                 mode,
                 size,
                 register,
             } => format!(
-                "CMP{} {}, D{}",
+                "cmp{}   {}, D{}",
                 size,
                 mode.disassemble(ext, *size),
                 register
@@ -1836,13 +1869,13 @@ impl Opcode {
                 size,
                 register,
             } => format!(
-                "CMPA{} {}, A{}",
+                "cmpa{}  {}, A{}",
                 size,
                 mode.disassemble(ext, *size),
                 register
             ),
             Opcode::CMPI { mode, size } => format!(
-                "CMPI{} {}, {}",
+                "cmpi{}  {}, {}",
                 size,
                 size.display(ext),
                 mode.disassemble(
@@ -1854,21 +1887,21 @@ impl Opcode {
                 size,
                 src_register,
                 dest_register,
-            } => format!("CMPM{} (A{})+, (A{})+", size, src_register, dest_register),
+            } => format!("cmpm{}  (A{})+, (A{})+", size, src_register, dest_register),
             Opcode::DBcc {
                 condition,
                 register,
             } => format!(
-                "DB{} D{}, {}",
+                "db{:2}    D{}, {}",
                 condition,
                 register,
                 Size::Word.display_signed(ext)
             ),
             Opcode::DIVS { mode, register } => {
-                format!("DIVS {}, D{}", mode.disassemble(ext, Size::Word), register)
+                format!("divs    {}, D{}", mode.disassemble(ext, Size::Word), register)
             }
             Opcode::DIVU { mode, register } => {
-                format!("DIVU {}, D{}", mode.disassemble(ext, Size::Word), register)
+                format!("divu    {}, D{}", mode.disassemble(ext, Size::Word), register)
             }
             Opcode::EOR {
                 size,
@@ -1878,7 +1911,7 @@ impl Opcode {
             } => match operand_direction {
                 OperandDirection::ToMemory => {
                     format!(
-                        "EOR{} D{}, {}",
+                        "eor{}   D{}, {}",
                         size,
                         register,
                         mode.disassemble(ext, *size)
@@ -1887,7 +1920,7 @@ impl Opcode {
                 OperandDirection::ToRegister => "ILLEGAL".to_string(),
             },
             Opcode::EORI { mode, size } => format!(
-                "EORI{} {}, {}",
+                "eori{}  {}, {}",
                 size,
                 size.display(ext),
                 mode.disassemble(
@@ -1895,35 +1928,35 @@ impl Opcode {
                     *size,
                 ),
             ),
-            Opcode::EORI_to_CCR => format!("EORI {}, CCR", Size::Byte.display(ext)),
-            Opcode::EORI_to_SR => format!("EORI {}, SR", Size::Word.display(ext)),
+            Opcode::EORI_to_CCR => format!("eori    {}, CCR", Size::Byte.display(ext)),
+            Opcode::EORI_to_SR => format!("eori    {}, SR", Size::Word.display(ext)),
             Opcode::EXG {
                 mode,
                 src_register,
                 dest_register,
             } => match mode {
                 ExchangeMode::DataRegisters => {
-                    format!("EXG D{}, D{}", src_register, dest_register)
+                    format!("exg     D{}, D{}", src_register, dest_register)
                 }
                 ExchangeMode::AddressRegisters => {
-                    format!("EXG A{}, A{}", src_register, dest_register)
+                    format!("exg     A{}, A{}", src_register, dest_register)
                 }
                 ExchangeMode::DataRegisterAndAddressRegister => {
-                    format!("EXG D{}, A{}", src_register, dest_register)
+                    format!("exg     D{}, A{}", src_register, dest_register)
                 }
-                ExchangeMode::Illegal => "ILLEGAL".to_string(),
+                ExchangeMode::Illegal => "illegal".to_string(),
             },
             Opcode::EXT { register, size } => {
-                format!("EXT{} D{}", size, register)
+                format!("ext{}   D{}", size, register)
             }
-            Opcode::ILLEGAL => "ILLEGAL".to_string(),
-            Opcode::JMP { mode } => format!("JMP {}", mode.disassemble(ext, Size::Illegal)),
-            Opcode::JSR { mode } => format!("JSR {}", mode.disassemble(ext, Size::Illegal)),
+            Opcode::ILLEGAL => "illegal".to_string(),
+            Opcode::JMP { mode } => format!("jmp     {}", mode.disassemble(ext, Size::Illegal)),
+            Opcode::JSR { mode } => format!("jsr     {}", mode.disassemble(ext, Size::Illegal)),
             Opcode::LEA { register, mode } => {
-                format!("LEA {}, A{}", mode.disassemble(ext, Size::Long), register)
+                format!("lea     {}, A{}", mode.disassemble(ext, Size::Long), register)
             }
             Opcode::LINK { register } => {
-                format!("LINK A{}, {}", register, Size::Word.display_signed(ext))
+                format!("link    A{}, {}", register, Size::Word.display_signed(ext))
             }
             Opcode::LSL {
                 mode,
@@ -1934,16 +1967,16 @@ impl Opcode {
             } => match mode {
                 AddressingMode::Illegal => match shift_count {
                     None => format!(
-                        "LSL{} D{}, D{}",
+                        "lsl{}   D{}, D{}",
                         size,
                         shift_register.unwrap(),
                         register.unwrap()
                     ),
                     Some(shift_count) => {
-                        format!("LSL{} {}, D{}", size, shift_count, register.unwrap())
+                        format!("lsl{}   {}, D{}", size, shift_count, register.unwrap())
                     }
                 },
-                _ => format!("LSL{} {}", size, mode.disassemble(ext, *size)),
+                _ => format!("lsl{}   {}", size, mode.disassemble(ext, *size)),
             },
             Opcode::LSR {
                 mode,
@@ -1954,23 +1987,23 @@ impl Opcode {
             } => match mode {
                 AddressingMode::Illegal => match shift_count {
                     None => format!(
-                        "LSR{} D{}, D{}",
+                        "lsr{}   D{}, D{}",
                         size,
                         shift_register.unwrap(),
                         register.unwrap()
                     ),
                     Some(shift_count) => {
-                        format!("LSR{} {}, D{}", size, shift_count, register.unwrap())
+                        format!("lsr{}   {}, D{}", size, shift_count, register.unwrap())
                     }
                 },
-                _ => format!("LSR{} {}", size, mode.disassemble(ext, *size)),
+                _ => format!("lsr{}   {}", size, mode.disassemble(ext, *size)),
             },
             Opcode::MOVE {
                 src_mode,
                 dest_mode,
                 size,
             } => format!(
-                "MOVE{} {}, {}",
+                "move{}  {}, {}",
                 size,
                 src_mode.disassemble(ext, *size),
                 dest_mode.disassemble(
@@ -1983,7 +2016,7 @@ impl Opcode {
                 dest_mode,
                 size,
             } => format!(
-                "MOVEA{} {}, {}",
+                "movea{} {}, {}",
                 size,
                 src_mode.disassemble(ext, *size),
                 dest_mode.disassemble(
@@ -1992,20 +2025,20 @@ impl Opcode {
                 )
             ),
             Opcode::MOVE_to_CCR { mode } => {
-                format!("MOVE {}, CCR", mode.disassemble(ext, Size::Byte))
+                format!("move    {}, CCR", mode.disassemble(ext, Size::Byte))
             }
             Opcode::MOVE_from_SR { mode } => {
-                format!("MOVE SR, {}", mode.disassemble(ext, Size::Word))
+                format!("move    SR, {}", mode.disassemble(ext, Size::Word))
             }
             Opcode::MOVE_to_SR { mode } => {
-                format!("MOVE {}, SR", mode.disassemble(ext, Size::Word))
+                format!("move    {}, SR", mode.disassemble(ext, Size::Word))
             }
             Opcode::MOVE_USP {
                 register,
                 direction,
             } => match direction {
-                Direction::RegisterToMemory => format!("MOVE A{}, USP", register),
-                Direction::MemoryToRegister => format!("MOVE USP, A{}", register),
+                Direction::RegisterToMemory => format!("move    A{}, USP", register),
+                Direction::MemoryToRegister => format!("move    USP, A{}", register),
             },
             Opcode::MOVEM {
                 mode,
@@ -2018,15 +2051,15 @@ impl Opcode {
                 );
                 match direction {
                     Direction::RegisterToMemory => match ext {
-                        None => format!("MOVEM{} #, {}", size, mode),
+                        None => format!("movem{} #, {}", size, mode),
                         Some(val) => {
-                            format!("MOVEM{} {:08b}{:08b}, {}", size, val[0], val[1], mode)
+                            format!("movem{} {} {}", size, register_list(val[0], val[1], true), mode)
                         }
                     },
                     Direction::MemoryToRegister => match ext {
-                        None => format!("MOVEM{} {}, #", size, mode),
+                        None => format!("movem{} {}, #", size, mode),
                         Some(val) => {
-                            format!("MOVEM{} {}, {:08b}{:08b}", size, mode, val[0], val[1], )
+                            format!("movem{} {} {}", size, mode, register_list(val[0], val[1], false))
                         }
                     },
                 }
@@ -2038,30 +2071,30 @@ impl Opcode {
                 size,
             } => match direction {
                 Direction::RegisterToMemory => format!(
-                    "MOVEP{} D{}, (d16, A{})",
+                    "movep{} D{}, (d16, A{})",
                     size, data_register, address_register
                 ),
                 Direction::MemoryToRegister => format!(
-                    "MOVEP{} (d16, A{}), D{}",
+                    "movep{} (d16, A{}), D{}",
                     size, address_register, data_register
                 ),
             },
             Opcode::MOVEQ { register, data } => {
-                format!("MOVEQ {}, D{}", data, register)
+                format!("moveq   #{}, D{}", data, register)
             }
             Opcode::MULS { mode, register } => {
-                format!("MULS {}, D{}", mode.disassemble(ext, Size::Word), register)
+                format!("muls    {}, D{}", mode.disassemble(ext, Size::Word), register)
             }
             Opcode::MULU { mode, register } => {
-                format!("MULU {}, D{}", mode.disassemble(ext, Size::Word), register)
+                format!("mulu    {}, D{}", mode.disassemble(ext, Size::Word), register)
             }
-            Opcode::NBCD { mode } => format!("NBCD {}", mode.disassemble(ext, Size::Byte)),
-            Opcode::NEG { mode, size } => format!("NEG{} {}", size, mode.disassemble(ext, *size)),
+            Opcode::NBCD { mode } => format!("nbcd    {}", mode.disassemble(ext, Size::Byte)),
+            Opcode::NEG { mode, size } => format!("neg{}   {}", size, mode.disassemble(ext, *size)),
             Opcode::NEGX { mode, size } => {
-                format!("NEGX{} {}", size, mode.disassemble(ext, *size))
+                format!("negx{}  {}", size, mode.disassemble(ext, *size))
             }
-            Opcode::NOP => "NOP".to_string(),
-            Opcode::NOT { mode, size } => format!("NOT{} {}", size, mode.disassemble(ext, *size)),
+            Opcode::NOP => "nop".to_string(),
+            Opcode::NOT { mode, size } => format!("not{}   {}", size, mode.disassemble(ext, *size)),
             Opcode::OR {
                 size,
                 mode,
@@ -2069,14 +2102,14 @@ impl Opcode {
                 register,
             } => match operand_direction {
                 OperandDirection::ToRegister => {
-                    format!("OR{} {}, D{}", size, mode.disassemble(ext, *size), register)
+                    format!("or{}    {}, D{}", size, mode.disassemble(ext, *size), register)
                 }
                 OperandDirection::ToMemory => {
-                    format!("OR{} D{}, {}", size, register, mode.disassemble(ext, *size))
+                    format!("or{}    D{}, {}", size, register, mode.disassemble(ext, *size))
                 }
             },
             Opcode::ORI { mode, size } => format!(
-                "ORI{} {}, {}",
+                "ori{}   {}, {}",
                 size,
                 size.display(ext),
                 mode.disassemble(
@@ -2084,10 +2117,10 @@ impl Opcode {
                     *size,
                 )
             ),
-            Opcode::ORI_to_CCR => format!("ORI {}, CCR", Size::Byte.display(ext)),
-            Opcode::ORI_to_SR => format!("ORI {}, SR", Size::Word.display(ext)),
-            Opcode::PEA { mode } => format!("PEA {}", mode.disassemble(ext, Size::Long)),
-            Opcode::RESET => "RESET".to_string(),
+            Opcode::ORI_to_CCR => format!("ori     {}, CCR", Size::Byte.display(ext)),
+            Opcode::ORI_to_SR => format!("ori     {}, SR", Size::Word.display(ext)),
+            Opcode::PEA { mode } => format!("pea     {}", mode.disassemble(ext, Size::Long)),
+            Opcode::RESET => "reset".to_string(),
             Opcode::ROL {
                 mode,
                 size,
@@ -2097,16 +2130,16 @@ impl Opcode {
             } => match mode {
                 AddressingMode::Illegal => match shift_count {
                     None => format!(
-                        "ROL{} D{}, D{}",
+                        "rol{}   D{}, D{}",
                         size,
                         shift_register.unwrap(),
                         register.unwrap()
                     ),
                     Some(shift_count) => {
-                        format!("ROL{} {}, D{}", size, shift_count, register.unwrap())
+                        format!("rol{}   {}, D{}", size, shift_count, register.unwrap())
                     }
                 },
-                _ => format!("ROL{} {}", size, mode.disassemble(ext, *size)),
+                _ => format!("rol{}   {}", size, mode.disassemble(ext, *size)),
             },
             Opcode::ROR {
                 mode,
@@ -2117,16 +2150,16 @@ impl Opcode {
             } => match mode {
                 AddressingMode::Illegal => match shift_count {
                     None => format!(
-                        "ROR{} D{}, D{}",
+                        "ror{}   D{}, D{}",
                         size,
                         shift_register.unwrap(),
                         register.unwrap()
                     ),
                     Some(shift_count) => {
-                        format!("ROR{} {}, D{}", size, shift_count, register.unwrap())
+                        format!("ror{}   {}, D{}", size, shift_count, register.unwrap())
                     }
                 },
-                _ => format!("ROR{} {}", size, mode.disassemble(ext, *size)),
+                _ => format!("ror{}   {}", size, mode.disassemble(ext, *size)),
             },
             Opcode::ROXL {
                 mode,
@@ -2137,16 +2170,16 @@ impl Opcode {
             } => match mode {
                 AddressingMode::Illegal => match shift_count {
                     None => format!(
-                        "ROXL{} D{}, D{}",
+                        "roxl{}  D{}, D{}",
                         size,
                         shift_register.unwrap(),
                         register.unwrap()
                     ),
                     Some(shift_count) => {
-                        format!("ROXL{} {}, D{}", size, shift_count, register.unwrap())
+                        format!("roxl{}  {}, D{}", size, shift_count, register.unwrap())
                     }
                 },
-                _ => format!("ROXL{} {}", size, mode.disassemble(ext, *size)),
+                _ => format!("roxl{}  {}", size, mode.disassemble(ext, *size)),
             },
             Opcode::ROXR {
                 mode,
@@ -2157,36 +2190,36 @@ impl Opcode {
             } => match mode {
                 AddressingMode::Illegal => match shift_count {
                     None => format!(
-                        "ROXR{} D{}, D{}",
+                        "roxr{}  D{}, D{}",
                         size,
                         shift_register.unwrap(),
                         register.unwrap()
                     ),
                     Some(shift_count) => {
-                        format!("ROXR{} {}, D{}", size, shift_count, register.unwrap())
+                        format!("roxr{}  {}, D{}", size, shift_count, register.unwrap())
                     }
                 },
-                _ => format!("ROXR{} {}", size, mode.disassemble(ext, *size)),
+                _ => format!("roxr{}  {}", size, mode.disassemble(ext, *size)),
             },
-            Opcode::RTE => "RTE".to_string(),
-            Opcode::RTR => "RTR".to_string(),
-            Opcode::RTS => "RTS".to_string(),
+            Opcode::RTE => "rte".to_string(),
+            Opcode::RTR => "rtr".to_string(),
+            Opcode::RTS => "rts".to_string(),
             Opcode::SBCD {
                 operand_mode,
                 src_register,
                 dest_register,
             } => match operand_mode {
                 OperandMode::RegisterToRegister => {
-                    format!("SBCD D{}, D{}", src_register, dest_register)
+                    format!("sbcd    D{}, D{}", src_register, dest_register)
                 }
                 OperandMode::MemoryToMemory => {
-                    format!("SBCD -(A{}), -(A{})", src_register, dest_register)
+                    format!("sbcd    -(A{}), -(A{})", src_register, dest_register)
                 }
             },
             Opcode::Scc { mode, condition } => {
-                format!("S{} {}", condition, mode.disassemble(ext, Size::Byte))
+                format!("s{:2}     {}", condition, mode.disassemble(ext, Size::Byte))
             }
-            Opcode::STOP => format!("STOP {}", Size::Word.display(ext)),
+            Opcode::STOP => format!("stop    {}", Size::Word.display(ext)),
             Opcode::SUB {
                 mode,
                 size,
@@ -2195,7 +2228,7 @@ impl Opcode {
             } => match operand_direction {
                 OperandDirection::ToRegister => {
                     format!(
-                        "SUB{} {}, D{}",
+                        "sub{}   {}, D{}",
                         size,
                         mode.disassemble(ext, *size),
                         register
@@ -2203,7 +2236,7 @@ impl Opcode {
                 }
                 OperandDirection::ToMemory => {
                     format!(
-                        "SUB{} D{}, {}",
+                        "sub{}   D{}, {}",
                         size,
                         register,
                         mode.disassemble(ext, *size)
@@ -2215,13 +2248,13 @@ impl Opcode {
                 size,
                 register,
             } => format!(
-                "SUBA{} {}, A{}",
+                "suba{}  {}, A{}",
                 size,
                 mode.disassemble(ext, *size),
                 register
             ),
             Opcode::SUBI { mode, size } => format!(
-                "SUBI{} {}, {}",
+                "subi{}  {}, {}",
                 size,
                 size.display(ext),
                 mode.disassemble(
@@ -2230,7 +2263,7 @@ impl Opcode {
                 )
             ),
             Opcode::SUBQ { mode, size, data } => {
-                format!("SUBQ{} {}, {}", size, data, mode.disassemble(ext, *size))
+                format!("subq{}  {}, {}", size, data, mode.disassemble(ext, *size))
             }
             Opcode::SUBX {
                 operand_mode,
@@ -2239,18 +2272,18 @@ impl Opcode {
                 dest_register,
             } => match operand_mode {
                 OperandMode::RegisterToRegister => {
-                    format!("SUBX{} D{}, D{}", size, src_register, dest_register)
+                    format!("subx{}  D{}, D{}", size, src_register, dest_register)
                 }
                 OperandMode::MemoryToMemory => {
-                    format!("SUBX{} -(A{}), -(A{})", size, src_register, dest_register)
+                    format!("subx{}  -(A{}), -(A{})", size, src_register, dest_register)
                 }
             },
-            Opcode::SWAP { register } => format!("SWAP D{}", register),
-            Opcode::TAS { mode } => format!("TAS {}", mode.disassemble(ext, Size::Byte)),
-            Opcode::TRAP { vector } => format!("TRAP {}", vector),
-            Opcode::TRAPV => "TRAPV".to_string(),
-            Opcode::TST { mode, size } => format!("TST{} {}", size, mode.disassemble(ext, *size)),
-            Opcode::UNLK { register } => format!("UNLK A{}", register),
+            Opcode::SWAP { register } => format!("swap    D{}", register),
+            Opcode::TAS { mode } => format!("tas     {}", mode.disassemble(ext, Size::Byte)),
+            Opcode::TRAP { vector } => format!("trap    {}", vector),
+            Opcode::TRAPV => "trapv".to_string(),
+            Opcode::TST { mode, size } => format!("tst{}   {}", size, mode.disassemble(ext, *size)),
+            Opcode::UNLK { register } => format!("unlk    A{}", register),
         }
     }
 
@@ -3249,6 +3282,27 @@ impl Opcode {
 
 impl Display for Opcode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.disassemble(None))
+        f.write_str(&self.disassemble(None, None))
     }
+}
+
+fn register_list(d: u8, a: u8, dest: bool) -> String {
+    format!("{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
+            if d & 0b10000000 > 0 { if dest { "D0," } else { "A7," } } else { "" },
+            if d & 0b01000000 > 0 { if dest { "D1," } else { "A6," } } else { "" },
+            if d & 0b00100000 > 0 { if dest { "D2," } else { "A5," } } else { "" },
+            if d & 0b00010000 > 0 { if dest { "D3," } else { "A4," } } else { "" },
+            if d & 0b00001000 > 0 { if dest { "D4," } else { "A3," } } else { "" },
+            if d & 0b00000100 > 0 { if dest { "D5," } else { "A2," } } else { "" },
+            if d & 0b00000010 > 0 { if dest { "D6," } else { "A1," } } else { "" },
+            if d & 0b00000001 > 0 { if dest { "D7," } else { "A0," } } else { "" },
+            if a & 0b10000000 > 0 { if dest { "A0," } else { "D7," } } else { "" },
+            if a & 0b01000000 > 0 { if dest { "A1," } else { "D6," } } else { "" },
+            if a & 0b00100000 > 0 { if dest { "A2," } else { "D5," } } else { "" },
+            if a & 0b00010000 > 0 { if dest { "A3," } else { "D4," } } else { "" },
+            if a & 0b00001000 > 0 { if dest { "A4," } else { "D3," } } else { "" },
+            if a & 0b00000100 > 0 { if dest { "A5," } else { "D2," } } else { "" },
+            if a & 0b00000010 > 0 { if dest { "A6," } else { "D1," } } else { "" },
+            if a & 0b00000001 > 0 { if dest { "A7," } else { "D0," } } else { "" },
+    )
 }
