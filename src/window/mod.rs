@@ -117,6 +117,14 @@ pub fn window_loop(
                         c.trans(width - 40.0, 10.0).transform,
                         gl,
                     ).unwrap();
+                    text(
+                        [1.0, 1.0, 1.0, 1.0],
+                        8,
+                        &format!("{}", frame_count),
+                        &mut glyphs,
+                        c.trans(width - 40.0, 30.0).transform,
+                        gl,
+                    ).unwrap();
                 }
                 menu.render(trans, gl, &mut glyphs);
                 glyphs.factory.encoder.flush(device);
