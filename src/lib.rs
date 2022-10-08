@@ -1,4 +1,3 @@
-#![feature(mixed_integer_ops)]
 #![feature(array_methods)]
 
 extern crate bincode;
@@ -30,11 +29,13 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
-use clap::ArgMatches;
+use clap::Parser;
 use piston_window::{PistonWindow, WindowSettings};
 
+use args::{Args, Commands};
 use rom::Rom;
 
+pub mod args;
 pub mod control;
 pub mod gen;
 pub mod input;
@@ -44,14 +45,15 @@ pub mod record;
 pub mod rom;
 pub mod window;
 
-pub fn run(matches: ArgMatches) {
+pub fn run() {
+    let args = Args::parse();
     let window: PistonWindow<sdl2_window::Sdl2Window> =
         WindowSettings::new("emu", [300, 300]).build().unwrap();
 
     let mut save_path = None;
     let rom: Option<Rom> = loop {
-        let input_file = match matches.value_of("INPUT") {
-            Some(i) => Some(PathBuf::from(i)),
+        let input_file = match args.input {
+            Some(ref i) => Some(PathBuf::from(i)),
             None => rfd::FileDialog::new().pick_file(),
         };
         if let Some(input_file) = input_file {
@@ -80,7 +82,7 @@ pub fn run(matches: ArgMatches) {
             if let Ok(cartridge) = gen {
                 break Some(Rom::Genesis(cartridge));
             };
-            if matches.is_present("INPUT") {
+            if args.input.is_some() {
                 break None;
             }
         } else {
@@ -96,20 +98,22 @@ pub fn run(matches: ArgMatches) {
         Some(save_path) => save_path,
     };
 
-    if let Some(matches) = matches.subcommand_matches("disassemble") {
-        let output_path = matches.value_of("OUTPUT");
-        let mut out = match output_path {
-            Some(ref path) => Box::new(File::create(&Path::new(path)).unwrap()) as Box<dyn Write>,
-            None => Box::new(std::io::stdout()) as Box<dyn Write>,
-        };
-        match rom {
-            Rom::Nes(cartridge) => nes::disassemble(cartridge, &mut out).unwrap(),
-            Rom::Genesis(cartridge) => gen::disassemble(cartridge, &mut out).unwrap(),
+    match args.command {
+        Commands::Disassemble { output } => {
+            let mut out = match output {
+                Some(ref path) => {
+                    Box::new(File::create(&Path::new(path)).unwrap()) as Box<dyn Write>
+                }
+                None => Box::new(std::io::stdout()) as Box<dyn Write>,
+            };
+            match rom {
+                Rom::Nes(cartridge) => nes::disassemble(cartridge, &mut out).unwrap(),
+                Rom::Genesis(cartridge) => gen::disassemble(cartridge, &mut out).unwrap(),
+            }
         }
-    } else if let Some(matches) = matches.subcommand_matches("run") {
-        match rom {
-            Rom::Nes(cartridge) => nes::run(matches, cartridge, save_path, window),
-            Rom::Genesis(cartridge) => gen::run(matches, cartridge, save_path, window),
-        }
+        Commands::Run { .. } => match rom {
+            Rom::Nes(cartridge) => nes::run(args.command, cartridge, save_path, window),
+            Rom::Genesis(cartridge) => gen::run(args.command, cartridge, save_path, window),
+        },
     }
 }

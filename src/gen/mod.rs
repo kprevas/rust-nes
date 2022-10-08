@@ -3,10 +3,10 @@ use std::error::Error;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
-use clap::ArgMatches;
 use piston_window::*;
 use simple_error::SimpleResult;
 
+use Commands;
 use window::window_loop;
 
 pub mod cartridge;
@@ -29,40 +29,44 @@ pub fn disassemble(
 }
 
 pub fn run(
-    matches: &ArgMatches,
+    command: Commands,
     cartridge: Box<[u8]>,
     save_path: PathBuf,
     mut window: PistonWindow<sdl2_window::Sdl2Window>,
 ) {
-    window.set_size([320, 224]);
-    let mut window = window.ups(60).bench_mode(matches.is_present("bench_mode"));
-
-    let mut inputs = [::input::player_1_gen(), ::input::player_2_gen()];
-    let record_path = save_path.with_extension("rcd");
-
-    let instrument_cpu = matches.is_present("instrument_cpu");
-
-    let vdp_bus = RefCell::new(vdp::bus::VdpBus::new(instrument_cpu));
-
-    let vdp = vdp::Vdp::new(
-        &vdp_bus,
-        Some(&mut window),
-        matches.is_present("dump_vram"),
+    if let Commands::Run {
         instrument_cpu,
-    );
-    let mut cpu = m68k::Cpu::boot(&cartridge, Some(vdp), &vdp_bus, instrument_cpu);
+        bench_mode,
+        dump_vram,
+        pause,
+        ..
+    } = command
+    {
+        window.set_size([320, 224]);
+        let mut window = window.ups(60).bench_mode(bench_mode);
 
-    window_loop(
-        window,
-        &mut inputs,
-        &record_path,
-        &mut cpu,
-        320.0,
-        224.0,
-        &Path::new("settings_gen.dat"),
-        matches.is_present("pause"),
-        instrument_cpu,
-    );
+        let mut inputs = [::input::player_1_gen(), ::input::player_2_gen()];
+        let record_path = save_path.with_extension("rcd");
 
-    cpu.close();
+        let vdp_bus = RefCell::new(vdp::bus::VdpBus::new(instrument_cpu));
+
+        let vdp = vdp::Vdp::new(&vdp_bus, Some(&mut window), dump_vram, instrument_cpu);
+        let mut cpu = m68k::Cpu::boot(&cartridge, Some(vdp), &vdp_bus, instrument_cpu);
+
+        window_loop(
+            window,
+            &mut inputs,
+            &record_path,
+            &mut cpu,
+            320.0,
+            224.0,
+            &Path::new("settings_gen.dat"),
+            pause,
+            instrument_cpu,
+        );
+
+        cpu.close();
+    } else {
+        panic!()
+    }
 }
