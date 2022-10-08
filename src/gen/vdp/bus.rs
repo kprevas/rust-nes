@@ -4,6 +4,7 @@ use std::fmt::{Debug, Formatter};
 #[derive(Copy, Clone, Debug)]
 pub enum AddrMode {
     Read,
+    ReadByte,
     Write,
 }
 
@@ -39,12 +40,18 @@ impl Addr {
         let dma = ((val >> 7) & 0b1) == 1;
         let (mode, target) = match (((val >> 4) & 0b11) << 2) | (val >> 30) {
             0b0000 => (AddrMode::Read, AddrTarget::VRAM),
+            0b1100 => (AddrMode::ReadByte, AddrTarget::VRAM),
             0b0001 => (AddrMode::Write, AddrTarget::VRAM),
             0b1000 => (AddrMode::Read, AddrTarget::CRAM),
             0b0011 => (AddrMode::Write, AddrTarget::CRAM),
             0b0100 => (AddrMode::Read, AddrTarget::VSRAM),
             0b0101 => (AddrMode::Write, AddrTarget::VSRAM),
-            _ => panic!(),
+            _ => panic!("{:04b}", (((val >> 4) & 0b11) << 2) | (val >> 30)),
+        };
+        let addr = match target {
+            AddrTarget::VRAM => addr,
+            AddrTarget::CRAM => addr % 0x80,
+            AddrTarget::VSRAM => addr % 0x50,
         };
         Addr {
             mode,
@@ -343,7 +350,7 @@ impl VdpBus {
         match addr {
             0xC00000 => {
                 if let Some(Addr {
-                                mode: AddrMode::Read,
+                                mode: AddrMode::Read | AddrMode::ReadByte,
                                 ..
                             }) = &self.addr
                 {
@@ -373,6 +380,13 @@ impl VdpBus {
                 {
                     self.increment_addr();
                     (self.read_data >> 16) as u16
+                } else if let Some(Addr {
+                                       mode: AddrMode::ReadByte,
+                                       ..
+                                   }) = &self.addr
+                {
+                    self.increment_addr();
+                    (self.read_data >> 24) as u16
                 } else {
                     0
                 }
@@ -402,6 +416,14 @@ impl VdpBus {
                     self.increment_addr();
                     self.increment_addr();
                     self.read_data
+                } else if let Some(Addr {
+                                       mode: AddrMode::ReadByte,
+                                       ..
+                                   }) = &self.addr
+                {
+                    self.increment_addr();
+                    self.increment_addr();
+                    self.read_data >> 24
                 } else {
                     0
                 }

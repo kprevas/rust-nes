@@ -157,7 +157,7 @@ impl<'a> Vdp<'a> {
         let write_data = bus.write_data.pop_front();
         match bus.addr {
             Some(Addr {
-                     mode: AddrMode::Read,
+                     mode: AddrMode::Read | AddrMode::ReadByte,
                      target,
                      addr,
                      ..
