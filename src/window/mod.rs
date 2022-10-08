@@ -12,7 +12,7 @@ pub mod renderer;
 
 pub trait Cpu {
     fn reset(&mut self, soft: bool);
-    fn do_frame(&mut self, time_secs: f64, inputs: &[ControllerState<8>; 2], debug: bool);
+    fn do_frame(&mut self, time_secs: f64, inputs: &[ControllerState<8>; 2], debug: bool) -> bool;
     fn render(
         &mut self,
         c: Context,
@@ -93,7 +93,11 @@ pub fn window_loop(
                     input_changed = false;
                 }
                 recorder.set_frame_inputs(&mut inputs, frame_count);
-                cpu.do_frame(if control.step { 1.0 / 60.0 } else { u.dt }, &inputs, control.debug_cpu);
+                let brk = cpu.do_frame(if control.step { 1.0 / 60.0 } else { u.dt }, &inputs, control.debug_cpu);
+                if brk {
+                    control.pause = true;
+                    control.debug_cpu = true;
+                }
                 frame_count += 1;
             }
         }

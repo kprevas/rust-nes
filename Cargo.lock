@@ -1204,8 +1204,8 @@ dependencies = [
     "num-rational",
     "num-traits",
     "png",
- "scoped_threadpool",
- "tiff",
+    "scoped_threadpool",
+    "tiff",
 ]
 
 [[package]]

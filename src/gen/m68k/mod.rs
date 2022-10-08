@@ -426,6 +426,7 @@ pub struct Cpu<'a> {
     pc_ignores: Box<Vec<Range<u32>>>,
     memory_watches: Box<HashSet<u32>>,
     memory_breaks: Box<HashSet<u32>>,
+    pause_on_frame_end: bool,
 
     test_ram_only: bool,
 
@@ -477,6 +478,7 @@ impl<'a> Cpu<'a> {
             pc_ignores: Box::new(vec![]),
             memory_watches: Box::new(HashSet::new()),
             memory_breaks: Box::new(HashSet::new()),
+            pause_on_frame_end: false,
             test_ram_only: false,
             phantom: PhantomData,
         };
@@ -598,13 +600,14 @@ impl<'a> Cpu<'a> {
                     } else {
                         Size::from_memory_bytes(&[self.z80.next_op(), 0])
                     }
-                },
+                }
                 0xA10001 => Size::from_byte(0b10100000),
                 0xA10003 => self.read_controller(0),
                 0xA10005 => self.read_controller(1),
                 0xA10000..=0xA10FFF => Size::from(0).unwrap(), // IO Registers
                 0xA11100 => {
-                    Size::from((if self.z80.has_bus { 1 } else { 0 }) << (Size::bits() - 8)).unwrap()
+                    Size::from((if self.z80.has_bus { 1 } else { 0 }) << (Size::bits() - 8))
+                        .unwrap()
                 }
                 0xA11000..=0xA11FFF => Size::from(0).unwrap(), // Z80 Control
                 0xC00000..=0xDFFFFF => Size::read_from_vdp_bus(self.vdp_bus, addr),
@@ -650,7 +653,7 @@ impl<'a> Cpu<'a> {
                 val |= a << 4;
                 val |= start << 5;
             }
-            _ => panic!()
+            _ => panic!(),
         }
         Size::from_byte(val)
     }
@@ -686,9 +689,10 @@ impl<'a> Cpu<'a> {
                 0x400000..=0x7FFFFF => {} // Expansion port
                 0xA00000..=0xA0FFFF => {
                     if !self.z80.has_bus {
-                        self.z80.write_addr((addr - 0xA00000) as u16, val.low_byte());
+                        self.z80
+                            .write_addr((addr - 0xA00000) as u16, val.low_byte());
                     }
-                },
+                }
                 0xA10003 => {
                     let th_bit = (val.low_byte() >> 6) & 0b1;
                     if th_bit != self.controller_th_bit[0] {
@@ -1891,6 +1895,11 @@ impl<'a> Cpu<'a> {
 
         let opcode = opcode(opcode_hex);
 
+        if self.pc_breaks.contains(&opcode_pc) {
+            self.instrumented = true;
+            self.pause_on_frame_end = true;
+        }
+
         if self.instrumented {
             let mut ignore = false;
             for ignore_range in self.pc_ignores.iter() {
@@ -1941,9 +1950,6 @@ impl<'a> Cpu<'a> {
                 if self.flag(OVERFLOW) { "V" } else { "v" },
                 if self.flag(CARRY) { "C" } else { "c" },
                 );
-                if self.pc_breaks.contains(&opcode_pc) {
-                    panic!()
-                }
             }
         }
 
@@ -3009,6 +3015,12 @@ impl<'a> Cpu<'a> {
         self.pc_watches.insert(addr);
     }
 
+    pub fn add_pc_watch_range(&mut self, range: Range<u32>) {
+        range.for_each(|addr| {
+            self.pc_watches.insert(addr);
+        });
+    }
+
     pub fn set_pc_break(&mut self, addr: u32) {
         self.pc_breaks.insert(addr);
     }
@@ -3108,13 +3120,16 @@ impl window::Cpu for Cpu<'_> {
         self.stopped = false;
     }
 
-    fn do_frame(&mut self, time_secs: f64, inputs: &[ControllerState<8>; 2], debug: bool) {
+    fn do_frame(&mut self, time_secs: f64, inputs: &[ControllerState<8>; 2], debug: bool) -> bool {
+        self.pause_on_frame_end = false;
         self.instrumented = debug;
         self.ticks += time_secs * MASTER_CLOCK_TICKS_PER_SECOND * self.speed_adj;
 
         while self.ticks > 0.0 {
             self.next_operation(inputs);
         }
+
+        self.pause_on_frame_end
     }
 
     fn render(
