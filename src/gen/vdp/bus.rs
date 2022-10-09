@@ -50,8 +50,7 @@ impl Addr {
         };
         let addr = match target {
             AddrTarget::VRAM => addr,
-            AddrTarget::CRAM => addr % 0x80,
-            AddrTarget::VSRAM => addr % 0x50,
+            AddrTarget::CRAM | AddrTarget::VSRAM => addr % 0x80,
         };
         Addr {
             mode,
@@ -672,7 +671,7 @@ impl VdpBus {
             let new_addr_wrapped = match addr.target {
                 AddrTarget::VRAM => new_addr,
                 AddrTarget::CRAM => new_addr % 0x80,
-                AddrTarget::VSRAM => new_addr % 0x50,
+                AddrTarget::VSRAM => new_addr % 0x80,
             };
             self.addr = Some(Addr {
                 mode: addr.mode,

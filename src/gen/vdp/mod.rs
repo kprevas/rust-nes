@@ -178,7 +178,8 @@ impl<'a> Vdp<'a> {
                 }
                 AddrTarget::VSRAM => {
                     bus.read_data = u32::from_be_bytes(
-                        self.vsram[addr as usize..(addr + 4) as usize]
+                        self.vsram[(addr as usize) % self.vsram.len()
+                            ..((addr + 4) as usize) % self.vsram.len()]
                             .try_into()
                             .unwrap(),
                     );
@@ -212,15 +213,19 @@ impl<'a> Vdp<'a> {
                                 self.cram[addr + 1] = (val & 0xFF) as u8;
                             }
                         },
-                        AddrTarget::VSRAM => match data {
-                            WriteData::Byte(val) => {
-                                self.vsram[addr] = val;
+                        AddrTarget::VSRAM => {
+                            if addr < self.vsram.len() {
+                                match data {
+                                    WriteData::Byte(val) => {
+                                        self.vsram[addr] = val;
+                                    }
+                                    WriteData::Word(val) => {
+                                        self.vsram[addr] = (val >> 8) as u8;
+                                        self.vsram[addr + 1] = (val & 0xFF) as u8;
+                                    }
+                                }
                             }
-                            WriteData::Word(val) => {
-                                self.vsram[addr] = (val >> 8) as u8;
-                                self.vsram[addr + 1] = (val & 0xFF) as u8;
-                            }
-                        },
+                        }
                     }
                     bus.increment_addr();
                 }
