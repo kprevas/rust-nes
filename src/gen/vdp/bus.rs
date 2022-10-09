@@ -13,6 +13,7 @@ pub enum AddrTarget {
     VRAM,
     CRAM,
     VSRAM,
+    Invalid,
 }
 
 #[derive(Copy, Clone)]
@@ -46,11 +47,11 @@ impl Addr {
             0b0011 => (AddrMode::Write, AddrTarget::CRAM),
             0b0100 => (AddrMode::Read, AddrTarget::VSRAM),
             0b0101 => (AddrMode::Write, AddrTarget::VSRAM),
-            _ => panic!("{:04b}", (((val >> 4) & 0b11) << 2) | (val >> 30)),
+            _ => (AddrMode::Read, AddrTarget::Invalid),
         };
         let addr = match target {
-            AddrTarget::VRAM => addr,
             AddrTarget::CRAM | AddrTarget::VSRAM => addr % 0x80,
+            _ => addr,
         };
         Addr {
             mode,
@@ -241,7 +242,7 @@ pub enum WriteData {
 }
 
 pub struct VdpBus {
-    control_high_word: Option<u16>,
+    address_register_pending_write: bool,
     pub status: Status,
     pub beam_vpos: u16,
     pub beam_hpos: u16,
@@ -265,7 +266,9 @@ pub struct VdpBus {
     dma_length_half: u16,
     dma_source_addr_half: u32,
     dma_type: DmaType,
+    addr_register: u32,
     pub addr: Option<Addr>,
+    pub start_dma: bool,
     pub read_data: u32,
     pub write_data: VecDeque<WriteData>,
     pub horizontal_interrupt: bool,
@@ -277,7 +280,7 @@ pub struct VdpBus {
 impl VdpBus {
     pub fn new(instrumented: bool) -> VdpBus {
         VdpBus {
-            control_high_word: None,
+            address_register_pending_write: false,
             status: Status {
                 fifo_empty: true,
                 fifo_full: false,
@@ -336,7 +339,9 @@ impl VdpBus {
             dma_length_half: 0,
             dma_source_addr_half: 0,
             dma_type: DmaType::RamToVram,
+            addr_register: 0,
             addr: None,
+            start_dma: false,
             read_data: 0,
             write_data: VecDeque::new(),
             horizontal_interrupt: false,
@@ -372,6 +377,7 @@ impl VdpBus {
     pub fn read_word(&mut self, addr: u32) -> u16 {
         match addr {
             0xC00000 => {
+                self.address_register_pending_write = false;
                 if let Some(Addr {
                                 mode: AddrMode::Read,
                                 ..
@@ -390,7 +396,10 @@ impl VdpBus {
                     0
                 }
             }
-            0xC00004 | 0xC00006 => self.status.to_u16(),
+            0xC00004 | 0xC00006 => {
+                self.address_register_pending_write = false;
+                self.status.to_u16()
+            },
             0xC00008 | 0xC0000A | 0xC0000C | 0xC0000E => {
                 if let InterlaceMode::NoInterlace = self.mode_4.interlace_mode {
                     (self.beam_vpos << 8) | ((self.beam_hpos >> 1) & 0xFF)
@@ -400,7 +409,7 @@ impl VdpBus {
                         | ((self.beam_hpos >> 1) & 0xFF)
                 }
             }
-            _ => panic!(),
+            _ => panic!("{:06X}", addr),
         }
     }
 
@@ -469,13 +478,19 @@ impl VdpBus {
                         debug!(target: "vdp", "{} {} write {:04X} {:08X} {:?}", self.beam_vpos, self.beam_hpos, data, addr, target)
                     }
                 }
+                self.address_register_pending_write = false;
             }
             0xC00004 => {
-                if let Some(high_word) = self.control_high_word.take() {
-                    self.addr = Some(Addr::from_u32(((high_word as u32) << 16) | (data as u32)));
+                if self.address_register_pending_write {
+                    self.addr_register = (self.addr_register & 0xFFFF0000) | (data as u32);
+                    self.addr = Some(Addr::from_u32(self.addr_register));
                     if self.instrumented {
                         debug!(target: "vdp", "{} {} set addr {:?}", self.beam_vpos, self.beam_hpos, self.addr.unwrap())
                     }
+                    if let Some(Addr { dma: true, .. }) = self.addr {
+                        self.start_dma = true;
+                    }
+                    self.address_register_pending_write = false;
                 } else if (data >> 14) & 0b11 == 0b10 {
                     let (register_number, data) = ((data >> 8) & 0b11111, data & 0xFF);
                     match register_number {
@@ -643,7 +658,9 @@ impl VdpBus {
                         _ => panic!(),
                     }
                 } else {
-                    self.control_high_word = Some(data);
+                    self.addr_register = (self.addr_register & 0xFFFF) | ((data as u32) << 16);
+                    self.addr = Some(Addr::from_u32(self.addr_register));
+                    self.address_register_pending_write = true;
                 }
             }
             0xC0001C | 0xC0001E => {} // TODO: debug register
@@ -669,9 +686,8 @@ impl VdpBus {
             };
             let new_addr = addr.addr.wrapping_add(inc);
             let new_addr_wrapped = match addr.target {
-                AddrTarget::VRAM => new_addr,
-                AddrTarget::CRAM => new_addr % 0x80,
-                AddrTarget::VSRAM => new_addr % 0x80,
+                AddrTarget::CRAM | AddrTarget::VSRAM => new_addr % 0x80,
+                _ => new_addr,
             };
             self.addr = Some(Addr {
                 mode: addr.mode,
@@ -738,6 +754,6 @@ impl VdpBus {
             self.dma_source_addr_half += 1;
             self.increment_addr();
         }
-        self.addr = None;
+        self.start_dma = false;
     }
 }

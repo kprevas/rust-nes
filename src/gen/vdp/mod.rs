@@ -184,6 +184,7 @@ impl<'a> Vdp<'a> {
                             .unwrap(),
                     );
                 }
+                AddrTarget::Invalid => {}
             },
             Some(Addr {
                      mode: AddrMode::Write,
@@ -226,6 +227,7 @@ impl<'a> Vdp<'a> {
                                 }
                             }
                         }
+                        AddrTarget::Invalid => {}
                     }
                     bus.increment_addr();
                 }
@@ -237,16 +239,18 @@ impl<'a> Vdp<'a> {
                      ..
                  }) => {
                 // TODO DMA shouldn't happen instantaneously
-                bus.dma(
-                    m68k_cartridge,
-                    m68k_ram,
-                    match target {
-                        AddrTarget::VRAM => self.vram.borrow_mut(),
-                        AddrTarget::CRAM => self.cram.borrow_mut(),
-                        AddrTarget::VSRAM => self.vsram.borrow_mut(),
-                    },
-                    write_data,
-                );
+                if bus.start_dma {
+                    bus.dma(
+                        m68k_cartridge,
+                        m68k_ram,
+                        match target {
+                            AddrTarget::VRAM | AddrTarget::Invalid => self.vram.borrow_mut(),
+                            AddrTarget::CRAM => self.cram.borrow_mut(),
+                            AddrTarget::VSRAM => self.vsram.borrow_mut(),
+                        },
+                        write_data,
+                    );
+                }
             }
             None => {}
         }
