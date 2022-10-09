@@ -610,6 +610,7 @@ impl<'a> Cpu<'a> {
                         .unwrap()
                 }
                 0xA11000..=0xA11FFF => Size::from(0).unwrap(), // Z80 Control
+                0xC00011..=0xC0001B => Size::from(0).unwrap(), // PSG
                 0xC00000..=0xDFFFFF => Size::read_from_vdp_bus(self.vdp_bus, addr),
                 0xE00000..=0xFFFFFF => {
                     let ram_addr = addr & 0xFFFF;
@@ -728,6 +729,7 @@ impl<'a> Cpu<'a> {
                     }
                 }
                 0xA11000..=0xA11FFF => {} // Z80 Control
+                0xC00011..=0xC0001B => {} // PSG
                 0xC00000..=0xDFFFFF => Size::write_to_vdp_bus(self.vdp_bus, addr, val),
                 0xE00000..=0xFFFFFF => {
                     let ram_addr = addr & 0xFFFF;

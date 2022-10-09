@@ -352,7 +352,7 @@ impl VdpBus {
 
     pub fn read_byte(&mut self, addr: u32) -> u8 {
         match addr {
-            0xC00000 => {
+            0xC00000..=0xC00003 => {
                 if let Some(Addr {
                                 mode: AddrMode::Read | AddrMode::ReadByte,
                                 ..
@@ -376,7 +376,7 @@ impl VdpBus {
 
     pub fn read_word(&mut self, addr: u32) -> u16 {
         match addr {
-            0xC00000 => {
+            0xC00000 | 0xC00002 => {
                 self.address_register_pending_write = false;
                 if let Some(Addr {
                                 mode: AddrMode::Read,
@@ -409,6 +409,7 @@ impl VdpBus {
                         | ((self.beam_hpos >> 1) & 0xFF)
                 }
             }
+            0xC0001C | 0xC0001E => 0,  // Debug register
             _ => panic!("{:06X}", addr),
         }
     }
@@ -443,7 +444,7 @@ impl VdpBus {
 
     pub fn write_byte(&mut self, addr: u32, data: u8) {
         match addr {
-            0xC00000 => {
+            0xC00000..=0xC00003 => {
                 if let Some(Addr {
                                 mode: AddrMode::Write,
                                 addr,
@@ -457,7 +458,7 @@ impl VdpBus {
                     }
                 }
             }
-            0xC00004 | 0xC00005 => panic!(), // TODO: allowed?
+            0xC00004..=0xC00007 => self.write_word(addr, ((data as u16) << 8) | (data as u16)),
             0xC00011 | 0xC00013 | 0xC00015 | 0xC00017 => {} // TODO: PSG
             _ => panic!(),
         }
@@ -465,7 +466,7 @@ impl VdpBus {
 
     pub fn write_word(&mut self, addr: u32, data: u16) {
         match addr {
-            0xC00000 => {
+            0xC00000 | 0xC00002 => {
                 if let Some(Addr {
                                 mode: AddrMode::Write,
                                 addr,
@@ -480,7 +481,7 @@ impl VdpBus {
                 }
                 self.address_register_pending_write = false;
             }
-            0xC00004 => {
+            0xC00004 | 0xC00006 => {
                 if self.address_register_pending_write {
                     self.addr_register = (self.addr_register & 0xFFFF0000) | (data as u32);
                     self.addr = Some(Addr::from_u32(self.addr_register));
@@ -664,7 +665,7 @@ impl VdpBus {
                 }
             }
             0xC0001C | 0xC0001E => {} // TODO: debug register
-            _ => panic!(),
+            _ => panic!("{:06X}", addr),
         }
     }
 
