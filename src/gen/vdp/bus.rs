@@ -279,7 +279,7 @@ impl VdpBus {
         VdpBus {
             control_high_word: None,
             status: Status {
-                fifo_empty: false,
+                fifo_empty: true,
                 fifo_full: false,
                 vertical_interrupt: false,
                 sprite_limit: false,
