@@ -164,25 +164,29 @@ impl<'a> Vdp<'a> {
                  }) => match target {
                 AddrTarget::VRAM => {
                     bus.read_data = u32::from_be_bytes(
-                        self.vram[addr as usize..(addr + 4) as usize]
-                            .try_into()
-                            .unwrap(),
+                        [
+                            self.vram[(addr as usize) % self.vram.len()],
+                            self.vram[((addr + 1) as usize) % self.vram.len()],
+                            self.vram[((addr + 2) as usize) % self.vram.len()],
+                            self.vram[((addr + 3) as usize) % self.vram.len()],
+                        ],
                     );
                 }
                 AddrTarget::CRAM => {
-                    bus.read_data = u32::from_be_bytes(
-                        self.cram[addr as usize..(addr + 4) as usize]
-                            .try_into()
-                            .unwrap(),
-                    );
+                    bus.read_data = u32::from_be_bytes([
+                        self.cram[(addr as usize) % self.cram.len()],
+                        self.cram[((addr + 1) as usize) % self.cram.len()],
+                        self.cram[((addr + 2) as usize) % self.cram.len()],
+                        self.cram[((addr + 3) as usize) % self.cram.len()],
+                    ]);
                 }
                 AddrTarget::VSRAM => {
-                    bus.read_data = u32::from_be_bytes(
-                        self.vsram[(addr as usize) % self.vsram.len()
-                            ..((addr + 4) as usize) % self.vsram.len()]
-                            .try_into()
-                            .unwrap(),
-                    );
+                    bus.read_data = u32::from_be_bytes([
+                        self.vsram[(addr as usize) % self.vsram.len()],
+                        self.vsram[((addr + 1) as usize) % self.vsram.len()],
+                        self.vsram[((addr + 2) as usize) % self.vsram.len()],
+                        self.vsram[((addr + 3) as usize) % self.vsram.len()],
+                    ]);
                 }
                 AddrTarget::Invalid => {}
             },
@@ -198,31 +202,49 @@ impl<'a> Vdp<'a> {
                     match target {
                         AddrTarget::VRAM => match data {
                             WriteData::Byte(val) => {
-                                self.vram[addr] = val;
+                                if addr < self.vram.len() {
+                                    self.vram[addr] = val;
+                                }
                             }
                             WriteData::Word(val) => {
-                                self.vram[addr] = (val >> 8) as u8;
-                                self.vram[addr + 1] = (val & 0xFF) as u8;
+                                if addr < self.vram.len() {
+                                    self.vram[addr] = (val >> 8) as u8;
+                                }
+                                if addr + 1 < self.vram.len() {
+                                    self.vram[addr + 1] = (val & 0xFF) as u8;
+                                }
                             }
                         },
                         AddrTarget::CRAM => match data {
                             WriteData::Byte(val) => {
-                                self.cram[addr] = val;
+                                if addr < self.cram.len() {
+                                    self.cram[addr] = val;
+                                }
                             }
                             WriteData::Word(val) => {
-                                self.cram[addr] = (val >> 8) as u8;
-                                self.cram[addr + 1] = (val & 0xFF) as u8;
+                                if addr < self.cram.len() {
+                                    self.cram[addr] = (val >> 8) as u8;
+                                }
+                                if addr + 1 < self.cram.len() {
+                                    self.cram[addr + 1] = (val & 0xFF) as u8;
+                                }
                             }
                         },
                         AddrTarget::VSRAM => {
                             if addr < self.vsram.len() {
                                 match data {
                                     WriteData::Byte(val) => {
-                                        self.vsram[addr] = val;
+                                        if addr < self.vsram.len() {
+                                            self.vsram[addr] = val;
+                                        }
                                     }
                                     WriteData::Word(val) => {
-                                        self.vsram[addr] = (val >> 8) as u8;
-                                        self.vsram[addr + 1] = (val & 0xFF) as u8;
+                                        if addr < self.vsram.len() {
+                                            self.vsram[addr] = (val >> 8) as u8;
+                                        }
+                                        if addr + 1 < self.vsram.len() {
+                                            self.vsram[addr + 1] = (val & 0xFF) as u8;
+                                        }
                                     }
                                 }
                             }

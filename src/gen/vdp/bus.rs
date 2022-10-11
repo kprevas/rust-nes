@@ -736,22 +736,38 @@ impl VdpBus {
             match self.dma_type {
                 DmaType::RamToVram => match source {
                     0x000000..=0x3FFFFF => {
-                        target[addr] = m68k_cartridge[source];
-                        target[addr + 1] = m68k_cartridge[source + 1];
+                        if addr < target.len() {
+                            target[addr] = m68k_cartridge[source];
+                        }
+                        if addr + 1 < target.len() {
+                            target[addr + 1] = m68k_cartridge[source + 1];
+                        }
                     }
                     0xE00000..=0xFFFFFF => {
-                        target[addr] = m68k_ram[source & 0xFFFF];
-                        target[addr + 1] = m68k_ram[(source & 0xFFFF) + 1];
+                        if addr < target.len() {
+                            target[addr] = m68k_ram[source & 0xFFFF];
+                        }
+                        if addr + 1 < target.len() {
+                            target[addr + 1] = m68k_ram[(source & 0xFFFF) + 1];
+                        }
                     }
                     _ => panic!(),
                 },
                 DmaType::VramFill => {
-                    target[addr] = fill_val;
-                    target[addr + 1] = fill_val;
+                    if addr < target.len() {
+                        target[addr] = fill_val;
+                    }
+                    if addr + 1 < target.len() {
+                        target[addr + 1] = fill_val;
+                    }
                 }
                 DmaType::VramToVram => {
-                    target[addr] = target[source];
-                    target[addr + 1] = target[source + 1];
+                    if addr < target.len() && source < target.len() {
+                        target[addr] = target[source];
+                    }
+                    if addr < target.len() && source + 1 < target.len() {
+                        target[addr + 1] = target[source + 1];
+                    }
                 }
             };
             len -= 2;
