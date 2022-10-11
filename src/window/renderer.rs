@@ -66,6 +66,10 @@ impl<const L: usize> Renderer<L> {
         self.background = background;
     }
 
+    pub fn clear_to_bgd(&mut self, gl: &mut G2d) {
+        clear(self.background, gl);
+    }
+
     pub fn render(
         &mut self,
         c: Context,

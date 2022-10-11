@@ -503,6 +503,9 @@ impl VdpBus {
                         }
                         0x01 => {
                             self.mode_2 = Mode2::from_u8(data as u8);
+                            if !self.mode_2.enable_display {
+                                self.status.vblank = true;
+                            }
                             if self.instrumented {
                                 debug!(target: "vdp", "{} {} set mode 2 {:?}", self.beam_vpos, self.beam_hpos, self.mode_2);
                             }

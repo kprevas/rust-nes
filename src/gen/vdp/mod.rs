@@ -446,7 +446,9 @@ impl<'a> Vdp<'a> {
             } else if self.v_counter == 225 {
                 bus.z80_interrupt = false;
             } else if self.v_counter == 261 {
-                bus.status.vblank = false;
+                if bus.mode_2.enable_display {
+                    bus.status.vblank = false;
+                }
                 bus.status.vertical_interrupt = false;
             } else if self.v_counter == 262 {
                 self.v_counter = 0;
@@ -785,8 +787,10 @@ impl<'a> Vdp<'a> {
         if !bus.mode_1.disable_display && bus.mode_2.enable_display {
             self.renderer
                 .render(c, texture_ctx, gl, device, 1.0, layers);
-        } else {
+        } else if bus.mode_1.disable_display {
             clear([0.0, 0.0, 0.0, 1.0], gl);
+        } else {
+            self.renderer.clear_to_bgd(gl);
         }
     }
 
