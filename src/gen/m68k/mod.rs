@@ -3093,6 +3093,10 @@ pub mod testing {
             opcode(self.read_addr(self.pc))
         }
 
+        pub fn peek_ram(&mut self, addr: u32) -> u16 {
+            self.read_addr_no_tick(addr)
+        }
+
         pub fn peek_ram_long(&mut self, addr: u32) -> u32 {
             self.read_addr_no_tick(addr)
         }
@@ -3109,6 +3113,10 @@ pub mod testing {
 
         pub fn pc_for_test(&self) -> u32 {
             self.pc
+        }
+
+        pub fn set_pc(&mut self, pc: u32) {
+            self.pc = pc;
         }
     }
 }
