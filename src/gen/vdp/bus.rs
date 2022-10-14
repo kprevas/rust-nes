@@ -708,6 +708,7 @@ impl VdpBus {
         m68k_cartridge: &[u8],
         m68k_ram: &[u8],
         target: &mut [u8],
+        mask: u8,
         write_data: Option<WriteData>,
     ) {
         let mut len = self.dma_length_half as usize * 2;
@@ -737,7 +738,7 @@ impl VdpBus {
                 DmaType::RamToVram => match source {
                     0x000000..=0x3FFFFF => {
                         if addr < target.len() {
-                            target[addr] = m68k_cartridge[source];
+                            target[addr] = m68k_cartridge[source] & mask;
                         }
                         if addr + 1 < target.len() {
                             target[addr + 1] = m68k_cartridge[source + 1];
@@ -745,7 +746,7 @@ impl VdpBus {
                     }
                     0xE00000..=0xFFFFFF => {
                         if addr < target.len() {
-                            target[addr] = m68k_ram[source & 0xFFFF];
+                            target[addr] = m68k_ram[source & 0xFFFF] & mask;
                         }
                         if addr + 1 < target.len() {
                             target[addr + 1] = m68k_ram[(source & 0xFFFF) + 1];
@@ -755,7 +756,7 @@ impl VdpBus {
                 },
                 DmaType::VramFill => {
                     if addr < target.len() {
-                        target[addr] = fill_val;
+                        target[addr] = fill_val & mask;
                     }
                     if addr + 1 < target.len() {
                         target[addr + 1] = fill_val;
@@ -763,7 +764,7 @@ impl VdpBus {
                 }
                 DmaType::VramToVram => {
                     if addr < target.len() && source < target.len() {
-                        target[addr] = target[source];
+                        target[addr] = target[source] & mask;
                     }
                     if addr < target.len() && source + 1 < target.len() {
                         target[addr + 1] = target[source + 1];

@@ -3101,6 +3101,10 @@ pub mod testing {
             self.read_addr_no_tick(addr)
         }
 
+        pub fn a_for_test(&self, register: usize) -> u32 {
+            self.a[register]
+        }
+
         pub fn verify_ram(&mut self, addr: u32, val: u8, test_id: &str) {
             assert_eq!(
                 self.read_addr::<u8>(addr),

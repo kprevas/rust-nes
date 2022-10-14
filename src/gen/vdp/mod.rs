@@ -218,12 +218,12 @@ impl<'a> Vdp<'a> {
                         AddrTarget::CRAM => match data {
                             WriteData::Byte(val) => {
                                 if addr < self.cram.len() {
-                                    self.cram[addr] = val;
+                                    self.cram[addr] = val & if addr % 2 == 1 { 0x1F } else { 0xFF };
                                 }
                             }
                             WriteData::Word(val) => {
                                 if addr < self.cram.len() {
-                                    self.cram[addr] = (val >> 8) as u8;
+                                    self.cram[addr] = ((val >> 8) as u8) & 0x1F;
                                 }
                                 if addr + 1 < self.cram.len() {
                                     self.cram[addr + 1] = (val & 0xFF) as u8;
@@ -269,6 +269,10 @@ impl<'a> Vdp<'a> {
                             AddrTarget::VRAM | AddrTarget::Invalid => self.vram.borrow_mut(),
                             AddrTarget::CRAM => self.cram.borrow_mut(),
                             AddrTarget::VSRAM => self.vsram.borrow_mut(),
+                        },
+                        match target {
+                            AddrTarget::CRAM => 0x1F,
+                            _ => 0xFF,
                         },
                         write_data,
                     );

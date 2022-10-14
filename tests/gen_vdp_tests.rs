@@ -258,7 +258,6 @@ fn test_dma_transfer_to_vram_inc_0() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_transfer_to_cram_inc_0() {
     run_vdp_test(0x4F4);
 }
@@ -293,7 +292,6 @@ fn test_dma_transfer_to_vram_inc_2() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_transfer_to_cram_inc_2() {
     run_vdp_test(0x578);
 }
@@ -328,7 +326,6 @@ fn test_dma_transfer_to_vram_inc_4() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_transfer_to_cram_inc_4() {
     run_vdp_test(0x604);
 }
@@ -345,7 +342,6 @@ fn test_dma_transfer_to_vram_cd4_1_inc_0() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_transfer_to_cram_cd4_1_inc_0() {
     run_vdp_test(0x64E);
 }
@@ -380,7 +376,6 @@ fn test_dma_transfer_to_vram_cd4_1_inc_2() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_transfer_to_cram_cd4_1_inc_2() {
     run_vdp_test(0x6D2);
 }
@@ -415,7 +410,6 @@ fn test_dma_transfer_to_vram_cd4_1_inc_4() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_transfer_to_cram_cd4_1_inc_4() {
     run_vdp_test(0x75E);
 }
@@ -751,5 +745,15 @@ fn run_vdp_test(start_addr: u32) {
     while cpu.pc_for_test() != 0xE4C {
         cpu.next_operation(&[emu::input::player_1_gen(), emu::input::player_2_gen()]);
     }
-    assert_eq!(cpu.peek_ram(0xFFFF12), 0);
+    if cpu.peek_ram(0xFFFF12) == 1 {
+        let mut expected = vec![];
+        let mut actual = vec![];
+        for i in (cpu.a_for_test(2)..cpu.a_for_test(1)).step_by(2) {
+            expected.push(format!("{:04X}", cpu.peek_ram(i)));
+        }
+        for i in (cpu.a_for_test(1)..cpu.a_for_test(0)).step_by(2) {
+            actual.push(format!("{:04X}", cpu.peek_ram(i)));
+        }
+        assert_eq!(expected, actual);
+    }
 }
