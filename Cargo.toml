@@ -5,7 +5,7 @@ authors = ["Gus Prevas <kprevas@gmail.com>"]
 
 [dependencies]
 log = "0.4.17"
-env_logger = "0.9.1"
+env_logger = "0.9.3"
 clap = { version = "4.0.12", features = ["derive"] }
 piston = "0.53.1"
 piston2d-graphics = "0.42.0"
