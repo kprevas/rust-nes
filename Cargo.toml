@@ -7,7 +7,7 @@ authors = ["Gus Prevas <kprevas@gmail.com>"]
 log = "0.4.17"
 env_logger = "0.9.3"
 clap = { version = "4.0.12", features = ["derive"] }
-piston = "0.53.1"
+piston = "0.53.2"
 piston2d-graphics = "0.42.0"
 piston2d-opengl_graphics = "0.81.0"
 image = "0.24.4"
