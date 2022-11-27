@@ -37,9 +37,6 @@ num-traits = "0.2.15"
 num-integer = "0.1.45"
 gfx_device_gl = "0.16.2"
 
-[badges]
-travis-ci = { repository = "kprevas/rust-nes", branch = "master" }
-
 [profile.release]
 debug = true
 
