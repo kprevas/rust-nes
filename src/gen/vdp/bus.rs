@@ -1,4 +1,3 @@
-use std::collections::VecDeque;
 use std::fmt::{Debug, Formatter};
 
 #[derive(Copy, Clone, Debug)]
@@ -235,7 +234,7 @@ enum DmaType {
     VramToVram,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum WriteData {
     Byte(u8),
     Word(u16),
@@ -270,7 +269,9 @@ pub struct VdpBus {
     pub addr: Option<Addr>,
     pub start_dma: bool,
     pub read_data: u32,
-    pub write_data: VecDeque<WriteData>,
+    pub write_data: [WriteData; 4],
+    write_data_start: usize,
+    write_data_end: usize,
     pub horizontal_interrupt: bool,
     pub z80_interrupt: bool,
 
@@ -343,7 +344,14 @@ impl VdpBus {
             addr: None,
             start_dma: false,
             read_data: 0,
-            write_data: VecDeque::new(),
+            write_data: [
+                WriteData::Byte(0),
+                WriteData::Byte(0),
+                WriteData::Byte(0),
+                WriteData::Byte(0),
+            ],
+            write_data_start: 0,
+            write_data_end: 0,
             horizontal_interrupt: false,
             z80_interrupt: false,
             instrumented,
@@ -352,18 +360,7 @@ impl VdpBus {
 
     pub fn read_byte(&mut self, addr: u32) -> u8 {
         match addr {
-            0xC00000..=0xC00003 => {
-                if let Some(Addr {
-                                mode: AddrMode::Read | AddrMode::ReadByte,
-                                ..
-                            }) = &self.addr
-                {
-                    self.increment_addr();
-                    (self.read_data >> 24) as u8
-                } else {
-                    0
-                }
-            }
+            0xC00000..=0xC00003 => (self.read_word(addr % 2) >> 8) as u8,
             0xC00004 | 0xC00006 | 0xC00008 | 0xC0000A | 0xC0000C | 0xC0000E => {
                 (self.read_word(addr) >> 8) as u8
             }
@@ -380,18 +377,20 @@ impl VdpBus {
                 self.address_register_pending_write = false;
                 if let Some(Addr {
                                 mode: AddrMode::Read,
+                                target,
                                 ..
-                            }) = &self.addr
+                            }) = self.addr
                 {
                     self.increment_addr();
-                    (self.read_data >> 16) as u16
+                    self.fifo_munge((self.read_data >> 16) as u16, AddrMode::Read, target)
                 } else if let Some(Addr {
                                        mode: AddrMode::ReadByte,
+                                       target,
                                        ..
-                                   }) = &self.addr
+                                   }) = self.addr
                 {
                     self.increment_addr();
-                    (self.read_data >> 24) as u16
+                    self.fifo_munge((self.read_data >> 24) as u16, AddrMode::ReadByte, target)
                 } else {
                     0
                 }
@@ -399,7 +398,7 @@ impl VdpBus {
             0xC00004 | 0xC00006 => {
                 self.address_register_pending_write = false;
                 self.status.to_u16()
-            },
+            }
             0xC00008 | 0xC0000A | 0xC0000C | 0xC0000E => {
                 if let InterlaceMode::NoInterlace = self.mode_4.interlace_mode {
                     (self.beam_vpos << 8) | ((self.beam_hpos >> 1) & 0xFF)
@@ -409,7 +408,7 @@ impl VdpBus {
                         | ((self.beam_hpos >> 1) & 0xFF)
                 }
             }
-            0xC0001C | 0xC0001E => 0,  // Debug register
+            0xC0001C | 0xC0001E => 0, // Debug register
             _ => panic!("{:06X}", addr),
         }
     }
@@ -417,28 +416,48 @@ impl VdpBus {
     pub fn read_long(&mut self, addr: u32) -> u32 {
         match addr {
             0xC00000 => {
+                let read_words = [
+                    (self.read_data >> 16) as u16,
+                    (self.read_data & 0xFFFF) as u16,
+                ];
                 if let Some(Addr {
                                 mode: AddrMode::Read,
+                                target,
                                 ..
-                            }) = &self.addr
+                            }) = self.addr
                 {
                     self.increment_addr();
                     self.increment_addr();
-                    self.read_data
+                    ((self.fifo_munge(read_words[0], AddrMode::Read, target) as u32) << 16)
+                        | (self.fifo_munge(read_words[1], AddrMode::Read, target) as u32)
                 } else if let Some(Addr {
                                        mode: AddrMode::ReadByte,
+                                       target,
                                        ..
-                                   }) = &self.addr
+                                   }) = self.addr
                 {
                     self.increment_addr();
                     self.increment_addr();
-                    self.read_data >> 24
+                    self.fifo_munge(read_words[1], AddrMode::Read, target) as u32
                 } else {
                     0
                 }
             }
             0xC00004 => ((self.status.to_u16() as u32) << 16) | (self.status.to_u16() as u32),
             _ => panic!(),
+        }
+    }
+
+    fn fifo_munge(&self, data: u16, mode: AddrMode, target: AddrTarget) -> u16 {
+        let fifo_val = match self.write_data[self.write_data_end] {
+            WriteData::Byte(val) => val as u16,
+            WriteData::Word(val) => val,
+        };
+        match (mode, target) {
+            (_, AddrTarget::CRAM) => (data & 0x0EEE) | (fifo_val & 0xF111),
+            (_, AddrTarget::VSRAM) => (data & 0x07FF) | (fifo_val & 0xF800),
+            (AddrMode::ReadByte, AddrTarget::VRAM) => (data & 0xFF) | (fifo_val & 0xFF00),
+            _ => data,
         }
     }
 
@@ -452,7 +471,10 @@ impl VdpBus {
                                 ..
                             }) = &self.addr
                 {
-                    self.write_data.push_back(WriteData::Byte(data));
+                    self.write_data[self.write_data_end] = WriteData::Byte(data);
+                    self.write_data_end = (self.write_data_end + 1) % 4;
+                    self.status.fifo_empty = false;
+                    self.status.fifo_full = self.write_data_end == (self.write_data_start + 3) % 4;
                     if self.instrumented {
                         debug!(target: "vdp", "{} {} write {:02X} {:08X} {:?}", self.beam_vpos, self.beam_hpos, data, addr, target)
                     }
@@ -474,7 +496,10 @@ impl VdpBus {
                                 ..
                             }) = &self.addr
                 {
-                    self.write_data.push_back(WriteData::Word(data));
+                    self.write_data[self.write_data_end] = WriteData::Word(data);
+                    self.write_data_end = (self.write_data_end + 1) % 4;
+                    self.status.fifo_empty = false;
+                    self.status.fifo_full = self.write_data_end == (self.write_data_start + 3) % 4;
                     if self.instrumented {
                         debug!(target: "vdp", "{} {} write {:04X} {:08X} {:?}", self.beam_vpos, self.beam_hpos, data, addr, target)
                     }
@@ -776,5 +801,17 @@ impl VdpBus {
             self.increment_addr();
         }
         self.start_dma = false;
+    }
+
+    pub fn next_write_data(&mut self) -> Option<WriteData> {
+        if self.write_data_start == self.write_data_end {
+            None
+        } else {
+            let data = self.write_data[self.write_data_start];
+            self.write_data_start = (self.write_data_start + 1) % 4;
+            self.status.fifo_empty = self.write_data_start == self.write_data_end;
+            self.status.fifo_full = false;
+            Some(data)
+        }
     }
 }

@@ -154,7 +154,7 @@ impl<'a> Vdp<'a> {
 
     fn handle_bus_data(&mut self, m68k_cartridge: &[u8], m68k_ram: &[u8]) {
         let mut bus = self.bus.borrow_mut();
-        let write_data = bus.write_data.pop_front();
+        let write_data = bus.next_write_data();
         match bus.addr {
             Some(Addr {
                      mode: AddrMode::Read | AddrMode::ReadByte,

@@ -12,13 +12,11 @@ use emu::gen::{m68k, vdp};
 use emu::window::Cpu;
 
 #[test]
-#[ignore]
 fn test_fifo_buffer_size() {
     run_vdp_test(0x30C);
 }
 
 #[test]
-#[ignore]
 fn test_separate_fifo_read_write_buffer() {
     run_vdp_test(0x316);
 }
@@ -89,13 +87,11 @@ fn test_register_writes_affect_code_register() {
 }
 
 #[test]
-#[ignore]
 fn test_cp_write_pending_reset() {
     run_vdp_test(0x396);
 }
 
 #[test]
-#[ignore]
 fn test_read_target_switching() {
     run_vdp_test(0x3A0);
 }
@@ -263,7 +259,6 @@ fn test_dma_transfer_to_cram_inc_0() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_transfer_to_vsram_inc_0() {
     run_vdp_test(0x50A);
 }
@@ -297,7 +292,6 @@ fn test_dma_transfer_to_cram_inc_2() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_transfer_to_vsram_inc_2() {
     run_vdp_test(0x58E);
 }
@@ -331,7 +325,6 @@ fn test_dma_transfer_to_cram_inc_4() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_transfer_to_vsram_inc_4() {
     run_vdp_test(0x61A);
 }
@@ -347,7 +340,6 @@ fn test_dma_transfer_to_cram_cd4_1_inc_0() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_transfer_to_vsram_cd4_1_inc_0() {
     run_vdp_test(0x664);
 }
@@ -381,7 +373,6 @@ fn test_dma_transfer_to_cram_cd4_1_inc_2() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_transfer_to_vsram_cd4_1_inc_2() {
     run_vdp_test(0x6E8);
 }
@@ -415,7 +406,6 @@ fn test_dma_transfer_to_cram_cd4_1_inc_4() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_transfer_to_vsram_cd4_1_inc_4() {
     run_vdp_test(0x774);
 }
