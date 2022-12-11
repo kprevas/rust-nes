@@ -25,11 +25,9 @@ jobs:
         run: sudo apt-get install glib-2.0
       - name: Install SDL
         run: |
-          curl -O http://www.libsdl.org/release/SDL2-2.0.6.tar.gz
-          tar -xzvf SDL2-2.0.6.tar.gz && cd SDL2-2.0.6
-          ./configure
-          make
-          sudo make install
+          sudo add-apt-repository -y "deb http://archive.ubuntu.com/ubuntu `lsb_release -sc` main universe restricted multiverse"
+          sudo apt-get update -y -qq
+          sudo apt-get install libsdl2-dev
       - name: Build
         run: cargo build --verbose --release
       - name: Run integration tests
