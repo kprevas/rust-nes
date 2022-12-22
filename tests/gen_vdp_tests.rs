@@ -46,7 +46,6 @@ fn test_read_target_01100() {
 }
 
 #[test]
-#[ignore]
 fn test_vram_byteswapping() {
     run_vdp_test(0x348);
 }
