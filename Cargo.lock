@@ -793,7 +793,7 @@ dependencies = [
  "num-integer",
  "num-traits",
  "piston",
- "piston2d-graphics 0.42.0",
+ "piston2d-graphics",
  "piston2d-opengl_graphics",
  "piston_window",
  "pistoncore-sdl2_window",
@@ -1916,7 +1916,7 @@ dependencies = [
  "gfx",
  "gfx_core",
  "image",
- "piston-texture 0.9.0",
+ "piston-texture",
 ]
 
 [[package]]
@@ -1930,12 +1930,6 @@ name = "piston-shaders_graphics2d"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a35f4d08d2b6fd7ff02baab63346d4b7d2fdd5ac3f2e091a5128c22c77a489a"
-
-[[package]]
-name = "piston-texture"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62c93564eef40a9920d026697f63d224efd7ac80981fb418fe1dad447c2d9bdd"
 
 [[package]]
 name = "piston-texture"
@@ -1962,21 +1956,8 @@ dependencies = [
  "gfx",
  "piston-gfx_texture",
  "piston-shaders_graphics2d",
- "piston2d-graphics 0.43.0",
+ "piston2d-graphics",
  "shader_version",
-]
-
-[[package]]
-name = "piston2d-graphics"
-version = "0.42.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08852ecb6ef0486043d408d790d3abb38d4f6d6c4ee13adfc9e0dcbe9d95dd1d"
-dependencies = [
- "interpolation",
- "piston-texture 0.8.0",
- "piston-viewport",
- "read_color",
- "vecmath",
 ]
 
 [[package]]
@@ -1987,7 +1968,7 @@ checksum = "861e264a9a5ffc4514b89922750b19c9a83886158d539d4a52cb3b9b2d0d1f98"
 dependencies = [
  "fnv",
  "interpolation",
- "piston-texture 0.9.0",
+ "piston-texture",
  "piston-viewport",
  "read_color",
  "rusttype",
@@ -2005,9 +1986,9 @@ dependencies = [
  "image",
  "khronos_api 2.2.0",
  "piston-shaders_graphics2d",
- "piston-texture 0.9.0",
+ "piston-texture",
  "piston-viewport",
- "piston2d-graphics 0.43.0",
+ "piston2d-graphics",
  "shader_version",
 ]
 
@@ -2020,9 +2001,9 @@ dependencies = [
  "gfx",
  "gfx_device_gl",
  "piston",
- "piston-texture 0.9.0",
+ "piston-texture",
  "piston2d-gfx_graphics",
- "piston2d-graphics 0.43.0",
+ "piston2d-graphics",
  "pistoncore-glutin_window",
  "shader_version",
 ]
