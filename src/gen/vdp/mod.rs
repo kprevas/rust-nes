@@ -174,6 +174,7 @@ impl<'a> Vdp<'a> {
                     );
                 }
                 AddrTarget::CRAM => {
+                    let addr = addr - (addr % 2);
                     bus.read_data = u32::from_be_bytes([
                         self.cram[(addr as usize) % self.cram.len()],
                         self.cram[((addr + 1) as usize) % self.cram.len()],
@@ -228,6 +229,7 @@ impl<'a> Vdp<'a> {
                                 }
                             }
                             WriteData::Word(val) => {
+                                let addr = addr - (addr % 2);
                                 if addr < self.cram.len() {
                                     self.cram[addr] = ((val >> 8) as u8) & 0x1F;
                                 }
