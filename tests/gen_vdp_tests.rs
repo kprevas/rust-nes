@@ -56,7 +56,6 @@ fn test_cram_byteswapping() {
 }
 
 #[test]
-#[ignore]
 fn test_vsram_byteswapping() {
     run_vdp_test(0x35C);
 }

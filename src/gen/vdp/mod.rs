@@ -183,6 +183,7 @@ impl<'a> Vdp<'a> {
                     ]);
                 }
                 AddrTarget::VSRAM => {
+                    let addr = addr - (addr % 2);
                     bus.read_data = u32::from_be_bytes([
                         self.vsram[(addr as usize) % self.vsram.len()],
                         self.vsram[((addr + 1) as usize) % self.vsram.len()],
@@ -247,6 +248,7 @@ impl<'a> Vdp<'a> {
                                         }
                                     }
                                     WriteData::Word(val) => {
+                                        let addr = addr - (addr % 2);
                                         if addr < self.vsram.len() {
                                             self.vsram[addr] = (val >> 8) as u8;
                                         }
