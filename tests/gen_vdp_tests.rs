@@ -22,7 +22,6 @@ fn test_separate_fifo_read_write_buffer() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_transfer_using_fifo() {
     run_vdp_test(0x320);
 }
