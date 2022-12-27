@@ -117,7 +117,6 @@ fn test_dma_transfer_bus_lock() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_transfer_source_address_wrapping() {
     run_vdp_test(0x3E2);
 }

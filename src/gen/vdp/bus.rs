@@ -384,10 +384,10 @@ impl VdpBus {
                     self.increment_addr();
                     self.fifo_munge((self.read_data >> 16) as u16, AddrMode::Read, target)
                 } else if let Some(Addr {
-                                       mode: AddrMode::ReadByte,
-                                       target,
-                                       ..
-                                   }) = self.addr
+                                                       mode: AddrMode::ReadByte,
+                                                       target,
+                                                       ..
+                                                   }) = self.addr
                 {
                     self.increment_addr();
                     self.fifo_munge((self.read_data >> 24) as u16, AddrMode::ReadByte, target)
@@ -431,10 +431,10 @@ impl VdpBus {
                     ((self.fifo_munge(read_words[0], AddrMode::Read, target) as u32) << 16)
                         | (self.fifo_munge(read_words[1], AddrMode::Read, target) as u32)
                 } else if let Some(Addr {
-                                       mode: AddrMode::ReadByte,
-                                       target,
-                                       ..
-                                   }) = self.addr
+                                                       mode: AddrMode::ReadByte,
+                                                       target,
+                                                       ..
+                                                   }) = self.addr
                 {
                     self.increment_addr();
                     self.increment_addr();
@@ -768,6 +768,12 @@ impl VdpBus {
                         if addr + 1 < target.len() {
                             target[addr + 1] = m68k_cartridge[source + 1];
                         }
+                        self.write_data[self.write_data_end] =
+                            WriteData::Word(u16::from_be_bytes([
+                                m68k_cartridge[source],
+                                m68k_cartridge[source + 1],
+                            ]));
+                        self.write_data_end = (self.write_data_end + 1) % 4;
                     }
                     0xE00000..=0xFFFFFF => {
                         if addr < target.len() {
@@ -776,6 +782,12 @@ impl VdpBus {
                         if addr + 1 < target.len() {
                             target[addr + 1] = m68k_ram[(source & 0xFFFF) + 1];
                         }
+                        self.write_data[self.write_data_end] =
+                            WriteData::Word(u16::from_be_bytes([
+                                m68k_ram[source & 0xFFFF],
+                                m68k_ram[(source & 0xFFFF) + 1],
+                            ]));
+                        self.write_data_end = (self.write_data_end + 1) % 4;
                     }
                     _ => panic!(),
                 },
@@ -797,10 +809,14 @@ impl VdpBus {
                 }
             };
             len -= 2;
-            self.dma_source_addr_half += 1;
+            self.dma_source_addr_half = (self.dma_source_addr_half & (!0xFFFF))
+                | ((self.dma_source_addr_half + 1) & 0xFFFF);
             self.increment_addr();
         }
         self.start_dma = false;
+        self.write_data_start = self.write_data_end;
+        self.status.fifo_empty = true;
+        self.status.fifo_full = false;
     }
 
     pub fn next_write_data(&mut self) -> Option<WriteData> {
