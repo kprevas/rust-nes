@@ -257,19 +257,16 @@ fn test_dma_transfer_to_vsram_inc_0() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_transfer_to_vram_inc_1() {
     run_vdp_test(0x520);
 }
 
 #[test]
-#[ignore]
 fn test_dma_transfer_to_cram_inc_1() {
     run_vdp_test(0x536);
 }
 
 #[test]
-#[ignore]
 fn test_dma_transfer_to_vsram_inc_1() {
     run_vdp_test(0x54C);
 }
@@ -290,19 +287,16 @@ fn test_dma_transfer_to_vsram_inc_2() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_transfer_to_vram_inc_3() {
     run_vdp_test(0x5AC);
 }
 
 #[test]
-#[ignore]
 fn test_dma_transfer_to_cram_inc_3() {
     run_vdp_test(0x5C2);
 }
 
 #[test]
-#[ignore]
 fn test_dma_transfer_to_vsram_inc_3() {
     run_vdp_test(0x5D8);
 }
@@ -338,19 +332,16 @@ fn test_dma_transfer_to_vsram_cd4_1_inc_0() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_transfer_to_vram_cd4_1_inc_1() {
     run_vdp_test(0x67A);
 }
 
 #[test]
-#[ignore]
 fn test_dma_transfer_to_cram_cd4_1_inc_1() {
     run_vdp_test(0x690);
 }
 
 #[test]
-#[ignore]
 fn test_dma_transfer_to_vsram_cd4_1_inc_1() {
     run_vdp_test(0x6A6);
 }
@@ -371,19 +362,16 @@ fn test_dma_transfer_to_vsram_cd4_1_inc_2() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_transfer_to_vram_cd4_1_inc_3() {
     run_vdp_test(0x706);
 }
 
 #[test]
-#[ignore]
 fn test_dma_transfer_to_cram_cd4_1_inc_3() {
     run_vdp_test(0x71C);
 }
 
 #[test]
-#[ignore]
 fn test_dma_transfer_to_vsram_cd4_1_inc_3() {
     run_vdp_test(0x732);
 }

@@ -753,10 +753,14 @@ impl VdpBus {
                 match self.dma_type {
                     DmaType::RamToVram => {
                         let source = self.dma_source_addr as usize * 2;
+                        let addr = match target_type {
+                            AddrTarget::VRAM => addr,
+                            _ => addr - addr % 2,
+                        };
                         match source {
                             0x000000..=0x3FFFFF => {
                                 target[addr] = m68k_cartridge[source];
-                                target[addr + 1] = m68k_cartridge[source + 1];
+                                target[addr ^ 1] = m68k_cartridge[source + 1];
                                 self.write_data[self.write_data_end] =
                                     WriteData::Word(u16::from_be_bytes([
                                         m68k_cartridge[source],
@@ -766,7 +770,7 @@ impl VdpBus {
                             }
                             0xE00000..=0xFFFFFF => {
                                 target[addr] = m68k_ram[source & 0xFFFF];
-                                target[addr + 1] = m68k_ram[(source & 0xFFFF) + 1];
+                                target[addr ^ 1] = m68k_ram[(source & 0xFFFF) + 1];
                                 self.write_data[self.write_data_end] =
                                     WriteData::Word(u16::from_be_bytes([
                                         m68k_ram[source & 0xFFFF],
