@@ -406,7 +406,6 @@ fn test_dma_transfer_to_vsram_cd4_1_inc_4() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_fill_to_vram_inc_0() {
     run_vdp_test(0x0792)
 }
@@ -424,7 +423,6 @@ fn test_dma_fill_to_vsram_inc_0() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_fill_to_vram_inc_1() {
     run_vdp_test(0x07DC)
 }
@@ -442,7 +440,6 @@ fn test_dma_fill_to_vsram_inc_1() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_fill_to_vram_inc_2() {
     run_vdp_test(0x0826)
 }
@@ -460,7 +457,6 @@ fn test_dma_fill_to_vsram_inc_2() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_fill_to_vram_inc_4() {
     run_vdp_test(0x0870)
 }
@@ -478,7 +474,6 @@ fn test_dma_fill_to_vsram_inc_4() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_fill_to_vram_cd4_1_inc_0() {
     run_vdp_test(0x08BA)
 }
@@ -496,7 +491,6 @@ fn test_dma_fill_to_vsram_cd4_1_inc_0() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_fill_to_vram_cd4_1_inc_1() {
     run_vdp_test(0x0904)
 }
@@ -514,7 +508,6 @@ fn test_dma_fill_to_vsram_cd4_1_inc_1() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_fill_to_vram_cd4_1_inc_2() {
     run_vdp_test(0x094E)
 }
@@ -532,7 +525,6 @@ fn test_dma_fill_to_vsram_cd4_1_inc_2() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_fill_to_vram_cd4_1_inc_4() {
     run_vdp_test(0x0998)
 }
@@ -712,6 +704,7 @@ fn test_dma_copy_9000_to_8000_cd03_1111() {
 }
 
 fn run_vdp_test(start_addr: u32) {
+    let _ = env_logger::try_init();
     let cartridge = gen::load_cartridge(
         File::open(&Path::new("tests/gen_vdp/VDPFIFOTesting.bin"))
             .as_mut()

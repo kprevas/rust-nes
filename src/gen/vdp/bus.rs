@@ -262,8 +262,8 @@ pub struct VdpBus {
     pub plane_width: u16,
     pub window_h_pos: WindowHPos,
     pub window_v_pos: WindowVPos,
-    dma_length_half: u16,
-    dma_source_addr_half: u32,
+    dma_length: u16,
+    dma_source_addr: u32,
     dma_type: DmaType,
     addr_register: u32,
     pub addr: Option<Addr>,
@@ -337,8 +337,8 @@ impl VdpBus {
             plane_width: 256,
             window_h_pos: WindowHPos::DrawToLeft(0),
             window_v_pos: WindowVPos::DrawToTop(0),
-            dma_length_half: 0,
-            dma_source_addr_half: 0,
+            dma_length: 0,
+            dma_source_addr: 0,
             dma_type: DmaType::RamToVram,
             addr_register: 0,
             addr: None,
@@ -642,29 +642,29 @@ impl VdpBus {
                             }
                         }
                         0x13 => {
-                            self.dma_length_half = (self.dma_length_half & 0xFF00) | data;
+                            self.dma_length = (self.dma_length & 0xFF00) | data;
                             if self.instrumented {
-                                debug!(target: "vdp", "{} {} set DMA length {}", self.beam_vpos, self.beam_hpos, self.dma_length_half as u32 * 2);
+                                debug!(target: "vdp", "{} {} set DMA length {}", self.beam_vpos, self.beam_hpos, self.dma_length as u32 * 2);
                             }
                         }
                         0x14 => {
-                            self.dma_length_half = (self.dma_length_half & 0xFF) | (data << 8);
+                            self.dma_length = (self.dma_length & 0xFF) | (data << 8);
                             if self.instrumented {
-                                debug!(target: "vdp", "{} {} set DMA length {}", self.beam_vpos, self.beam_hpos, self.dma_length_half as u32 * 2);
+                                debug!(target: "vdp", "{} {} set DMA length {}", self.beam_vpos, self.beam_hpos, self.dma_length as u32 * 2);
                             }
                         }
                         0x15 => {
-                            self.dma_source_addr_half =
-                                (self.dma_source_addr_half & 0xFFFF00) | data as u32;
+                            self.dma_source_addr =
+                                (self.dma_source_addr & 0xFFFF00) | data as u32;
                             if self.instrumented {
-                                debug!(target: "vdp", "{} {} set DMA source {:06X}", self.beam_vpos, self.beam_hpos, self.dma_source_addr_half * 2);
+                                debug!(target: "vdp", "{} {} set DMA source {:06X}", self.beam_vpos, self.beam_hpos, self.dma_source_addr * 2);
                             }
                         }
                         0x16 => {
-                            self.dma_source_addr_half =
-                                (self.dma_source_addr_half & 0xFF00FF) | ((data as u32) << 8);
+                            self.dma_source_addr =
+                                (self.dma_source_addr & 0xFF00FF) | ((data as u32) << 8);
                             if self.instrumented {
-                                debug!(target: "vdp", "{} {} set DMA source {:06X}", self.beam_vpos, self.beam_hpos, self.dma_source_addr_half * 2);
+                                debug!(target: "vdp", "{} {} set DMA source {:06X}", self.beam_vpos, self.beam_hpos, self.dma_source_addr * 2);
                             }
                         }
                         0x17 => {
@@ -678,10 +678,10 @@ impl VdpBus {
                                 DmaType::RamToVram => 0b1111111,
                                 DmaType::VramFill | DmaType::VramToVram => 0b111111,
                             };
-                            self.dma_source_addr_half = (self.dma_source_addr_half & 0x00FFFF)
+                            self.dma_source_addr = (self.dma_source_addr & 0x00FFFF)
                                 | (((data & addr_mask) as u32) << 16);
                             if self.instrumented {
-                                debug!(target: "vdp", "{} {} set DMA source {:06X} {:?}", self.beam_vpos, self.beam_hpos, self.dma_source_addr_half * 2, self.dma_type);
+                                debug!(target: "vdp", "{} {} set DMA source {:06X} {:?}", self.beam_vpos, self.beam_hpos, self.dma_source_addr * 2, self.dma_type);
                             }
                         }
                         _ => panic!(),
@@ -698,22 +698,13 @@ impl VdpBus {
     }
 
     pub fn write_long(&mut self, addr: u32, data: u32) {
-        if self.auto_increment == 1 && addr == 0xC00000 {
-            self.write_word(addr, (data & 0xFFFF) as u16);
-        } else {
-            self.write_word(addr, (data >> 16) as u16);
-            self.write_word(addr, (data & 0xFFFF) as u16);
-        }
+        self.write_word(addr, (data >> 16) as u16);
+        self.write_word(addr, (data & 0xFFFF) as u16);
     }
 
     pub fn increment_addr(&mut self) {
         if let Some(addr) = self.addr {
-            let inc = if self.auto_increment == 1 {
-                2
-            } else {
-                self.auto_increment as u16
-            };
-            let new_addr = addr.addr.wrapping_add(inc);
+            let new_addr = addr.addr.wrapping_add(self.auto_increment as u16);
             let new_addr_wrapped = match addr.target {
                 AddrTarget::CRAM | AddrTarget::VSRAM => new_addr % 0x80,
                 _ => new_addr,
@@ -736,82 +727,95 @@ impl VdpBus {
         mask: u8,
         write_data: Option<WriteData>,
     ) {
-        let mut len = self.dma_length_half as usize * 2;
-        let fill_val = if let DmaType::VramFill = self.dma_type {
-            match write_data {
-                None => return,
-                Some(data) => match data {
-                    WriteData::Byte(val) => val,
-                    WriteData::Word(val) => (val >> 8) as u8,
-                },
-            }
-        } else {
-            0
-        };
+        let mut len = self.dma_length;
+        let mut first_write = true;
         if self.instrumented {
             debug!(target: "vdp", "{} {} DMA {:?} {:06X} to {:04X}, length {}",
                 self.beam_vpos, self.beam_hpos,
                 self.dma_type,
-                self.dma_source_addr_half * 2,
+                self.dma_source_addr * 2,
                 self.addr.unwrap().addr,
-                self.dma_length_half as u32 * 2);
+                self.dma_length as u32 * 2);
         }
         while len > 0 {
-            let source = self.dma_source_addr_half as usize * 2;
-            let addr = self.addr.unwrap().addr as usize;
+            let mut addr = self.addr.unwrap().addr as usize;
             match self.dma_type {
-                DmaType::RamToVram => match source {
-                    0x000000..=0x3FFFFF => {
-                        if addr < target.len() {
-                            target[addr] = m68k_cartridge[source] & mask;
+                DmaType::RamToVram => {
+                    let source = self.dma_source_addr as usize * 2;
+                    match source {
+                        0x000000..=0x3FFFFF => {
+                            if addr < target.len() {
+                                target[addr] = m68k_cartridge[source] & mask;
+                            }
+                            if addr + 1 < target.len() {
+                                target[addr + 1] = m68k_cartridge[source + 1];
+                            }
+                            self.write_data[self.write_data_end] =
+                                WriteData::Word(u16::from_be_bytes([
+                                    m68k_cartridge[source],
+                                    m68k_cartridge[source + 1],
+                                ]));
+                            self.write_data_end = (self.write_data_end + 1) % 4;
                         }
-                        if addr + 1 < target.len() {
-                            target[addr + 1] = m68k_cartridge[source + 1];
+                        0xE00000..=0xFFFFFF => {
+                            if addr < target.len() {
+                                target[addr] = m68k_ram[source & 0xFFFF] & mask;
+                            }
+                            if addr + 1 < target.len() {
+                                target[addr + 1] = m68k_ram[(source & 0xFFFF) + 1];
+                            }
+                            self.write_data[self.write_data_end] =
+                                WriteData::Word(u16::from_be_bytes([
+                                    m68k_ram[source & 0xFFFF],
+                                    m68k_ram[(source & 0xFFFF) + 1],
+                                ]));
+                            self.write_data_end = (self.write_data_end + 1) % 4;
                         }
-                        self.write_data[self.write_data_end] =
-                            WriteData::Word(u16::from_be_bytes([
-                                m68k_cartridge[source],
-                                m68k_cartridge[source + 1],
-                            ]));
-                        self.write_data_end = (self.write_data_end + 1) % 4;
+                        _ => panic!(),
                     }
-                    0xE00000..=0xFFFFFF => {
-                        if addr < target.len() {
-                            target[addr] = m68k_ram[source & 0xFFFF] & mask;
-                        }
-                        if addr + 1 < target.len() {
-                            target[addr + 1] = m68k_ram[(source & 0xFFFF) + 1];
-                        }
-                        self.write_data[self.write_data_end] =
-                            WriteData::Word(u16::from_be_bytes([
-                                m68k_ram[source & 0xFFFF],
-                                m68k_ram[(source & 0xFFFF) + 1],
-                            ]));
-                        self.write_data_end = (self.write_data_end + 1) % 4;
-                    }
-                    _ => panic!(),
                 },
                 DmaType::VramFill => {
-                    if addr < target.len() {
-                        target[addr] = fill_val & mask;
-                    }
-                    if addr + 1 < target.len() {
-                        target[addr + 1] = fill_val;
+                    match write_data {
+                        None => return,
+                        Some(data) => match data {
+                            WriteData::Byte(val) => {
+                                if first_write && addr < target.len() {
+                                    target[addr] = val;
+                                }
+                                if addr ^ 1 < target.len() {
+                                    target[addr ^ 1] = val;
+                                }
+                            }
+                            WriteData::Word(val) => {
+                                if first_write {
+                                    if addr < target.len() {
+                                        target[addr] = (val >> 8) as u8;
+                                    }
+                                    if addr ^ 1 < target.len() {
+                                        target[addr ^ 1] = (val & 0xFF) as u8;
+                                    }
+                                    self.increment_addr();
+                                    addr = self.addr.unwrap().addr as usize;
+                                }
+                                if addr ^ 1 < target.len() {
+                                    target[addr ^ 1] = (val >> 8) as u8;
+                                }
+                            }
+                        }
                     }
                 }
                 DmaType::VramToVram => {
+                    let source = self.dma_source_addr as usize;
                     if addr < target.len() && source < target.len() {
                         target[addr] = target[source] & mask;
                     }
-                    if addr < target.len() && source + 1 < target.len() {
-                        target[addr + 1] = target[source + 1];
-                    }
                 }
             };
-            len -= 2;
-            self.dma_source_addr_half = (self.dma_source_addr_half & (!0xFFFF))
-                | ((self.dma_source_addr_half + 1) & 0xFFFF);
+            len -= 1;
+            self.dma_source_addr = (self.dma_source_addr & (!0xFFFF))
+                | ((self.dma_source_addr + 1) & 0xFFFF);
             self.increment_addr();
+            first_write = false;
         }
         self.start_dma = false;
         self.write_data_start = self.write_data_end;
