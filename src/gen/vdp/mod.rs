@@ -185,10 +185,10 @@ impl<'a> Vdp<'a> {
                 AddrTarget::VSRAM => {
                     let addr = addr - (addr % 2);
                     bus.read_data = u32::from_be_bytes([
-                        self.vsram[(addr as usize) % self.vsram.len()],
-                        self.vsram[((addr + 1) as usize) % self.vsram.len()],
-                        self.vsram[((addr + 2) as usize) % self.vsram.len()],
-                        self.vsram[((addr + 3) as usize) % self.vsram.len()],
+                        self.read_vsram(addr),
+                        self.read_vsram(addr + 1),
+                        self.read_vsram(addr + 2),
+                        self.read_vsram(addr + 3),
                     ]);
                 }
                 AddrTarget::Invalid => {}
@@ -286,6 +286,14 @@ impl<'a> Vdp<'a> {
                 }
             }
             None => {}
+        }
+    }
+
+    fn read_vsram(&mut self, addr: u16) -> u8 {
+        if addr as usize >= self.vsram.len() {
+            self.vsram[(addr % 2) as usize]  // TODO: should be current latch state
+        } else {
+            self.vsram[addr as usize]
         }
     }
 
