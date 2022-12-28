@@ -449,16 +449,21 @@ impl VdpBus {
     }
 
     fn fifo_munge(&self, data: u16, mode: AddrMode, target: AddrTarget) -> u16 {
-        let fifo_val = match self.write_data[self.write_data_end] {
-            WriteData::Byte(val) => val as u16,
-            WriteData::Word(val) => val,
-        };
+        let fifo_val = self.fifo_garbage();
         match (mode, target) {
             (_, AddrTarget::CRAM) => (data & 0x0EEE) | (fifo_val & 0xF111),
             (_, AddrTarget::VSRAM) => (data & 0x07FF) | (fifo_val & 0xF800),
             (AddrMode::ReadByte, AddrTarget::VRAM) => (data & 0xFF) | (fifo_val & 0xFF00),
             _ => data,
         }
+    }
+
+    fn fifo_garbage(&self) -> u16 {
+        let fifo_val = match self.write_data[self.write_data_end] {
+            WriteData::Byte(val) => val as u16,
+            WriteData::Word(val) => val,
+        };
+        fifo_val
     }
 
     pub fn write_byte(&mut self, addr: u32, data: u8) {
@@ -723,8 +728,8 @@ impl VdpBus {
         &mut self,
         m68k_cartridge: &[u8],
         m68k_ram: &[u8],
+        target_type: AddrTarget,
         target: &mut [u8],
-        mask: u8,
         write_data: Option<WriteData>,
     ) {
         let mut len = self.dma_length;
@@ -745,7 +750,7 @@ impl VdpBus {
                     match source {
                         0x000000..=0x3FFFFF => {
                             if addr < target.len() {
-                                target[addr] = m68k_cartridge[source] & mask;
+                                target[addr] = m68k_cartridge[source];
                             }
                             if addr + 1 < target.len() {
                                 target[addr + 1] = m68k_cartridge[source + 1];
@@ -759,7 +764,7 @@ impl VdpBus {
                         }
                         0xE00000..=0xFFFFFF => {
                             if addr < target.len() {
-                                target[addr] = m68k_ram[source & 0xFFFF] & mask;
+                                target[addr] = m68k_ram[source & 0xFFFF];
                             }
                             if addr + 1 < target.len() {
                                 target[addr + 1] = m68k_ram[(source & 0xFFFF) + 1];
@@ -788,6 +793,10 @@ impl VdpBus {
                             }
                             WriteData::Word(val) => {
                                 if first_write {
+                                    addr = match target_type {
+                                        AddrTarget::VRAM => addr,
+                                        _ => addr - addr % 2,
+                                    };
                                     if addr < target.len() {
                                         target[addr] = (val >> 8) as u8;
                                     }
@@ -797,8 +806,21 @@ impl VdpBus {
                                     self.increment_addr();
                                     addr = self.addr.unwrap().addr as usize;
                                 }
-                                if addr ^ 1 < target.len() {
-                                    target[addr ^ 1] = (val >> 8) as u8;
+                                match target_type {
+                                    AddrTarget::VRAM => {
+                                        if addr ^ 1 < target.len() {
+                                            target[addr ^ 1] = (val >> 8) as u8;
+                                        }
+                                    }
+                                    _ => {
+                                        let addr = addr - addr % 2;
+                                        if addr < target.len() {
+                                            target[addr] = (self.fifo_garbage() >> 8) as u8;
+                                        }
+                                        if addr + 1 < target.len() {
+                                            target[addr + 1] = (self.fifo_garbage() & 0xFF) as u8;
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -807,7 +829,7 @@ impl VdpBus {
                 DmaType::VramToVram => {
                     let source = self.dma_source_addr as usize;
                     if addr < target.len() && source < target.len() {
-                        target[addr] = target[source] & mask;
+                        target[addr] = target[source];
                     }
                 }
             };

@@ -411,7 +411,6 @@ fn test_dma_fill_to_vram_inc_0() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_fill_to_cram_inc_0() {
     run_vdp_test(0x07A8)
 }
@@ -428,7 +427,6 @@ fn test_dma_fill_to_vram_inc_1() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_fill_to_cram_inc_1() {
     run_vdp_test(0x07F2)
 }
@@ -445,7 +443,6 @@ fn test_dma_fill_to_vram_inc_2() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_fill_to_cram_inc_2() {
     run_vdp_test(0x083C)
 }
@@ -462,7 +459,6 @@ fn test_dma_fill_to_vram_inc_4() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_fill_to_cram_inc_4() {
     run_vdp_test(0x0886)
 }
@@ -479,7 +475,6 @@ fn test_dma_fill_to_vram_cd4_1_inc_0() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_fill_to_cram_cd4_1_inc_0() {
     run_vdp_test(0x08D0)
 }
@@ -496,7 +491,6 @@ fn test_dma_fill_to_vram_cd4_1_inc_1() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_fill_to_cram_cd4_1_inc_1() {
     run_vdp_test(0x091A)
 }
@@ -513,7 +507,6 @@ fn test_dma_fill_to_vram_cd4_1_inc_2() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_fill_to_cram_cd4_1_inc_2() {
     run_vdp_test(0x0964)
 }
@@ -530,7 +523,6 @@ fn test_dma_fill_to_vram_cd4_1_inc_4() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_fill_to_cram_cd4_1_inc_4() {
     run_vdp_test(0x09AE)
 }
