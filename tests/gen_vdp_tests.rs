@@ -27,7 +27,6 @@ fn test_dma_transfer_using_fifo() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_fill_fifo_usage() {
     run_vdp_test(0x32A);
 }
