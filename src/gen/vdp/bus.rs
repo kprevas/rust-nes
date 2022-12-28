@@ -659,8 +659,7 @@ impl VdpBus {
                             }
                         }
                         0x15 => {
-                            self.dma_source_addr =
-                                (self.dma_source_addr & 0xFFFF00) | data as u32;
+                            self.dma_source_addr = (self.dma_source_addr & 0xFFFF00) | data as u32;
                             if self.instrumented {
                                 debug!(target: "vdp", "{} {} set DMA source {:06X}", self.beam_vpos, self.beam_hpos, self.dma_source_addr * 2);
                             }
@@ -742,54 +741,50 @@ impl VdpBus {
                 self.addr.unwrap().addr,
                 self.dma_length as u32 * 2);
         }
-        while len > 0 {
+        loop {
             let mut addr = self.addr.unwrap().addr as usize;
-            match self.dma_type {
-                DmaType::RamToVram => {
-                    let source = self.dma_source_addr as usize * 2;
-                    match source {
-                        0x000000..=0x3FFFFF => {
-                            if addr < target.len() {
+            match target_type {
+                AddrTarget::CRAM | AddrTarget::VSRAM => {
+                    addr %= 0x80;
+                }
+                _ => {}
+            }
+            if addr < target.len() {
+                match self.dma_type {
+                    DmaType::RamToVram => {
+                        let source = self.dma_source_addr as usize * 2;
+                        match source {
+                            0x000000..=0x3FFFFF => {
                                 target[addr] = m68k_cartridge[source];
-                            }
-                            if addr + 1 < target.len() {
                                 target[addr + 1] = m68k_cartridge[source + 1];
+                                self.write_data[self.write_data_end] =
+                                    WriteData::Word(u16::from_be_bytes([
+                                        m68k_cartridge[source],
+                                        m68k_cartridge[source + 1],
+                                    ]));
+                                self.write_data_end = (self.write_data_end + 1) % 4;
                             }
-                            self.write_data[self.write_data_end] =
-                                WriteData::Word(u16::from_be_bytes([
-                                    m68k_cartridge[source],
-                                    m68k_cartridge[source + 1],
-                                ]));
-                            self.write_data_end = (self.write_data_end + 1) % 4;
-                        }
-                        0xE00000..=0xFFFFFF => {
-                            if addr < target.len() {
+                            0xE00000..=0xFFFFFF => {
                                 target[addr] = m68k_ram[source & 0xFFFF];
-                            }
-                            if addr + 1 < target.len() {
                                 target[addr + 1] = m68k_ram[(source & 0xFFFF) + 1];
+                                self.write_data[self.write_data_end] =
+                                    WriteData::Word(u16::from_be_bytes([
+                                        m68k_ram[source & 0xFFFF],
+                                        m68k_ram[(source & 0xFFFF) + 1],
+                                    ]));
+                                self.write_data_end = (self.write_data_end + 1) % 4;
                             }
-                            self.write_data[self.write_data_end] =
-                                WriteData::Word(u16::from_be_bytes([
-                                    m68k_ram[source & 0xFFFF],
-                                    m68k_ram[(source & 0xFFFF) + 1],
-                                ]));
-                            self.write_data_end = (self.write_data_end + 1) % 4;
+                            _ => panic!(),
                         }
-                        _ => panic!(),
                     }
-                },
-                DmaType::VramFill => {
-                    match write_data {
+                    DmaType::VramFill => match write_data {
                         None => return,
                         Some(data) => match data {
                             WriteData::Byte(val) => {
                                 if first_write && addr < target.len() {
                                     target[addr] = val;
                                 }
-                                if addr ^ 1 < target.len() {
-                                    target[addr ^ 1] = val;
-                                }
+                                target[addr ^ 1] = val;
                             }
                             WriteData::Word(val) => {
                                 if first_write {
@@ -797,47 +792,50 @@ impl VdpBus {
                                         AddrTarget::VRAM => addr,
                                         _ => addr - addr % 2,
                                     };
-                                    if addr < target.len() {
-                                        target[addr] = (val >> 8) as u8;
-                                    }
-                                    if addr ^ 1 < target.len() {
-                                        target[addr ^ 1] = (val & 0xFF) as u8;
-                                    }
+                                    target[addr] = (val >> 8) as u8;
+                                    target[addr ^ 1] = (val & 0xFF) as u8;
                                     self.increment_addr();
                                     addr = self.addr.unwrap().addr as usize;
                                 }
                                 match target_type {
                                     AddrTarget::VRAM => {
-                                        if addr ^ 1 < target.len() {
-                                            target[addr ^ 1] = (val >> 8) as u8;
-                                        }
+                                        target[addr ^ 1] = (val >> 8) as u8;
                                     }
                                     _ => {
                                         let addr = addr - addr % 2;
-                                        if addr < target.len() {
-                                            target[addr] = (self.fifo_garbage() >> 8) as u8;
-                                        }
-                                        if addr + 1 < target.len() {
-                                            target[addr + 1] = (self.fifo_garbage() & 0xFF) as u8;
-                                        }
+                                        target[addr] = (self.fifo_garbage() >> 8) as u8;
+                                        target[addr + 1] = (self.fifo_garbage() & 0xFF) as u8;
                                     }
                                 }
                             }
+                        },
+                    },
+                    DmaType::VramToVram => {
+                        let source = self.dma_source_addr as usize;
+                        let source = match target_type {
+                            AddrTarget::CRAM | AddrTarget::VSRAM => {
+                                if source > target.len() {
+                                    break;
+                                } else {
+                                    source
+                                }
+                            }
+                            _ => source % target.len(),
+                        };
+                        if addr < target.len() && source < target.len() {
+                            target[addr] = target[source];
                         }
                     }
-                }
-                DmaType::VramToVram => {
-                    let source = self.dma_source_addr as usize;
-                    if addr < target.len() && source < target.len() {
-                        target[addr] = target[source];
-                    }
-                }
-            };
-            len -= 1;
-            self.dma_source_addr = (self.dma_source_addr & (!0xFFFF))
-                | ((self.dma_source_addr + 1) & 0xFFFF);
+                };
+            }
+            self.dma_source_addr =
+                (self.dma_source_addr & (!0xFFFF)) | ((self.dma_source_addr + 1) & 0xFFFF);
             self.increment_addr();
             first_write = false;
+            len = len.wrapping_sub(1);
+            if len == 0 {
+                break;
+            }
         }
         self.start_dma = false;
         self.write_data_start = self.write_data_end;

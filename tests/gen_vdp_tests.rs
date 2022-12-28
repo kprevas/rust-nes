@@ -120,7 +120,6 @@ fn test_dma_transfer_source_address_wrapping() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_transfer_to_vram_wrapping() {
     run_vdp_test(0x3EC);
 }
