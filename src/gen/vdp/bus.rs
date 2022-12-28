@@ -48,6 +48,7 @@ impl Addr {
             0b0101 => (AddrMode::Write, AddrTarget::VSRAM),
             _ => (AddrMode::Read, AddrTarget::Invalid),
         };
+        let mode = if vram_to_vram { AddrMode::Write } else { mode };
         let addr = match target {
             AddrTarget::CRAM | AddrTarget::VSRAM => addr % 0x80,
             _ => addr,
@@ -827,7 +828,7 @@ impl VdpBus {
                             _ => source % target.len(),
                         };
                         if addr < target.len() && source < target.len() {
-                            target[addr] = target[source];
+                            target[addr ^ 1] = target[source ^ 1];
                         }
                     }
                 };

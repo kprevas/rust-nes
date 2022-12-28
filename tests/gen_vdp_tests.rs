@@ -512,103 +512,86 @@ fn test_dma_fill_to_vsram_cd4_1_inc_4() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_copy_9000_to_8000_inc_0() {
     run_vdp_test(0x09E2)
 }
 
 #[test]
-#[ignore]
 fn test_dma_copy_9000_to_8000_inc_1() {
     run_vdp_test(0x0A02)
 }
 
 #[test]
-#[ignore]
 fn test_dma_copy_9000_to_8000_inc_2() {
     run_vdp_test(0x0A22)
 }
 
 #[test]
-#[ignore]
 fn test_dma_copy_9000_to_8000_inc_4() {
     run_vdp_test(0x0A42)
 }
 
 #[test]
-#[ignore]
 fn test_dma_copy_8000_to_8002_for_0a() {
     run_vdp_test(0x0A62)
 }
 
 #[test]
-#[ignore]
 fn test_dma_copy_8000_to_8001_for_0a() {
     run_vdp_test(0x0A82)
 }
 
 #[test]
-#[ignore]
 fn test_dma_copy_8001_to_8003_for_0a() {
     run_vdp_test(0x0AA2)
 }
 
 #[test]
-#[ignore]
 fn test_dma_copy_9000_to_8000_for_09() {
     run_vdp_test(0x0ACA)
 }
 
 #[test]
-#[ignore]
 fn test_dma_copy_9000_to_8001_for_09() {
     run_vdp_test(0x0AEA)
 }
 
 #[test]
-#[ignore]
 fn test_dma_copy_9001_to_8000_for_09() {
     run_vdp_test(0x0B0A)
 }
 
 #[test]
-#[ignore]
 fn test_dma_copy_9001_to_8001_for_09() {
     run_vdp_test(0x0B2A)
 }
 
 #[test]
-#[ignore]
 fn test_dma_copy_9000_to_8000_for_0a() {
     run_vdp_test(0x0B4A)
 }
 
 #[test]
-#[ignore]
 fn test_dma_copy_9000_to_8001_for_0a() {
     run_vdp_test(0x0B6A)
 }
 
 #[test]
-#[ignore]
 fn test_dma_copy_9001_to_8000_for_0a() {
     run_vdp_test(0x0B8A)
 }
 
 #[test]
-#[ignore]
 fn test_dma_copy_9001_to_8001_for_0a() {
     run_vdp_test(0x0BAA)
 }
 
 #[test]
-#[ignore]
 fn test_dma_copy_9000_to_8000_cd03_0000() {
     run_vdp_test(0x0BD2)
 }
 
 #[test]
-#[ignore]
 fn test_dma_copy_9000_to_8000_cd03_0001() {
     run_vdp_test(0x0BF2)
 }
@@ -632,7 +615,6 @@ fn test_dma_copy_9000_to_8000_cd03_0101() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_copy_9000_to_8000_cd03_0111() {
     run_vdp_test(0x0C72)
 }
@@ -644,31 +626,26 @@ fn test_dma_copy_9000_to_8000_cd03_1000() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_copy_9000_to_8000_cd03_1001() {
     run_vdp_test(0x0CBA)
 }
 
 #[test]
-#[ignore]
 fn test_dma_copy_9000_to_8000_cd03_1011() {
     run_vdp_test(0x0CDA)
 }
 
 #[test]
-#[ignore]
 fn test_dma_copy_9000_to_8000_cd03_1100() {
     run_vdp_test(0x0CFA)
 }
 
 #[test]
-#[ignore]
 fn test_dma_copy_9000_to_8000_cd03_1101() {
     run_vdp_test(0x0D1A)
 }
 
 #[test]
-#[ignore]
 fn test_dma_copy_9000_to_8000_cd03_1111() {
     run_vdp_test(0x0D3A)
 }
