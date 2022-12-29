@@ -73,7 +73,6 @@ fn test_mode_4_register_masked() {
 }
 
 #[test]
-#[ignore]
 fn test_register_writes_affect_code_register() {
     run_vdp_test(0x38C);
 }

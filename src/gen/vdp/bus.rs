@@ -521,6 +521,7 @@ impl VdpBus {
                     }
                     self.address_register_pending_write = false;
                 } else if (data >> 14) & 0b11 == 0b10 {
+                    self.addr = None;
                     let (register_number, data) = ((data >> 8) & 0b11111, data & 0xFF);
                     match register_number {
                         0x00 => {
