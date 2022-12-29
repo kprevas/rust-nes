@@ -57,7 +57,6 @@ fn test_vsram_byteswapping() {
 }
 
 #[test]
-#[ignore]
 fn test_partial_cp_writes() {
     run_vdp_test(0x36E);
 }
