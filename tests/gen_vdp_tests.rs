@@ -67,7 +67,6 @@ fn test_register_write_bit_13_masked() {
 }
 
 #[test]
-#[ignore]
 fn test_mode_4_register_masked() {
     run_vdp_test(0x382);
 }

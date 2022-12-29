@@ -523,171 +523,173 @@ impl VdpBus {
                 } else if (data >> 14) & 0b11 == 0b10 {
                     self.addr = None;
                     let (register_number, data) = ((data >> 8) & 0b11111, data & 0xFF);
-                    match register_number {
-                        0x00 => {
-                            self.mode_1 = Mode1::from_u8(data as u8);
-                            if self.instrumented {
-                                debug!(target: "vdp", "{} {} set mode 1 {:?}", self.beam_vpos, self.beam_hpos, self.mode_1);
+                    if register_number <= 0xA || self.mode_2.mode_5 {
+                        match register_number {
+                            0x00 => {
+                                self.mode_1 = Mode1::from_u8(data as u8);
+                                if self.instrumented {
+                                    debug!(target: "vdp", "{} {} set mode 1 {:?}", self.beam_vpos, self.beam_hpos, self.mode_1);
+                                }
                             }
+                            0x01 => {
+                                self.mode_2 = Mode2::from_u8(data as u8);
+                                if !self.mode_2.enable_display {
+                                    self.status.vblank = true;
+                                }
+                                if self.instrumented {
+                                    debug!(target: "vdp", "{} {} set mode 2 {:?}", self.beam_vpos, self.beam_hpos, self.mode_2);
+                                }
+                            }
+                            0x02 => {
+                                self.plane_a_nametable_addr = data << 10;
+                                if self.instrumented {
+                                    debug!(target: "vdp", "{} {} set plane A nametable {:04X}", self.beam_vpos, self.beam_hpos, self.plane_a_nametable_addr);
+                                }
+                            }
+                            // TODO ignore lsb in 320 pixel mode
+                            0x03 => {
+                                self.window_nametable_addr = data << 10;
+                                if self.instrumented {
+                                    debug!(target: "vdp", "{} {} set window nametable {:04X}", self.beam_vpos, self.beam_hpos, self.window_nametable_addr);
+                                }
+                            }
+                            0x04 => {
+                                self.plane_b_nametable_addr = data << 13;
+                                if self.instrumented {
+                                    debug!(target: "vdp", "{} {} set plane B nametable {:04X}", self.beam_vpos, self.beam_hpos, self.plane_b_nametable_addr);
+                                }
+                            }
+                            // TODO ignore lsb in 320 pixel mode
+                            0x05 => {
+                                self.sprite_table_addr = data << 9;
+                                if self.instrumented {
+                                    debug!(target: "vdp", "{} {} set sprite table {:04X}", self.beam_vpos, self.beam_hpos, self.sprite_table_addr);
+                                }
+                            }
+                            0x06 => {} // 128k mode sprite table
+                            0x07 => {
+                                self.bg_palette = ((data >> 4) & 0b11) as u8;
+                                self.bg_color = (data & 0b1111) as u8;
+                                if self.instrumented {
+                                    debug!(target: "vdp", "{} {} set background {} {}", self.beam_vpos, self.beam_hpos, self.bg_palette, self.bg_color);
+                                }
+                            }
+                            0x08 => {} // Master System horizontal scroll
+                            0x09 => {} // Master System vertical scroll
+                            0x0A => {
+                                self.horizontal_interrupt_counter = data;
+                                if self.instrumented {
+                                    debug!(target: "vdp", "{} {} set horizontal interrupt counter {}", self.beam_vpos, self.beam_hpos, self.horizontal_interrupt);
+                                }
+                            }
+                            0x0B => {
+                                self.mode_3 = Mode3::from_u8(data as u8);
+                                if self.instrumented {
+                                    debug!(target: "vdp", "{} {} set mode 3 {:?}", self.beam_vpos, self.beam_hpos, self.mode_3);
+                                }
+                            }
+                            0x0C => {
+                                self.mode_4 = Mode4::from_u8(data as u8);
+                                if self.instrumented {
+                                    debug!(target: "vdp", "{} {} set mode 4 {:?}", self.beam_vpos, self.beam_hpos, self.mode_4);
+                                }
+                            }
+                            0x0D => {
+                                self.horizontal_scroll_data_addr = data << 10;
+                                if self.instrumented {
+                                    debug!(target: "vdp", "{} {} set horizontal scroll data {:04X}", self.beam_vpos, self.beam_hpos, self.horizontal_scroll_data_addr);
+                                }
+                            }
+                            0x0E => {} // 128k mode plane nametables
+                            0x0F => {
+                                self.auto_increment = data as u8;
+                                if self.instrumented {
+                                    debug!(target: "vdp", "{} {} set auto-increment {}", self.beam_vpos, self.beam_hpos, self.auto_increment);
+                                }
+                            }
+                            0x10 => {
+                                self.plane_height = match (data >> 4) & 0b11 {
+                                    0b00 => 256,
+                                    0b01 => 512,
+                                    0b10 => 0,
+                                    0b11 => 1024,
+                                    _ => panic!(),
+                                };
+                                self.plane_width = match data & 0b11 {
+                                    0b00 => 256,
+                                    0b01 => 512,
+                                    0b10 => 0,
+                                    0b11 => 1024,
+                                    _ => panic!(),
+                                };
+                                if self.instrumented {
+                                    debug!(target: "vdp", "{} {} set plane size {}x{}", self.beam_vpos, self.beam_hpos, self.plane_width, self.plane_height);
+                                }
+                            }
+                            0x11 => {
+                                self.window_h_pos = if (data & 0b10000000) > 0 {
+                                    WindowHPos::DrawToRight((data & 0b11111) as u8)
+                                } else {
+                                    WindowHPos::DrawToLeft((data & 0b11111) as u8)
+                                };
+                                if self.instrumented {
+                                    debug!(target: "vdp", "{} {} set window horizontal {:?}", self.beam_vpos, self.beam_hpos, self.window_h_pos);
+                                }
+                            }
+                            0x12 => {
+                                self.window_v_pos = if (data & 0b10000000) > 0 {
+                                    WindowVPos::DrawToBottom((data & 0b11111) as u8)
+                                } else {
+                                    WindowVPos::DrawToTop((data & 0b11111) as u8)
+                                };
+                                if self.instrumented {
+                                    debug!(target: "vdp", "{} {} set window vertical {:?}", self.beam_vpos, self.beam_hpos, self.window_v_pos);
+                                }
+                            }
+                            0x13 => {
+                                self.dma_length = (self.dma_length & 0xFF00) | data;
+                                if self.instrumented {
+                                    debug!(target: "vdp", "{} {} set DMA length {}", self.beam_vpos, self.beam_hpos, self.dma_length as u32 * 2);
+                                }
+                            }
+                            0x14 => {
+                                self.dma_length = (self.dma_length & 0xFF) | (data << 8);
+                                if self.instrumented {
+                                    debug!(target: "vdp", "{} {} set DMA length {}", self.beam_vpos, self.beam_hpos, self.dma_length as u32 * 2);
+                                }
+                            }
+                            0x15 => {
+                                self.dma_source_addr = (self.dma_source_addr & 0xFFFF00) | data as u32;
+                                if self.instrumented {
+                                    debug!(target: "vdp", "{} {} set DMA source {:06X}", self.beam_vpos, self.beam_hpos, self.dma_source_addr * 2);
+                                }
+                            }
+                            0x16 => {
+                                self.dma_source_addr =
+                                    (self.dma_source_addr & 0xFF00FF) | ((data as u32) << 8);
+                                if self.instrumented {
+                                    debug!(target: "vdp", "{} {} set DMA source {:06X}", self.beam_vpos, self.beam_hpos, self.dma_source_addr * 2);
+                                }
+                            }
+                            0x17 => {
+                                self.dma_type = match (data & 0b11000000) >> 6 {
+                                    0b00 | 0b01 => DmaType::RamToVram,
+                                    0b10 => DmaType::VramFill,
+                                    0b11 => DmaType::VramToVram,
+                                    _ => panic!(),
+                                };
+                                let addr_mask = match self.dma_type {
+                                    DmaType::RamToVram => 0b1111111,
+                                    DmaType::VramFill | DmaType::VramToVram => 0b111111,
+                                };
+                                self.dma_source_addr = (self.dma_source_addr & 0x00FFFF)
+                                    | (((data & addr_mask) as u32) << 16);
+                                if self.instrumented {
+                                    debug!(target: "vdp", "{} {} set DMA source {:06X} {:?}", self.beam_vpos, self.beam_hpos, self.dma_source_addr * 2, self.dma_type);
+                                }
+                            }
+                            _ => panic!(),
                         }
-                        0x01 => {
-                            self.mode_2 = Mode2::from_u8(data as u8);
-                            if !self.mode_2.enable_display {
-                                self.status.vblank = true;
-                            }
-                            if self.instrumented {
-                                debug!(target: "vdp", "{} {} set mode 2 {:?}", self.beam_vpos, self.beam_hpos, self.mode_2);
-                            }
-                        }
-                        0x02 => {
-                            self.plane_a_nametable_addr = data << 10;
-                            if self.instrumented {
-                                debug!(target: "vdp", "{} {} set plane A nametable {:04X}", self.beam_vpos, self.beam_hpos, self.plane_a_nametable_addr);
-                            }
-                        }
-                        // TODO ignore lsb in 320 pixel mode
-                        0x03 => {
-                            self.window_nametable_addr = data << 10;
-                            if self.instrumented {
-                                debug!(target: "vdp", "{} {} set window nametable {:04X}", self.beam_vpos, self.beam_hpos, self.window_nametable_addr);
-                            }
-                        }
-                        0x04 => {
-                            self.plane_b_nametable_addr = data << 13;
-                            if self.instrumented {
-                                debug!(target: "vdp", "{} {} set plane B nametable {:04X}", self.beam_vpos, self.beam_hpos, self.plane_b_nametable_addr);
-                            }
-                        }
-                        // TODO ignore lsb in 320 pixel mode
-                        0x05 => {
-                            self.sprite_table_addr = data << 9;
-                            if self.instrumented {
-                                debug!(target: "vdp", "{} {} set sprite table {:04X}", self.beam_vpos, self.beam_hpos, self.sprite_table_addr);
-                            }
-                        }
-                        0x06 => {} // 128k mode sprite table
-                        0x07 => {
-                            self.bg_palette = ((data >> 4) & 0b11) as u8;
-                            self.bg_color = (data & 0b1111) as u8;
-                            if self.instrumented {
-                                debug!(target: "vdp", "{} {} set background {} {}", self.beam_vpos, self.beam_hpos, self.bg_palette, self.bg_color);
-                            }
-                        }
-                        0x08 => {} // Master System horizontal scroll
-                        0x09 => {} // Master System vertical scroll
-                        0x0A => {
-                            self.horizontal_interrupt_counter = data;
-                            if self.instrumented {
-                                debug!(target: "vdp", "{} {} set horizontal interrupt counter {}", self.beam_vpos, self.beam_hpos, self.horizontal_interrupt);
-                            }
-                        }
-                        0x0B => {
-                            self.mode_3 = Mode3::from_u8(data as u8);
-                            if self.instrumented {
-                                debug!(target: "vdp", "{} {} set mode 3 {:?}", self.beam_vpos, self.beam_hpos, self.mode_3);
-                            }
-                        }
-                        0x0C => {
-                            self.mode_4 = Mode4::from_u8(data as u8);
-                            if self.instrumented {
-                                debug!(target: "vdp", "{} {} set mode 4 {:?}", self.beam_vpos, self.beam_hpos, self.mode_4);
-                            }
-                        }
-                        0x0D => {
-                            self.horizontal_scroll_data_addr = data << 10;
-                            if self.instrumented {
-                                debug!(target: "vdp", "{} {} set horizontal scroll data {:04X}", self.beam_vpos, self.beam_hpos, self.horizontal_scroll_data_addr);
-                            }
-                        }
-                        0x0E => {} // 128k mode plane nametables
-                        0x0F => {
-                            self.auto_increment = data as u8;
-                            if self.instrumented {
-                                debug!(target: "vdp", "{} {} set auto-increment {}", self.beam_vpos, self.beam_hpos, self.auto_increment);
-                            }
-                        }
-                        0x10 => {
-                            self.plane_height = match (data >> 4) & 0b11 {
-                                0b00 => 256,
-                                0b01 => 512,
-                                0b10 => 0,
-                                0b11 => 1024,
-                                _ => panic!(),
-                            };
-                            self.plane_width = match data & 0b11 {
-                                0b00 => 256,
-                                0b01 => 512,
-                                0b10 => 0,
-                                0b11 => 1024,
-                                _ => panic!(),
-                            };
-                            if self.instrumented {
-                                debug!(target: "vdp", "{} {} set plane size {}x{}", self.beam_vpos, self.beam_hpos, self.plane_width, self.plane_height);
-                            }
-                        }
-                        0x11 => {
-                            self.window_h_pos = if (data & 0b10000000) > 0 {
-                                WindowHPos::DrawToRight((data & 0b11111) as u8)
-                            } else {
-                                WindowHPos::DrawToLeft((data & 0b11111) as u8)
-                            };
-                            if self.instrumented {
-                                debug!(target: "vdp", "{} {} set window horizontal {:?}", self.beam_vpos, self.beam_hpos, self.window_h_pos);
-                            }
-                        }
-                        0x12 => {
-                            self.window_v_pos = if (data & 0b10000000) > 0 {
-                                WindowVPos::DrawToBottom((data & 0b11111) as u8)
-                            } else {
-                                WindowVPos::DrawToTop((data & 0b11111) as u8)
-                            };
-                            if self.instrumented {
-                                debug!(target: "vdp", "{} {} set window vertical {:?}", self.beam_vpos, self.beam_hpos, self.window_v_pos);
-                            }
-                        }
-                        0x13 => {
-                            self.dma_length = (self.dma_length & 0xFF00) | data;
-                            if self.instrumented {
-                                debug!(target: "vdp", "{} {} set DMA length {}", self.beam_vpos, self.beam_hpos, self.dma_length as u32 * 2);
-                            }
-                        }
-                        0x14 => {
-                            self.dma_length = (self.dma_length & 0xFF) | (data << 8);
-                            if self.instrumented {
-                                debug!(target: "vdp", "{} {} set DMA length {}", self.beam_vpos, self.beam_hpos, self.dma_length as u32 * 2);
-                            }
-                        }
-                        0x15 => {
-                            self.dma_source_addr = (self.dma_source_addr & 0xFFFF00) | data as u32;
-                            if self.instrumented {
-                                debug!(target: "vdp", "{} {} set DMA source {:06X}", self.beam_vpos, self.beam_hpos, self.dma_source_addr * 2);
-                            }
-                        }
-                        0x16 => {
-                            self.dma_source_addr =
-                                (self.dma_source_addr & 0xFF00FF) | ((data as u32) << 8);
-                            if self.instrumented {
-                                debug!(target: "vdp", "{} {} set DMA source {:06X}", self.beam_vpos, self.beam_hpos, self.dma_source_addr * 2);
-                            }
-                        }
-                        0x17 => {
-                            self.dma_type = match (data & 0b11000000) >> 6 {
-                                0b00 | 0b01 => DmaType::RamToVram,
-                                0b10 => DmaType::VramFill,
-                                0b11 => DmaType::VramToVram,
-                                _ => panic!(),
-                            };
-                            let addr_mask = match self.dma_type {
-                                DmaType::RamToVram => 0b1111111,
-                                DmaType::VramFill | DmaType::VramToVram => 0b111111,
-                            };
-                            self.dma_source_addr = (self.dma_source_addr & 0x00FFFF)
-                                | (((data & addr_mask) as u32) << 16);
-                            if self.instrumented {
-                                debug!(target: "vdp", "{} {} set DMA source {:06X} {:?}", self.beam_vpos, self.beam_hpos, self.dma_source_addr * 2, self.dma_type);
-                            }
-                        }
-                        _ => panic!(),
                     }
                 } else {
                     self.addr_register = (self.addr_register & 0xFFFF) | ((data as u32) << 16);
