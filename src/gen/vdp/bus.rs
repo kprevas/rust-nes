@@ -49,10 +49,6 @@ impl Addr {
             _ => (AddrMode::Read, AddrTarget::Invalid),
         };
         let mode = if vram_to_vram { AddrMode::Write } else { mode };
-        let addr = match target {
-            AddrTarget::CRAM | AddrTarget::VSRAM => addr % 0x80,
-            _ => addr,
-        };
         Addr {
             mode,
             target,
@@ -229,7 +225,7 @@ pub enum WindowVPos {
 }
 
 #[derive(Debug)]
-enum DmaType {
+pub enum DmaType {
     RamToVram,
     VramFill,
     VramToVram,
@@ -265,7 +261,7 @@ pub struct VdpBus {
     pub window_v_pos: WindowVPos,
     dma_length: u16,
     dma_source_addr: u32,
-    dma_type: DmaType,
+    pub dma_type: DmaType,
     addr_register: u32,
     pub addr: Option<Addr>,
     pub start_dma: bool,
@@ -709,15 +705,10 @@ impl VdpBus {
 
     pub fn increment_addr(&mut self) {
         if let Some(addr) = self.addr {
-            let new_addr = addr.addr.wrapping_add(self.auto_increment as u16);
-            let new_addr_wrapped = match addr.target {
-                AddrTarget::CRAM | AddrTarget::VSRAM => new_addr % 0x80,
-                _ => new_addr,
-            };
             self.addr = Some(Addr {
                 mode: addr.mode,
                 target: addr.target,
-                addr: new_addr_wrapped,
+                addr: addr.addr.wrapping_add(self.auto_increment as u16),
                 vram_to_vram: addr.vram_to_vram,
                 dma: addr.dma,
             })
@@ -801,6 +792,12 @@ impl VdpBus {
                                     target[addr ^ 1] = (val & 0xFF) as u8;
                                     self.increment_addr();
                                     addr = self.addr.unwrap().addr as usize;
+                                    match target_type {
+                                        AddrTarget::CRAM | AddrTarget::VSRAM => {
+                                            addr %= 0x80;
+                                        }
+                                        _ => {}
+                                    }
                                 }
                                 match target_type {
                                     AddrTarget::VRAM => {

@@ -597,19 +597,16 @@ fn test_dma_copy_9000_to_8000_cd03_0001() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_copy_9000_to_8000_cd03_0011() {
     run_vdp_test(0x0C12)
 }
 
 #[test]
-#[ignore]
 fn test_dma_copy_9000_to_8000_cd03_0100() {
     run_vdp_test(0x0C32)
 }
 
 #[test]
-#[ignore]
 fn test_dma_copy_9000_to_8000_cd03_0101() {
     run_vdp_test(0x0C52)
 }
@@ -620,7 +617,6 @@ fn test_dma_copy_9000_to_8000_cd03_0111() {
 }
 
 #[test]
-#[ignore]
 fn test_dma_copy_9000_to_8000_cd03_1000() {
     run_vdp_test(0x0C9A)
 }

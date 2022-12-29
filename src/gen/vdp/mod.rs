@@ -8,10 +8,7 @@ use num_integer::Integer;
 use piston_window::*;
 use triple_buffer::triple_buffer;
 
-use gen::vdp::bus::{
-    Addr, AddrMode, AddrTarget, HorizontalScrollingMode, Status, VdpBus, VerticalScrollingMode,
-    WindowHPos, WindowVPos, WriteData,
-};
+use gen::vdp::bus::{Addr, AddrMode, AddrTarget, DmaType, HorizontalScrollingMode, Status, VdpBus, VerticalScrollingMode, WindowHPos, WindowVPos, WriteData};
 use window::renderer::Renderer;
 
 pub mod bus;
@@ -174,7 +171,7 @@ impl<'a> Vdp<'a> {
                     );
                 }
                 AddrTarget::CRAM => {
-                    let addr = addr - (addr % 2);
+                    let addr = (addr % 0x80) - (addr % 2);
                     bus.read_data = u32::from_be_bytes([
                         self.cram[(addr as usize) % self.cram.len()],
                         self.cram[((addr + 1) as usize) % self.cram.len()],
@@ -183,7 +180,7 @@ impl<'a> Vdp<'a> {
                     ]);
                 }
                 AddrTarget::VSRAM => {
-                    let addr = addr - (addr % 2);
+                    let addr = (addr % 0x80) - (addr % 2);
                     bus.read_data = u32::from_be_bytes([
                         self.read_vsram(addr),
                         self.read_vsram(addr + 1),
@@ -200,7 +197,12 @@ impl<'a> Vdp<'a> {
                      dma: false,
                      ..
                  }) => {
-                let addr = addr as usize;
+                let addr = match target {
+                    AddrTarget::CRAM | AddrTarget::VSRAM => {
+                        (addr % 0x80) as usize
+                    }
+                    _ => addr as usize
+                };
                 if let Some(data) = write_data {
                     match target {
                         AddrTarget::VRAM => match data {
@@ -272,6 +274,10 @@ impl<'a> Vdp<'a> {
                  }) => {
                 // TODO DMA shouldn't happen instantaneously
                 if bus.start_dma {
+                    let target = match bus.dma_type {
+                        DmaType::VramToVram => AddrTarget::VRAM,
+                        _ => target,
+                    };
                     bus.dma(
                         m68k_cartridge,
                         m68k_ram,
