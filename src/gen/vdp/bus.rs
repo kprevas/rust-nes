@@ -466,21 +466,22 @@ impl VdpBus {
     pub fn write_byte(&mut self, addr: u32, data: u8) {
         match addr {
             0xC00000..=0xC00003 => {
-                if let Some(Addr {
-                                mode: AddrMode::Write,
-                                addr,
-                                target,
-                                ..
-                            }) = &self.addr
-                {
-                    self.write_data[self.write_data_end] = WriteData::Byte(data);
-                    self.write_data_end = (self.write_data_end + 1) % 4;
-                    self.status.fifo_empty = false;
-                    self.status.fifo_full = self.write_data_end == (self.write_data_start + 3) % 4;
-                    if self.instrumented {
+                if self.instrumented {
+                    if let Some(Addr {
+                                    mode: AddrMode::Write,
+                                    addr,
+                                    target,
+                                    ..
+                                }) = &self.addr
+                    {
                         debug!(target: "vdp", "{} {} write {:02X} {:08X} {:?}", self.beam_vpos, self.beam_hpos, data, addr, target)
                     }
                 }
+                self.write_data[self.write_data_end] = WriteData::Byte(data);
+                self.write_data_end = (self.write_data_end + 1) % 4;
+                self.status.fifo_empty = false;
+                self.status.fifo_full = self.write_data_end == (self.write_data_start + 3) % 4;
+                self.address_register_pending_write = false;
             }
             0xC00004..=0xC00007 => self.write_word(addr, ((data as u16) << 8) | (data as u16)),
             0xC00011 | 0xC00013 | 0xC00015 | 0xC00017 => {} // TODO: PSG
@@ -491,21 +492,21 @@ impl VdpBus {
     pub fn write_word(&mut self, addr: u32, data: u16) {
         match addr {
             0xC00000 | 0xC00002 => {
-                if let Some(Addr {
-                                mode: AddrMode::Write,
-                                addr,
-                                target,
-                                ..
-                            }) = &self.addr
-                {
-                    self.write_data[self.write_data_end] = WriteData::Word(data);
-                    self.write_data_end = (self.write_data_end + 1) % 4;
-                    self.status.fifo_empty = false;
-                    self.status.fifo_full = self.write_data_end == (self.write_data_start + 3) % 4;
-                    if self.instrumented {
+                if self.instrumented {
+                    if let Some(Addr {
+                                    mode: AddrMode::Write,
+                                    addr,
+                                    target,
+                                    ..
+                                }) = &self.addr
+                    {
                         debug!(target: "vdp", "{} {} write {:04X} {:08X} {:?}", self.beam_vpos, self.beam_hpos, data, addr, target)
                     }
                 }
+                self.write_data[self.write_data_end] = WriteData::Word(data);
+                self.write_data_end = (self.write_data_end + 1) % 4;
+                self.status.fifo_empty = false;
+                self.status.fifo_full = self.write_data_end == (self.write_data_start + 3) % 4;
                 self.address_register_pending_write = false;
             }
             0xC00004 | 0xC00006 => {

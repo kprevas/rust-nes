@@ -32,7 +32,6 @@ fn test_dma_fill_fifo_usage() {
 }
 
 #[test]
-#[ignore]
 fn test_fifo_write_to_invalid_target() {
     run_vdp_test(0x334);
 }
