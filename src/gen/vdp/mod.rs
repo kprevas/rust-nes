@@ -546,23 +546,25 @@ impl<'a> Vdp<'a> {
             );
         }
 
-        bus.beam_vpos = self.v_counter;
-        if bus.beam_vpos > 234 {
-            bus.beam_vpos += 250;
-        }
+        if !bus.mode_1.freeze_hv_counter {
+            bus.beam_vpos = self.v_counter;
+            if bus.beam_vpos > 234 {
+                bus.beam_vpos += 250;
+            }
 
-        bus.beam_hpos = self.h_counter;
-        if bus.mode_4.h_40_wide_mode {
-            if bus.beam_hpos > 364 {
-                bus.beam_hpos += 92;
+            bus.beam_hpos = self.h_counter;
+            if bus.mode_4.h_40_wide_mode {
+                if bus.beam_hpos > 364 {
+                    bus.beam_hpos += 92;
+                }
+            } else {
+                if bus.beam_hpos > 295 {
+                    bus.beam_hpos += 170;
+                }
             }
-        } else {
-            if bus.beam_hpos > 295 {
-                bus.beam_hpos += 170;
+            if bus.beam_hpos > 512 {
+                bus.beam_hpos -= 512;
             }
-        }
-        if bus.beam_hpos > 512 {
-            bus.beam_hpos -= 512;
         }
     }
 

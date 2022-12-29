@@ -94,7 +94,7 @@ pub struct Mode1 {
     blank_leftmost_8: bool,
     pub enable_horizontal_interrupt: bool,
     use_high_color_bits: bool,
-    freeze_hv_on_level_2_interrupt: bool,
+    pub freeze_hv_counter: bool,
     pub disable_display: bool,
 }
 
@@ -104,7 +104,7 @@ impl Mode1 {
             blank_leftmost_8: (val & 0b00100000) > 0,
             enable_horizontal_interrupt: (val & 0b00010000) > 0,
             use_high_color_bits: (val & 0b00000100) > 0,
-            freeze_hv_on_level_2_interrupt: (val & 0b00000010) > 0,
+            freeze_hv_counter: (val & 0b00000010) > 0,
             disable_display: (val & 0b00000001) > 0,
         }
     }
@@ -297,7 +297,7 @@ impl VdpBus {
                 blank_leftmost_8: false,
                 enable_horizontal_interrupt: false,
                 use_high_color_bits: false,
-                freeze_hv_on_level_2_interrupt: false,
+                freeze_hv_counter: false,
                 disable_display: false,
             },
             mode_2: Mode2 {

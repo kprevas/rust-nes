@@ -93,7 +93,6 @@ fn test_fifo_wait_states() {
 }
 
 #[test]
-#[ignore]
 fn test_hv_counter_latch() {
     run_vdp_test(0x3BC);
 }
