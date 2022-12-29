@@ -37,7 +37,6 @@ fn test_fifo_write_to_invalid_target() {
 }
 
 #[test]
-#[ignore]
 fn test_read_target_01100() {
     run_vdp_test(0x33E);
 }

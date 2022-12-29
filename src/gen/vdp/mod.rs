@@ -8,7 +8,10 @@ use num_integer::Integer;
 use piston_window::*;
 use triple_buffer::triple_buffer;
 
-use gen::vdp::bus::{Addr, AddrMode, AddrTarget, DmaType, HorizontalScrollingMode, Status, VdpBus, VerticalScrollingMode, WindowHPos, WindowVPos, WriteData};
+use gen::vdp::bus::{
+    Addr, AddrMode, AddrTarget, DmaType, HorizontalScrollingMode, Status, VdpBus,
+    VerticalScrollingMode, WindowHPos, WindowVPos, WriteData,
+};
 use window::renderer::Renderer;
 
 pub mod bus;
@@ -154,21 +157,19 @@ impl<'a> Vdp<'a> {
         let write_data = bus.next_write_data();
         match bus.addr {
             Some(Addr {
-                     mode: AddrMode::Read | AddrMode::ReadByte,
+                     mode: AddrMode::Read,
                      target,
                      addr,
                      ..
                  }) => match target {
                 AddrTarget::VRAM => {
                     let addr = addr - (addr % 2);
-                    bus.read_data = u32::from_be_bytes(
-                        [
-                            self.vram[(addr as usize) % self.vram.len()],
-                            self.vram[((addr + 1) as usize) % self.vram.len()],
-                            self.vram[((addr + 2) as usize) % self.vram.len()],
-                            self.vram[((addr + 3) as usize) % self.vram.len()],
-                        ],
-                    );
+                    bus.read_data = u32::from_be_bytes([
+                        self.vram[(addr as usize) % self.vram.len()],
+                        self.vram[((addr + 1) as usize) % self.vram.len()],
+                        self.vram[((addr + 2) as usize) % self.vram.len()],
+                        self.vram[((addr + 3) as usize) % self.vram.len()],
+                    ]);
                 }
                 AddrTarget::CRAM => {
                     let addr = (addr % 0x80) - (addr % 2);
@@ -191,6 +192,22 @@ impl<'a> Vdp<'a> {
                 AddrTarget::Invalid => {}
             },
             Some(Addr {
+                     mode: AddrMode::ReadByte,
+                     target,
+                     addr,
+                     ..
+                 }) => match target {
+                AddrTarget::VRAM => {
+                    bus.read_data = u32::from_be_bytes([
+                        self.vram[((addr ^ 1) as usize) % self.vram.len()],
+                        self.vram[(addr as usize) % self.vram.len()],
+                        self.vram[(((addr + 2) ^ 1) as usize) % self.vram.len()],
+                        self.vram[((addr + 2) as usize) % self.vram.len()],
+                    ]);
+                }
+                _ => {}
+            },
+            Some(Addr {
                      mode: AddrMode::Write,
                      target,
                      addr,
@@ -198,10 +215,8 @@ impl<'a> Vdp<'a> {
                      ..
                  }) => {
                 let addr = match target {
-                    AddrTarget::CRAM | AddrTarget::VSRAM => {
-                        (addr % 0x80) as usize
-                    }
-                    _ => addr as usize
+                    AddrTarget::CRAM | AddrTarget::VSRAM => (addr % 0x80) as usize,
+                    _ => addr as usize,
                 };
                 if let Some(data) = write_data {
                     match target {
@@ -297,7 +312,7 @@ impl<'a> Vdp<'a> {
 
     fn read_vsram(&mut self, addr: u16) -> u8 {
         if addr as usize >= self.vsram.len() {
-            self.vsram[(addr % 2) as usize]  // TODO: should be current latch state
+            self.vsram[(addr % 2) as usize] // TODO: should be current latch state
         } else {
             self.vsram[addr as usize]
         }
